@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Регистрация
+{% endblock %}
+
+{% block body %}
+<section>
+<div class="item-header">
+    <a href="/" class="left"> 
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
+        </svg>
+    </a>
+    <div class="right">
+        <div class="text header"> 
+            <div class="label-header headline6">Регистрация</div> 
+        </div>
+    </div>
+</div>
+</section>
+<section class="bottom">
+<div class="item">
+    <div class="right">
+        <div class="title oneline"> 
+            <div class="button1-medium">Аватарка</div> 
+        </div>
+    </div>
+</div>
+<div class="item">
+    <div class="left"> 
+        <img src="static/img/signup_avatarka.png" class="ava"> 
+    </div>
+    <div class="right">
+        <div class="text oneline"> 
+            <div class="label body1">Добавить аватар</div> 
+        </div>
+        <div class="element"> 
+            <a id="overlay_profile" class="button subtitle2-medium">Выбрать</a>
+            <input type="file" id="avatar_input" style="display: none;" accept="image/*">
+        </div>
+    </div>
+</div>
+</section>
+<div class="item footer">
+    <div class="right"> 
+        <div class="subtitle2">Аватарку указывать не обязательно</div> 
+    </div>
+</div>
+<form action="/signup" method="POST" id="regForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="bottom">
+<div class="item">
+    <div class="right">
+        <div class="title oneline"> 
+            <div class="button1-medium">Ввод данных</div> 
+        </div>
+    </div>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="name">
+    <label class="input-label">Имя</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
+    <label class="input-label">Username</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Label" name="password">
+    <label class="input-label">Пароль</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Label" name="rep_pass">
+    <label class="input-label">Повторите пароль</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+</section>
+<div class="item footer">
+    <div class="right"> 
+        <div class="subtitle2">Все поля обязательны для заполнения</div> 
+    </div>
+</div>
+<section class="bottom">
+<div class="item clicked" onclick="validateAndSubmit(this);">
+    <div class="right">
+        <div class="text oneline"> 
+            <div class="label body1">Продолжить</div> 
+        </div>
+        <div class="element"> 
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+    </div>
+</div>
+</section>
+</form>
+<script>
+const dbName = "Dovery";
+const storeName = "secrets";
+
+let selectedAvatarFile = null;
+
+document.getElementById('overlay_profile').addEventListener('click', () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = (e) => {
+        if (e.target.files[0]) {
+            selectedAvatarFile = e.target.files[0];
+            document.querySelector('.ava').src = URL.createObjectURL(selectedAvatarFile);
+        }
+    };
+    fileInput.click();
+});
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveUserData(userData, privateKey) {
+    const db = await initDB();
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+
+    store.put(privateKey, "private_key");
+    store.put(userData, "user_profile");
+
+    return new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+    });
+}
+
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function deriveEncryptionKey(password, username) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: encoder.encode(username),
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false, ["encrypt", "decrypt"]
+    );
+}
+
+async function validateAndSubmit(el) {
+    const form = el.closest('form');
+    const name = form.querySelector('input[name="name"]').value.trim();
+    const username = form.querySelector('input[name="username"]').value.trim();
+    const passwordInput = form.querySelector('input[name="password"]');
+    const repPassInput = form.querySelector('input[name="rep_pass"]');
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+    const passwordValue = passwordInput.value.trim();
+    const repPassValue = repPassInput.value.trim();
+
+    if (!name || !username || !passwordValue || !repPassValue) {
+        d_alert("Ошибка d201", "Заполните все поля", "ok");
+        return;
+    }
+    const letters = /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$/;
+    if (!letters.test(username)) {
+        d_alert("Ошибка d206", "Username может содержать только латинские буквы, цифры и символ подчеркивания, не идущий подряд, в начале или в конце", "ok");
+        return;
+    }
+    if (passwordValue !== repPassValue) {
+        d_alert("Ошибка d202", "Пароли не совпадают", "ok");
+        return;
+    }
+
+    try {
+        const keyPair = await window.crypto.subtle.generateKey(
+            {
+                name: "ECDH",
+                namedCurve: "P-256" // Современный стандарт
+            },
+            true, 
+            ["deriveKey", "deriveBits"] // Эти права нужны для создания общего секрета
+        );
+
+        const pubExport = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+        const pubBase64 = btoa(String.fromCharCode(...new Uint8Array(pubExport)));
+
+        const encryptionKey = await deriveEncryptionKey(passwordValue, username);
+        const privExport = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+        
+        const iv = crypto.getRandomValues(new Uint8Array(12)); 
+        const encryptedContent = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: iv },
+            encryptionKey,
+            privExport
+        );
+
+        const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(encryptedContent), iv.length);
+        const privBase64 = btoa(String.fromCharCode(...combined));
+        
+        const hashedPass = await hashPassword(passwordValue);
+
+        await saveUserData({ username: username, id: "pending" }, keyPair.privateKey);
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('username', username.toLowerCase());
+        formData.append('password', hashedPass);
+        formData.append('public_key', pubBase64);
+        formData.append('encrypted_private_key', privBase64);
+        formData.append('csrf_token', csrfToken);
+
+        if (selectedAvatarFile) {
+            formData.append('avatar', selectedAvatarFile);
+        }   
+
+        const response = await fetch('/signup', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === "success") {
+            await saveUserData(data.user_data, keyPair.privateKey);
+            window.location.href = "/";
+        } else if (data.message === "d207") {
+            d_alert("Ошибка d207", "Истекло время ожидания", "ok");
+        } else if (data.message === "d205") {
+            d_alert("Ошибка d205", "На сервере крашнулось создание id", "ok");
+        } else if (data.message === "d203") {
+            d_alert("Ошибка d203", "Username занят", "ok");
+        } else if (data.message === "d203") {
+            d_alert("Ошибка d203", "Username занят", "ok");
+        } else if (data.message === "d204") {
+            d_alert("Ошибка d204", "База данных слетела", "ok");
+        } else if (data.message === "d201") {
+            d_alert("Ошибка d201", "Заполните все поля", "ok");
+        } else if (data.message === "d206") {
+            d_alert("Ошибка d206", "Username может содержать только латинские буквы, цифры и символ подчеркивания, не идущий подряд, в начале или в конце", "ok");
+        } else if (data.message === "d208") {
+            d_alert("Ошибка d208", "Username короче 4 символов либо длинне 16 ", "ok");
+        }
+
+    } catch (e) {
+        console.log(e);
+        d_alert("Ошибка d209", "Не удалось создать защищенные ключи или ошибка сервера", "ok");
+    }
+}
+</script>
+{% endblock %}

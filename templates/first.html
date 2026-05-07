@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Приветствуем!
+{% endblock %}
+
+{% block body %}
+<section class="bottom">
+<div class="big-header">
+    <img src="static/img/first_page.png">
+    <div class="big-header-title label headline6">Добро пожаловать в Dovery</div>
+    <div class="label body1">Войдите или создайте аккаунт в мессенджере со сквозным шифрованием</div>
+</div>
+</section>
+<section class="bottom">
+<a href="/login" class="item clicked">
+    <div class="right separator">
+        <div class="text oneline"> 
+            <div class="label body1">Войти</div> 
+        </div>
+        <div class="element"> 
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+    </div>
+</a>
+<a href="/signup" class="item clicked">
+    <div class="right">
+        <div class="text oneline"> 
+            <div class="label body1">Зарегистрироваться</div> 
+        </div>
+        <div class="element"> 
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+    </div>
+</a>
+</section>
+{% endblock %}

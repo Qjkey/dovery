@@ -1,0 +1,857 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Dovery
+{% endblock %}
+
+{% block body %}
+<link href="static/CSS/textarea-mess.css" rel="stylesheet" type="text/css">
+<link href="static/CSS/message.css" rel="stylesheet" type="text/css">
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100dvh; 
+    width: 100vw;
+    overflow: hidden;
+    position: fixed;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.hidden {
+    display: none !important;
+}
+
+.dust {
+    position: absolute;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 1.5s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 1.5s ease-out;
+}
+
+.app-wrapper {
+  display: flex;
+  width: 100vw;
+  height: 100dvh;
+  background: var(--tg-theme-bg-color);
+}
+
+/* ПК И ПЛАНШЕТЫ */
+@media (min-width: 700px) {
+  .sidebar {
+    width: 350px;
+    border-right: 1px solid var(--tg-theme-section-separator-color);
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .chat-window {
+    flex-grow: 1;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .back-btn {
+    display: none;
+  }
+}
+
+/* ТЕЛЕФОНЫ */
+@media (max-width: 700px) {
+  .sidebar, .chat-window {
+    width: 100%;
+    height: 100%;
+  }
+  .chat-window {
+    display: none;
+  }
+  .app-wrapper.is-chat-open .sidebar {
+    display: none;
+  }
+  .app-wrapper.is-chat-open .chat-window {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tg-theme-hint-color);
+  background-color: #f9f9f9;
+  font-size: 1.1em;
+}
+
+.chat-active-content {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden; 
+}
+
+/* ИСПРАВЛЕННЫЙ HEADER */
+.chat-header {
+    width: 100%;
+    background: var(--tg-theme-bg-color);
+    z-index: 10;
+    flex-shrink: 0; /* Чтобы не сжимался */
+}
+</style>
+<div class="app-wrapper" id="app">
+  <aside class="sidebar">
+    <!-- Dovery header -->
+    <div id="div-classic">
+      <div class="item-header">
+        <div class="right">
+            <div class="text header">
+                <div class="label-header headline6">Dovery</div> 
+            </div>
+            <div onclick="openSearch();" class="element">
+                <svg width="56" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.5 14H14.71L14.43 13.73C15.41 12.59 16 11.11 16 9.5C16 5.91 13.09 3 9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L14 14.71V15.5L19 20.49L20.49 19L15.5 14ZM9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
+                </svg>
+            </div>
+            <div class="element" id="cntxt_menu_btn_01">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.5218 8C13.6696 8 14.6087 7.1 14.6087 6C14.6087 4.9 13.6696 4 12.5218 4C11.3739 4 10.4348 4.9 10.4348 6C10.4348 7.1 11.3739 8 12.5218 8ZM12.5218 10C11.3739 10 10.4348 10.9 10.4348 12C10.4348 13.1 11.3739 14 12.5218 14C13.6696 14 14.6087 13.1 14.6087 12C14.6087 10.9 13.6696 10 12.5218 10ZM12.5218 16C11.3739 16 10.4348 16.9 10.4348 18C10.4348 19.1 11.3739 20 12.5218 20C13.6696 20 14.6087 19.1 14.6087 18C14.6087 16.9 13.6696 16 12.5218 16Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
+                </svg>
+            </div>
+        </div>
+      </div>
+      <div id="chats-list"></div>
+    </div>
+
+    <!-- Окно поиска -->
+    <div id="search-panel" class="hidden">
+        <div class="item-header">
+            <div onclick="closeSearch();" class="left"> 
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
+                </svg>
+              </div>
+            <div class="right">
+                <div class="text header"> 
+                    <div class="label-header headline6">Поиск</div> 
+                </div>
+            </div>
+        </div>
+        <div class="search-container">
+          <div class="input-container">
+              <input id="search-field" type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
+              <label class="input-label" >Username</label>
+              <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+          </div>
+        </div>
+        <div id="search-results"></div>
+    </div>
+  </aside>
+
+  <main class="chat-window">
+    <!-- Окно не выбранного чата -->
+    <div id="empty-state" class="headline6 empty-state">
+      <p>Выберете чат, либо используйте поиск</p>
+    </div>
+    <!-- КОНТЕЙНЕР АКТИВНОГО ЧАТА -->
+    <div id="chat-active-content" class="chat-active-content" style="display: none;">
+        <!-- ШАПКА ЧАТА (ВНУТРИ ОКНА) -->
+        <header class="chat-header">
+            <div class="item-header">
+                <div onclick="toggleChat(false)" class="left"> 
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="var(--tg-theme-bg-color)"/>
+                    </svg>
+                </div>
+                <div class="second-left"> 
+                    <img src="" class="ava">
+                </div>
+                <div class="right">
+                    <div class="text twoline"> 
+                        <div class="label-header body1-medium" id="chat-name">Имя пользователя</div> 
+                        <div class="label-header-subtitle subtitle1">был(а) недавно</div> 
+                        <div style="display: none;" id="id_ept"></div>
+                    </div>
+                    <div class="element" id="cntxt_menu_btn_02">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12.5218 8C13.6696 8 14.6087 7.1 14.6087 6C14.6087 4.9 13.6696 4 12.5218 4C11.3739 4 10.4348 4.9 10.4348 6C10.4348 7.1 11.3739 8 12.5218 8ZM12.5218 10C11.3739 10 10.4348 10.9 10.4348 12C10.4348 13.1 11.3739 14 12.5218 14C13.6696 14 14.6087 13.1 14.6087 12C14.6087 10.9 13.6696 10 12.5218 10ZM12.5218 16C11.3739 16 10.4348 16.9 10.4348 18C10.4348 19.1 11.3739 20 12.5218 20C13.6696 20 14.6087 19.1 14.6087 18C14.6087 16.9 13.6696 16 12.5218 16Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- СЮДА БУДУТ ПАДАТЬ СООБЩЕНИЯ -->
+        <div class="messages-area" id="messages-area">
+        </div>
+
+        <!-- ПАНЕЛЬ ВВОДА (ВНУТРИ ОКНА, В САМОМ НИЗУ) -->
+        <footer class="chat-input-bar" id="cntxt_menu_msg">
+            <!-- <button class="icon-btn emoji-btn">
+                <i class="far fa-smile"></i>
+            </button> -->
+            <textarea id="msgInput" placeholder="Сообщение" rows="1"></textarea>
+
+            <!-- <div class="action-buttons" id="actionButtons">
+                <button class="icon-btn"><i class="fas fa-paperclip"></i></button>
+                <button class="icon-btn"><i class="fas fa-microphone"></i></button>
+            </div> -->
+            
+            <button class="send-btn" id="sendBtn">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0.00148348 0.911458C0.00148348 0.607639 0.00148348 1.32681e-05 1.07915 0C2.46473 -1.70589e-05 17.86 7.89931 18.9377 8.81076C19.7998 9.53993 19.398 10.3299 18.9362 10.6337C17.8588 11.5449 2.31749 19.4397 1.07767 19.4444C0 19.4444 0 18.8368 0 18.533L1.07875 11.849C1.20159 11.1198 1.54075 10.9375 1.69498 10.9375L10.9321 10.026C11.0348 10.026 11.24 9.96528 11.24 9.72222C11.24 9.47917 11.0348 9.4184 10.9321 9.4184L1.69498 8.50695C1.54075 8.50695 1.20159 8.32465 1.07875 7.59549C0.718159 5.39227 0.00148348 1.21528 0.00148348 0.911458Z" fill="var(--tg-theme-button-color)"/>
+                </svg>
+            </button>
+        </footer>
+    </div>
+  </main>
+</div>
+<script>
+function toggleChat(isSelected) {
+  const app = document.getElementById('app');
+  const emptyState = document.getElementById('empty-state');
+  const chatContent = document.getElementById('chat-active-content');
+
+  if (isSelected) {
+    app.classList.add('is-chat-open');
+    emptyState.style.display = 'none';
+    chatContent.style.display = 'flex';
+  } else {
+    app.classList.remove('is-chat-open');
+    if (window.innerWidth > 700) {
+        emptyState.style.display = 'flex';
+        chatContent.style.display = 'none';
+    }
+  }
+}
+</script>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<!-- Безопасность чата -->
+<script>
+async function get_public_key(pem) {
+    const b64 = pem.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\n|\r/g, '');
+    const binary = window.atob(b64);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+
+    return await window.crypto.subtle.importKey(
+        "spki",
+        bytes,
+        { name: "ECDH", namedCurve: "P-256" },
+        true,
+        []
+    );
+}
+
+async function get_private_key() {
+    return new Promise((resolve, reject) => {
+        const DB_NAME = 'Dovery'; 
+        const STORE_NAME = 'secrets';
+
+        const request = indexedDB.open(DB_NAME);
+
+        request.onerror = () => reject("Ошибка в открытии IndexedDB");
+        
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            const transaction = db.transaction(STORE_NAME, "readonly");
+            const store = transaction.objectStore(STORE_NAME);
+            const getRequest = store.get("private_key");
+
+            getRequest.onsuccess = () => resolve(getRequest.result);
+            getRequest.onerror = () => reject("Ошибка извлечения ключа");
+        };
+    });
+}
+
+async function calc_key_chat(myPrivateKey, opponentPublicKey) {
+    return await window.crypto.subtle.deriveKey(
+        { name: "ECDH", public: opponentPublicKey },
+        myPrivateKey,
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+    );
+}
+</script>
+<script>
+let debounceTimer;
+
+// --- ФУНКЦИИ ПОИСКА ---
+
+function openSearch() {
+    document.getElementById('div-classic').style.display = 'none';
+    document.getElementById('search-panel').classList.remove('hidden');
+    document.getElementById('search-field').focus();
+}
+
+function closeSearch() {
+    document.getElementById('search-panel').classList.add('hidden');
+    document.getElementById('div-classic').style.display = 'block';
+    document.getElementById('search-field').value = '';
+    document.getElementById('search-results').innerHTML = '';
+}
+
+document.getElementById('search-field').addEventListener('input', function(e) {
+    const query = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    
+    if (query.length < 2) {
+        document.getElementById('search-results').innerHTML = '';
+        return;
+    }
+
+    debounceTimer = setTimeout(() => {
+        fetchUsers(query);
+    }, 500); 
+});
+
+async function fetchUsers(query) {
+    try {
+        const response = await fetch(`/search_users?q=${encodeURIComponent(query)}`);
+        const users = await response.json();
+        renderResults(users);
+    } catch (err) {
+        console.error("Ошибка поиска:", err);
+    }
+}
+
+function renderResults(users) {
+    const container = document.getElementById('search-results');
+    container.innerHTML = '';
+
+    if (users.length === 0) {
+        container.innerHTML = '<p class="body1" style="padding:10px 0px 0px 20px; color:var(--tg-theme-hint-color);">Ничего не найдено</p>';
+        return;
+    }
+
+    users.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'item clicked';
+        // Подставил user.ava и user.name из твоего JSON
+        div.innerHTML = `
+            <div class="left"> 
+                <img src="static/files/avatars/${user.ava}" class="ava"> 
+            </div>
+            <div class="right separator">
+                <div class="text twoline"> 
+                    <div class="label body1">${user.name}</div> 
+                    <div class="label subtitle subtitle1">@${user.username}</div> 
+                </div>
+            </div>
+        `;
+        // При клике добавляем в список чатов
+        div.addEventListener('click', () => {
+            startChat(user.id, user.name);
+        });
+        container.appendChild(div);
+    });
+}
+
+// --- ЛОГИКА ЧАТОВ ---
+
+async function startChat(userId, userName) {
+    try {
+        const csrfElement = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfElement.getAttribute('content');
+        // Отправляем запрос на сервер, чтобы создать связь в таблице chats
+        const response = await fetch('/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        if (response.ok) {
+            closeSearch();
+            await loadMyChats(); // Обновляем список в боковой панели
+            await openDirectWindow(userName); // Открываем интерфейс переписки
+        }
+    } catch (err) {
+        console.error("Ошибка при создании чата:", err);
+    }
+}
+const chatsData = {};
+async function loadMyChats() {
+    try {
+        const response = await fetch('/get_my_chats');
+        const chats = await response.json();
+        const listContainer = document.getElementById('chats-list');
+        
+        listContainer.innerHTML = ''; 
+
+        chats.forEach(chat => {
+            const item = document.createElement('div');
+            item.className = 'item clicked';
+            chatsData[chat.id] = {
+                username: chat.username,
+                name: chat.name,
+                avatar: chat.avatar,
+                publicKey: chat.public_key
+            };
+            item.setAttribute('data-user-id', chat.id);
+            item.innerHTML = `
+                <div class="left"> 
+                    <img src="static/files/avatars/${chat.avatar}" class="ava"> 
+                </div>
+                <div class="right separator">
+                    <div class="text twoline"> 
+                        <div class="label body1">${chat.name}</div> 
+                        <div class="label subtitle subtitle1">был(а) недавно</div> 
+                    </div>
+                </div>
+            `;
+            item.onclick = async () => {
+                await openDirectWindow(chat.id);
+            };
+            listContainer.appendChild(item);
+        });
+    } catch (err) {
+        console.error("Ошибка загрузки списка чатов:", err);
+    }
+}
+
+window.onload = () => {
+    loadMyChats();
+};
+// Хранение ключа чата
+window.keychat = null;
+
+async function openDirectWindow(userId) {
+    const user = chatsData[userId];
+    if (!user) { 
+        return;
+    }
+
+    const headerTitle = document.querySelector('.chat-header .label-header');
+    if (headerTitle) headerTitle.innerText = user.name;
+    const container = document.getElementById('id_ept');
+    container.textContent = userId; 
+    const headerAvatar = document.querySelector('.chat-header img.ava');
+    if (headerAvatar) {
+        headerAvatar.src = `static/files/avatars/${user.avatar}`;
+    }
+
+    try {
+        const private_key = await get_private_key(); 
+        const public_key = await get_public_key(user.publicKey);
+        window.keychat = await calc_key_chat(private_key, public_key);
+
+    } catch (err) {
+        console.error("Ошибка установки защищенного соединения:", err);
+    }
+    loadChat(userId);
+    toggleChat(true);
+}
+
+</script>
+<!-- Контейнер с элементами контекстного меню -->
+<div id="tagDropdown" class="tag-dropdown">
+</div> 
+<!-- Подключения -->
+ <script src="/static/js/sockets.js"></script>
+<script src="/static/js/html_canvas.js"></script>
+<!-- Копирование и удаление сообщения -->
+<script>
+function copy_message(id) {
+    // Ищем элемент, у которого data-id совпадает с переданным
+    const msgElement = document.querySelector(`[data-id="${id}"]`);
+    
+    if (msgElement) {
+        // Находим внутри него блок с текстом
+        const textContent = msgElement.querySelector('.message-content');
+        
+        if (textContent) {
+            const text = textContent.innerText;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                hideDropdown();
+            }).catch(err => {
+                console.error("Ошибка при копировании:", err);
+            });
+        } else {
+            console.error("Блок .message-content не найден внутри сообщения");
+        }
+    } else {
+        console.error(`Сообщение ${id} не найдено в DOM`);
+    }
+}
+
+window.snapDelete = async function(id) {
+    const cleanId = id.trim();
+    const messageElement = document.querySelector(`[data-id="${cleanId}"]`);
+    if (!messageElement) return;
+    const wrapper = messageElement.closest('.message-wrapper');
+    if (!wrapper) return;
+
+    if (typeof hideDropdown === 'function') hideDropdown();
+
+    try {
+        // Использование самого быстрого метода захвата
+        const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
+        
+        const width = wrapper.offsetWidth;
+        const height = wrapper.offsetHeight;
+        const rect = wrapper.getBoundingClientRect();
+
+        // Мгновенно скрываем оригинал
+        wrapper.style.visibility = 'hidden';
+
+        const layersCount = 20; // Минимум для Android
+        const layers = [];
+        
+        // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
+        for (let i = 0; i < layersCount; i++) {
+            const c = document.createElement('canvas');
+            c.width = width;
+            c.height = height;
+            c.className = 'dust';
+            c.style.cssText = `
+                position: absolute;
+                left: ${rect.left}px;
+                top: ${rect.top + window.scrollY}px;
+                width: ${width}px;
+                height: ${height}px;
+                pointer-events: none;
+                z-index: 9999;
+                transition: transform 0.8s ease-out, opacity 0.6s ease-out;
+            `;
+            document.body.appendChild(c);
+            layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
+        }
+
+        // Быстрое распределение
+        for (let i = 0; i < pixels.length; i += 12) { 
+            const x = (i / 4) % width;
+            const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
+            const d = layers[lIdx].imgData.data;
+
+            // Копируем основной пиксель
+            d[i] = pixels[i]; 
+            d[i+1] = pixels[i+1]; 
+            d[i+2] = pixels[i+2]; 
+            d[i+3] = pixels[i+3];
+        }
+
+        layers.forEach((l, i) => {
+            l.ctx.putImageData(l.imgData, 0, 0);
+            requestAnimationFrame(() => {
+                const x = (i - layersCount / 2) * 10;
+                const y = 0 - Math.random() * 40;
+                l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
+                l.c.style.opacity = '0';
+            });
+            setTimeout(() => l.c.remove(), 1000);
+        });
+
+        setTimeout(() => wrapper.remove(), 500);
+
+    } catch (err) {
+        wrapper.remove();
+    }
+};
+</script>
+<!-- Изменение размера поля ввода -->
+<script>
+const tx = document.getElementById('msgInput');
+
+tx.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = (this.scrollHeight) + 'px';
+});
+
+</script>
+<!-- Логика отправки -->
+<script>
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+const messagesArea = document.getElementById('messages-area');
+
+async function encryptText(text) {
+    if (!window.keychat) {
+        throw new Error("Ключ чата не инициализирован! Сначала открой чат.");
+    }
+    const encodedText = new TextEncoder().encode(text);
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encryptedContent = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        window.keychat,
+        encodedText
+    );
+
+    const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedContent), iv.length);
+
+    return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptText(encryptedBase64) {
+    if (!window.keychat) throw new Error("Ключ не инициализирован");
+    const combined = new Uint8Array(atob(encryptedBase64).split("").map(c => c.charCodeAt(0)));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+
+    const decryptedContent = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        window.keychat,
+        data
+    );
+
+    return new TextDecoder().decode(decryptedContent);
+}
+
+const socket = io();
+
+// --- ФУНКЦИЯ ОТПРАВКИ ---
+async function sendMessage() {
+    const text = msgInput.value;
+    if (!text.trim()) return;
+
+    let encryptedText;
+    try {
+        encryptedText = await encryptText(text);
+    } catch (err) {
+        console.error("Шифрование не удалось:", err);
+        return;
+    }
+
+    const generateId = (len) => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+        const randomValues = new Uint32Array(len);
+        window.crypto.getRandomValues(randomValues);
+        for (let i = 0; i < len; i++) {
+            result += chars[randomValues[i] % chars.length];
+        }
+        return result;
+    };
+
+
+    const msgId = "msg_" + generateId(15);
+
+    const receiverId = document.getElementById('id_ept').innerText;
+    socket.emit('send_direct_message', {
+        receiver_id: receiverId,
+        text: encryptedText,
+        msgId: msgId
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper sent new-msg';
+
+    // 1. Создаем структуру без текста сообщения внутри innerHTML
+    wrapper.innerHTML = `
+        <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${msgId}">
+            <div class="message-content body1" style="white-space: pre-wrap;"></div>
+            <div class="message-info">
+                <span class="message-time caption2">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+        </div>
+    `;
+
+    // 2. Находим пустой контейнер для контента и безопасно вставляем текст
+    // textContent превратит любой <html> в обычную строку текста
+    wrapper.querySelector('.message-content').textContent = text;
+
+    messagesArea.prepend(wrapper);
+    
+    msgInput.value = '';
+    msgInput.style.height = 'auto';
+    msgInput.focus();
+}
+
+socket.on('new_message', async (data) => {
+    try {
+        const receiverId = document.getElementById('id_ept').innerText;
+        const decryptedText = await decryptText(data.text);
+        if (receiverId == data.sender_id) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper received new-msg';
+            
+            // Вставляем твою структуру
+            wrapper.innerHTML = `
+                <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id || ''}">
+                    <div class="message-content body1" style="white-space: pre-wrap;"></div>
+                    <div class="message-info">
+                        <span class="message-time caption2">${data.time || ''}</span>
+                    </div>
+                </div>
+            `;
+            wrapper.querySelector('.message-content').textContent = decryptedText;
+            messagesArea.prepend(wrapper);
+        }
+    } catch (err) {
+        console.error("Не удалось расшифровать сообщение. Возможно, ключи не совпадают.", err);
+    }
+});
+
+// Клик по кнопке
+sendBtn.addEventListener('click', async () => {
+    await sendMessage();
+});
+
+// Enter для отправки
+msgInput.addEventListener('keydown', async (e) => {
+    // Проверяем, что нажата Enter без Shift
+    if (e.key === 'Enter' && !e.shiftKey) {
+        
+        // Добавляем проверку: если ширина экрана больше 1024px (типичный ПК/планшет)
+        // или используем проверку на тачскрин
+        const isMobile = window.matchMedia("(max-width: 1024px)").matches;
+
+        if (!isMobile) {
+            e.preventDefault();
+            await sendMessage();
+        }
+        // Если это мобилка, ничего не делаем — сработает стандартный перенос строки
+    }
+});
+
+</script>
+<!-- Отображение сообщений -->
+<script>
+async function loadChat(userId) {
+    const messagesArea = document.getElementById('messages-area');
+    
+    // 1. Очищаем экран
+    messagesArea.innerHTML = '';
+    const receiverId = userId;
+    try {
+        // 2. Fetch запрос к серверу
+        const response = await fetch(`/get_history_messages/${receiverId}`);
+        const messages = await response.json();
+
+        // 3. Цикл по сообщениям
+        for (const msg of messages) {
+            await renderMessage(msg, receiverId);
+        }
+
+        // 4. Скролл вниз
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+
+    } catch (err) {
+        console.error("Ошибка загрузки истории:", err);
+    }
+}
+
+async function renderMessage(msg, receiverId) {
+    const messagesArea = document.getElementById('messages-area');
+    
+    try {
+        const decryptedText = await decryptText(msg.message_text);
+        console.log(decryptedText);
+
+        const mne = msg.sender_id != receiverId;
+        const typeClass = mne ? 'sent' : 'received';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message-wrapper ' + typeClass;
+        
+        // Твой шаблон
+        wrapper.innerHTML = `
+            <div class="message-bubble ${typeClass}" id="cntxt_menu_btn_03" data-id="${msg.id}">
+                <div class="message-content body1" style="white-space: pre-wrap;"></div>
+                <div class="message-info">
+                    <span class="message-time caption2">${formatTime(msg.time)}</span>
+                </div>
+            </div>
+        `;
+
+        // Безопасно вставляем текст
+        wrapper.querySelector('.message-content').textContent = decryptedText;
+        messagesArea.prepend(wrapper);
+    } catch (e) {
+        console.warn("Не удалось расшифровать сообщение ID:", e, msg.id);
+    }
+}
+
+// Помощник для времени (обрабатывает ISO строку из базы)
+function formatTime(timeStr) {
+    const date = new Date(timeStr);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+</script>
+<!-- Контекстные меню -->
+<script>
+var list_items_icon_01 = [            
+    { label: "Мой профиль", link: "#", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface346" inkscape:label="surface346" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface346" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 307.68,220.94 C 307.68,249.79 284.29,273.18 255.44,273.18 C 226.59,273.18 203.2,249.79 203.2,220.94 C 203.2,192.09 226.59,168.7 255.44,168.7 C 284.29,168.7 307.68,192.09 307.68,220.94 "/> </g> <g id="g_4" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 160.5,380.08 C 164.43,364.91999999999996 170.89999999999998,354.06 178.01,346.27 C 197.98,324.43 228.55999999999997,326.71 256.02,326.71 C 283.47999999999996,326.71 314.05999999999995,324.43 334.03,346.27 C 341.15,354.06 347.61,364.91999999999996 351.54,380.08 "/> </g> </g> </g> </svg>' }
+];
+var list_items_icon_02 = [            
+    { label: "Удалить чат", danger: true, link: "#", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface1491" inkscape:label="surface1491" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface1491" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-destructive-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 143.04,196.16 C 143.04,196.16 161.18,392.9 161.18,392.9 C 162.64000000000001,408.71 175.9,420.8 191.77,420.8 C 191.77,420.8 320.23,420.8 320.23,420.8 C 336.1,420.8 349.36,408.71 350.82,392.9 C 350.82,392.9 368.96,196.16 368.96,196.16 M 394.96,144.32 C 394.96,144.32 308.56,144.32 308.56,144.32 M 117.04,144.32 C 117.04,144.32 308.56,144.32 308.56,144.32 M 308.56,144.32 C 308.56,144.32 308.56,121.92 308.56,121.92 C 308.56,104.95 294.80999999999995,91.2 277.84,91.2 C 277.84,91.2 234.16,91.2 234.16,91.2 C 217.19,91.2 203.44,104.95 203.44,121.92 C 203.44,121.92 203.44,144.32 203.44,144.32 "/> </g> </g> </g> </svg>' }
+];
+var list_items_icon_03 = [ 
+    { label: "Копировать", onclick:"copy_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' }, 
+    { label: "Вставить", onclick:"paste_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10510" inkscape:label="surface10510" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10510" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:round"> <path d="M 286.08,140.8 C 286.08,140.8 155.52,140.8 155.52,140.8 C 135.72,140.8 119.68,156.83999999999997 119.68,176.64 C 119.68,176.64 119.68,384 119.68,384 C 119.68,403.79 135.72,419.84 155.52,419.84 C 155.52,419.84 356.48,419.84 356.48,419.84 C 376.28000000000003,419.84 392.32,403.79 392.32,384 C 392.32,384 392.32,176.64 392.32,176.64 C 392.32,156.83999999999997 376.28000000000003,140.8 356.48,140.8 C 356.48,140.8 286.08,140.8 286.08,140.8 Z M 286.08,140.8 C 286.08,140.8 286.08,121.6 286.08,121.6 C 286.08,104.99 272.61,91.52 256,91.52 C 239.39,91.52 225.92,104.99 225.92,121.6 C 225.92,121.6 225.92,140.8 225.92,140.8 M 324.48,220.16 C 324.48,220.16 187.52,220.16 187.52,220.16 M 324.48,279.04 C 324.48,279.04 187.52,279.04 187.52,279.04 M 293.12,338.56 C 293.12,338.56 218.88,338.56 218.88,338.56 "/> </g> </g> </g> </svg>' }
+];
+
+var list_items_icon_04 = [ 
+    { label: "Вставить", onclick:"paste_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10510" inkscape:label="surface10510" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10510" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:round"> <path d="M 286.08,140.8 C 286.08,140.8 155.52,140.8 155.52,140.8 C 135.72,140.8 119.68,156.83999999999997 119.68,176.64 C 119.68,176.64 119.68,384 119.68,384 C 119.68,403.79 135.72,419.84 155.52,419.84 C 155.52,419.84 356.48,419.84 356.48,419.84 C 376.28000000000003,419.84 392.32,403.79 392.32,384 C 392.32,384 392.32,176.64 392.32,176.64 C 392.32,156.83999999999997 376.28000000000003,140.8 356.48,140.8 C 356.48,140.8 286.08,140.8 286.08,140.8 Z M 286.08,140.8 C 286.08,140.8 286.08,121.6 286.08,121.6 C 286.08,104.99 272.61,91.52 256,91.52 C 239.39,91.52 225.92,104.99 225.92,121.6 C 225.92,121.6 225.92,140.8 225.92,140.8 M 324.48,220.16 C 324.48,220.16 187.52,220.16 187.52,220.16 M 324.48,279.04 C 324.48,279.04 187.52,279.04 187.52,279.04 M 293.12,338.56 C 293.12,338.56 218.88,338.56 218.88,338.56 "/> </g> </g> </g> </svg>' }
+];
+</script>
+<!-- Копирование/вставить для поля ввода -->
+<script>
+// Контекстное меню для поля ввода сообщений
+const inputField = document.querySelector('#msgInput');
+function copy_text() {
+    const start = inputField.selectionStart;
+    const end = inputField.selectionEnd;
+    const selectedText = inputField.value.substring(start, end);
+
+    if (selectedText) {
+        navigator.clipboard.writeText(selectedText)
+            .then(() => hideDropdown())
+            .catch(err => console.error('Ошибка копирования:', err));
+            inputField.focus();
+    }
+}
+
+async function paste_text() {
+    try {
+        const text = await navigator.clipboard.readText();
+        // Вставляем текст в позицию курсора
+        const start = inputField.selectionStart;
+        const end = inputField.selectionEnd;
+        
+        inputField.setRangeText(text, start, end, 'end');
+        
+        hideDropdown();
+        inputField.focus();
+    } catch (err) {
+        console.warn('Доступ к буферу отклонен пользователем' + err);
+    }
+}
+
+
+inputField.addEventListener('contextmenu', async function(e) { // Добавили async
+    e.preventDefault();
+
+    const selectedText = window.getSelection().toString();
+    let hasClipboard = false;
+
+    try {
+        // Проверяем наличие текста в буфере
+        const clipboardText = await navigator.clipboard.readText();
+        hasClipboard = clipboardText.length > 0;
+    } catch (err) {
+        // Если доступа нет или буфер пуст, просто считаем, что вставить нечего
+        hasClipboard = false;
+    }
+
+    let items = [];
+    if (selectedText) {
+        items = list_items_icon_03; // Копировать + Вставить
+        if (items.length > 0) {
+            showDropdown(this, items, 'icon', { x: e.pageX }, paste=false);
+        }
+    } else if (hasClipboard) {
+        items = list_items_icon_04; // Только Вставить
+        if (items.length > 0) {
+            showDropdown(this, items, 'icon', { x: e.pageX }, paste=true);
+        }
+    }
+});
+
+</script>
+<script src="/static/js/context menu.js"></script>
+{% endblock %}

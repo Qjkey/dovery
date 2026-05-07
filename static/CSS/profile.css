@@ -1,0 +1,177 @@
+:root{
+  --sw-size: clamp(35px, 5.5vw, 45px); 
+  --ring-gap: 6px;
+  --ring-extra: 6px;
+
+  --blue-d: #3C7194;
+  --blue-l: #75D3F4;
+  --green-d: #449650;
+  --green-l: #A1D155;
+  --orange-d: #D0734C;
+  --orange-l: #F4AB2D;
+  --red-d: #CC555A;
+  --red-l: #FF9A61;
+  --purple-d: #9666C0;
+  --purple-l: #E77DE6;
+  --cyan-d: #2B99C6;
+  --cyan-l: #79DDC6;
+  --pink-d: #C15A83;
+  --pink-l: #F48A95;
+  --grey-d: #6D7783;
+  --grey-l: #A6B0BC;
+}
+
+.icon {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    opacity: 0.5;
+    z-index: 0;
+}
+.icon.big img {
+    width: 77%;
+    height: 77%;
+    opacity: 0.55;
+}
+.icon.sre img {
+    width: 74%;
+    height: 74%;
+    opacity: 0.5;
+}
+.icon.sma img {
+    width: 65%;
+    height: 65%;
+    opacity: 0.45;
+}
+.icon.smaa img {
+    width: 55%;
+    height: 55%;
+    opacity: 0.3;
+}
+.icon.smaaa img {
+    width: 50%;
+    height: 50%;
+    opacity: 0.2;
+}
+
+.profile-block {
+    width: 100%;
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden; 
+}
+.profile-block.no-img {
+    height: 150px;
+}
+.before {
+    height: 225px;
+    padding-top: 5px;
+    border-radius: 11px 11px 0px 0px;
+}
+.profile-block.s-img {
+    height: 220px;
+    justify-content: center;
+}
+
+.blue {
+    background-image: radial-gradient(var(--blue-l), var(--blue-d));
+}
+.green {
+    background-image: radial-gradient(var(--green-l), var(--green-d));
+}
+.yellow {
+    background-image: radial-gradient(var(--orange-l), var(--orange-d));
+}
+.red {
+    background-image: radial-gradient(var(--red-l), var(--red-d));
+}
+.purple {
+    background-image: radial-gradient(var(--purple-l), var(--purple-d));
+}
+.cyan {
+    background-image: radial-gradient(var(--cyan-l), var(--cyan-d));
+}
+.pink {
+    background-image: radial-gradient(var(--pink-l), var(--pink-d));
+}
+.grey {
+    background-image: radial-gradient(var(--grey-l), var(--grey-d));
+}
+
+.profile-block .text {
+    cursor: default;
+    color: white;
+    z-index: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    display: inline-block;
+    justify-content: center;
+    vertical-align: top;
+    box-sizing: border-box;
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+.profile-block .avatar {
+    width: 95px;
+    height: 95px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 10px;
+    margin-top: 19px;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.color-row input[type="radio"]:checked + .swatch .dot{
+  border: 2px solid var(--tg-theme-text-color);
+}
+
+.color-row{
+  display: grid;
+  grid-template-columns: repeat(8, 0.8fr);
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--ring-gap);
+}
+
+.color-row input[type="radio"]{
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch .dot{
+  width: var(--sw-size);
+  height: var(--sw-size);
+  border-radius: 50%;
+  z-index: 2;
+  transition: border 0.1s ease-in-out;
+  display: block;
+  box-sizing: border-box;
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+.swatch-blue  .dot { background: linear-gradient(135deg, var(--blue-d) 50%, var(--blue-l) 50%); }
+.swatch-green .dot { background: linear-gradient(135deg, var(--green-d) 50%, var(--green-l) 50%); }
+.swatch-yellow .dot { background: linear-gradient(135deg, var(--orange-d) 50%, var(--orange-l) 50%); }
+.swatch-red .dot { background: linear-gradient(135deg, var(--red-d) 50%, var(--red-l) 50%); }
+.swatch-purple .dot { background: linear-gradient(135deg, var(--purple-d) 50%, var(--pink-l) 50%); }
+.swatch-cyan .dot { background: linear-gradient(135deg, var(--cyan-d) 50%, var(--cyan-l) 50%); }
+.swatch-pink .dot { background: linear-gradient(135deg, var(--pink-d) 50%, var(--pink-l) 50%); }
+.swatch-grey .dot { background: linear-gradient(135deg, var(--grey-d) 50%, var(--grey-l) 50%); }
+
+.swatch { position: relative; }
+.swatch .dot  { left: 50%; top: 50%; transform: translate(-50%, 0%); }

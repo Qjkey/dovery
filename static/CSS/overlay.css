@@ -1,0 +1,128 @@
+/* --- Оверлей контейнер --- */
+.overlay-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4); /* Полупрозрачный фон */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 1000;
+    overscroll-behavior: contain; /* Предотвращает прокрутку под оверлеем на тач-устройствах */
+}
+
+/* Когда оверлей активен */
+.overlay-container.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* --- Само выпадающее окно --- */
+.profile-modal {
+    width: 100%;
+    max-width: 400px; 
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    position: relative;
+    padding-bottom: constant(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom);
+    cursor: grab;
+}
+
+.overlay-container.active .profile-modal {
+    transform: translateY(0);
+}
+
+td .img_s {
+    width: 23px;
+    border-radius: 50%;
+    vertical-align: middle; 
+    bottom: 2px;
+}
+
+.button-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.12); /* Полупрозрачный белый */
+    border-radius: 8px;
+    padding: 3px 15px 8px 15px;
+    width: 31%;
+    box-sizing: border-box;
+    
+    /* Размытый и затемненный фон (блюр) */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px); /* Для Safari */
+    
+    transition: background-color 0.2s ease;
+}
+
+.button-link:active {
+    transform: scale(0.96);
+    transition: 0.03s;
+}
+
+.buttons {
+    height: 60px;
+    display: flex;
+    justify-content: space-around; /* Распределить кнопки по ширине */
+    align-items: center;
+    padding: 5px 10px; /* Небольшие отступы по бокам */
+}
+
+.button-icon {
+    line-height: 1; /* Чтобы не было лишнего пространства */
+}
+
+/* --- Таблица --- */
+.div-profile-table {
+    padding: 15px;
+    background-color: var(--tg-theme-section-bg-color); /* Белый фон для таблицы */
+}
+.profile-table {
+    border-collapse: collapse; /* Убираем двойные границы */
+    width: 100%;
+    margin-top: 0; /* Примыкает сразу к цветному блоку */
+    background-color: var(--tg-theme-section-bg-color); /* Белый фон для таблицы */
+    outline: 1px solid #8080803f;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.profile-table tr {
+    border-bottom: 1px solid #8080803f; /* Разделитель между строками */
+}
+
+.profile-table tr:last-child {
+    border-bottom: none; /* У последней строки нет нижней границы */
+}
+
+.profile-table td {
+    padding: 10px 15px;
+}
+
+
+
+.profile-table td:first-child {
+    background-color: var(--tg-theme-bg-color); /* Фон для первого столбца */
+    width: 25%;
+    border-right: 1px solid #8080803f;
+    color: var(--tg-theme-text-color);
+}
+
+.profile-table td:last-child {
+    color: var(--tg-theme-text-color);
+}
+
+.profile-table a {
+    color: var(--tg-theme-link-color); /* Цвет ссылок */
+    text-decoration: none;
+}

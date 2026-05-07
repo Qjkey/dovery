@@ -1,0 +1,60 @@
+/* Общие стили для заголовка */
+.tab-header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    border-bottom: 0.5px solid var(--tg-theme-section-separator-color);
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.tab-header::-webkit-scrollbar { display: none; }
+
+/* РЕЖИМ 1: Обычные (растягиваются) */
+.tab-header.usual .tab {
+    flex: 1; 
+}
+
+.tab-content {
+    display: none; /* Скрыто по умолчанию */
+}
+
+.tab-content.actives_section {
+    display: block; /* Появляется при наличии класса actives */
+}
+
+/* РЕЖИМ 2: Прокручиваемые (адаптивные) */
+.tab-header.adaptive {
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.tab-header.adaptive .tab {
+    flex-shrink: 0;
+    padding: 14px 20px; /* Фиксированные отступы, чтобы текст не слипался */
+}
+
+/* Общие стили вкладок */
+.tab {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 14px 0;
+    cursor: pointer;
+    user-select: none;
+    color: var(--tg-theme-subtitle-text-color);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.tab span { position: relative; display: inline-block; }
+.tab.actives { color: var(--tg-theme-button-color); }
+
+.tab-underline {
+    position: absolute;
+    bottom: 0;
+    height: 3px;
+    background: var(--tg-theme-button-color);
+    border-radius: 4px 4px 0 0;
+    transition: left 0.25s ease, width 0.25s ease;
+    pointer-events: none;
+}

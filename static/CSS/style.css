@@ -1,0 +1,254 @@
+:root {
+    --tg-theme-bg-color: #ffffff;
+    --tg-theme-section-bg-color: #ffffff;
+    --tg-theme-secondary-bg-color: #f1f1f3;
+    --tg-theme-text-color: #1a1d21;
+    --tg-theme-hint-color: #a8a8a8;
+    --tg-theme-link-color: #2678b6;
+    --tg-theme-button-color: #229af0;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-header-bg-color: #ffffff;
+    --tg-theme-accent-text-color: #1c93e3;
+    --tg-theme-section-header-text-color: #298acf;
+    --tg-theme-subtitle-text-color: #82868a;
+    --tg-theme-destructive-text-color: #cc2929;
+    --tg-theme-section-separator-color: #d9d9d9;
+    --tg-theme-bottom-bar-bg-color: #f1f1f3;
+
+    --otstup: 20px;
+}
+
+html { scrollbar-width: none; } 
+body { -ms-overflow-style: none; }
+body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; }
+
+body {
+    background-color: var(--tg-theme-secondary-bg-color);
+    margin: 0;
+}
+a {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+section {
+    width: 100%;
+    background-color: var(--tg-theme-section-bg-color);
+}
+section.bottom {
+    margin-bottom: 12px;
+}
+
+/* item */
+.item {
+    padding-left: var(--otstup);
+    display: flex;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden; 
+}
+.item-header {
+    padding-left: var(--otstup);
+    display: flex;
+    height: 56px;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden; 
+    background-color: #527DA3;
+}
+.separator {
+    border-bottom: 0.5px solid var(--tg-theme-section-separator-color);
+}
+.big-header {
+    align-items: center;
+    text-align: center;
+    padding: 24px 28px;
+}
+.big-header img {
+    width: 100px;
+}
+.big-header-title {
+    margin-bottom: 12px;
+    margin-top: 8px;
+}
+.info_block {
+    display: grid;
+    grid-template-columns: 45px auto;
+    padding: 15px 40px 0px 20px;
+}
+.icon_info_block {
+    text-align: center;
+    width: 30px;
+    height: 30px;
+}
+.text_info_block {
+    text-align: left;
+    margin-bottom: 15px;
+    gap: 3px;
+}
+
+
+/* Основные компаненты item-а */
+.right {
+    display: flex;
+    padding-right: var(--otstup);
+    width: 100%;
+}
+.left {
+    display: flex;
+    place-items: center;
+    margin-right: 14px;
+    text-decoration: none;
+}
+
+.second-left {
+    display: flex;
+    place-items: center;
+    margin-right: 9px;
+    text-decoration: none;
+}
+/* Для любого контейнера с классом .clicked */
+.clicked {
+    position: relative;
+    overflow: hidden; /* Обязательно: обрезает ripple по border-radius контейнера */
+    -webkit-tap-highlight-color: transparent;
+}
+
+.clicked .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background-color: rgba(129, 129, 129, 0.1); /* Немного ярче для видимости */
+    transform: translate(-50%, -50%) scale(0); /* Начальное состояние */
+    opacity: 1;
+    pointer-events: none;
+    z-index: 3;
+    /* Плавное расширение */
+    transition: transform 0.6s cubic-bezier(0.2, 0, 0.4, 1), opacity 0.3s ease;
+}
+
+
+
+/* Когда палец нажат */
+.clicked .ripple.is-active {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Когда палец отпущен */
+.clicked .ripple.is-fading {
+    opacity: 0;
+}
+
+
+/* Контейнеры для элементов item-а */
+.ava {
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+}
+.icon {
+    width: 42px;
+}
+.text {
+    width: 100%;
+}
+.text.oneline {
+    padding-top: 15px;
+    padding-bottom: 15px;
+}
+.text.twoline {
+    padding-top: 9px;
+    padding-bottom: 9px;
+}
+.text.header {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+.element {
+    display: flex;
+    white-space: nowrap;
+    place-items: center;
+    text-decoration: none;
+}
+.element svg {
+    stroke: var(--tg-theme-hint-color);
+}
+.footer {
+    margin-bottom: 20px;
+    color: var(--tg-theme-subtitle-text-color);
+}
+
+
+/* Кнопки */
+.button {
+    display: flex;
+    background: var(--tg-theme-button-color);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px 6px 12px;
+    color: #fff;
+    cursor: pointer;
+}
+.button:active {
+    transform: scale(0.96);
+    transition: 0.03s;
+}
+
+
+/* Цвета элементов */
+.label {
+    color: var(--tg-theme-text-color);
+    cursor: default;
+}
+.label-header {
+    color: var(--tg-theme-bg-color);
+    cursor: default;
+}
+.label-header-subtitle {
+    color: #D2E9FB;
+    cursor: default;
+}
+.defult {
+    color: #fff;
+    cursor: default;
+    z-index: 1;
+}
+.subname {
+    color: #ffffff9d;
+    cursor: default;
+}
+.active {
+    margin-top: 2px;
+    color: var(--tg-theme-button-color);
+    cursor: default;
+}
+.title {
+    color: var(--tg-theme-accent-text-color);
+    cursor: default;
+    height: 20px;
+    padding-top: 20px;
+    width: 100%;
+}
+.second-title {
+    padding-top: 20px;
+    display: block;
+    text-decoration: none;
+    color: var(--tg-theme-accent-text-color);
+    cursor: pointer;
+}
+.label-active {
+    color: var(--tg-theme-accent-text-color);
+    cursor: default;
+    text-decoration: none;
+}
+.label-hint {
+    color: var(--tg-theme-subtitle-text-color);
+    cursor: default;
+}
+.label-destructive {
+    color: var(--tg-theme-destructive-text-color);
+    cursor: default;
+}
+.subtitle {
+    margin-top: 2px;
+    color: var(--tg-theme-subtitle-text-color);
+    cursor: default;
+
+}

@@ -1,0 +1,17 @@
+# База данных (самое важное)
+db/dovery.db
+instance/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Переменные окружения (пароли и секретные ключи)
+.env
+
+# Логи
+*.log

@@ -1,0 +1,97 @@
+.input-container {
+    position: relative;
+    padding: 10px var(--otstup);
+}
+
+::selection {
+    background: var(--tg-theme-button-color);
+    color: #fff;
+}
+
+input:focus {
+    caret-color: var(--tg-theme-button-color);
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px 40px 12px 14px;
+    height: 48px;
+    outline: 0.5px solid var(--tg-theme-hint-color);
+    background-color: var(--tg-theme-section-bg-color);
+    border-radius: 6px;
+    border: none;
+    font-size: 16px;
+    font-weight: 400;
+    transition: outline 0.2s;
+    box-sizing: border-box;
+}
+
+.input-field[type="text"] {
+    font-family: "Roboto";
+    color: var(--tg-theme-text-color);
+}
+
+.input-field:focus {
+    outline: 2px solid var(--tg-theme-button-color);
+}
+
+.input-label {
+    position: absolute;
+    top: 25px;
+    left: 30px;
+    font-size: 15px;
+    color: var(--tg-theme-hint-color);
+    pointer-events: none;
+    transition: all 0.2s ease;
+    font-family: "Roboto";
+    background-color: var(--tg-theme-section-bg-color);
+    padding: 0 4px;
+}
+
+.input-field:focus + .input-label,
+.input-field:not(:placeholder-shown) + .input-label
+{
+    color: var(--tg-theme-button-color);  
+    top: 1px; 
+    left: 30px;
+    font-size: 12px;
+}
+.input-field.has-text + .input-label {
+    color: var(--tg-theme-hint-color);  
+    top: 1px;
+    left: 30px;
+    font-size: 12px;
+}
+
+
+.input-field:focus + .input-label {
+    color: var(--tg-theme-button-color);
+}
+.input-field:not(:focus) + .input-label {
+    color: var(--tg-theme-hint-color);
+}
+.input-field::placeholder {
+    color: transparent;
+}
+
+.clear-button {
+    position: absolute;
+    top: 40%;
+    margin: 0;
+    right: 30px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--tg-theme-hint-color);
+    background-color: var(--tg-theme-section-bg-color);
+    transition: opacity 0.2s ease;
+    opacity: 0;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.clear-button svg {
+    fill: var(--tg-theme-hint-color);
+}
+
+.input-field:focus + .input-label + .clear-button{
+    opacity: 1;
+}

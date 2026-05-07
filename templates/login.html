@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Вход в аккаунт
+{% endblock %}
+
+{% block body %}
+<section>
+<div class="item-header">
+    <a href="/" class="left"> 
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
+        </svg>
+    </a>
+    <div class="right">
+        <div class="text header"> 
+            <div class="label-header headline6">Вход в аккаунт</div> 
+        </div>
+    </div>
+</div>
+<section>
+</section>
+</section>
+<form action="/login" method="POST">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="bottom">
+<div class="item">
+    <div class="right">
+        <div class="title oneline"> 
+            <div class="button1-medium">Ввод данных</div> 
+        </div>
+    </div>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
+    <label class="input-label">Username</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+<div class="input-container">
+    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Label" name="password">
+    <label class="input-label">Пароль</label>
+    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+</div>
+</section>
+<section>
+<div class="item clicked" onclick="validateAndSubmit(this);">
+    <div class="right">
+        <div class="text oneline"> 
+            <div class="label body1">Продолжить</div> 
+        </div>
+        <div class="element"> 
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+    </div>
+</div>
+</section>
+</form>
+<script>
+const dbName = "Dovery";
+const storeName = "secrets";
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveUserData(userData, privateKey) {
+    const db = await initDB();
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+
+    store.put(privateKey, "private_key");
+    store.put(userData, "user_profile");
+
+    return new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+    });
+}
+
+async function deriveEncryptionKey(password, username) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: encoder.encode(username),
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false, ["decrypt"]
+    );
+}
+
+async function decryptAndImportKey(encryptedBase64, password, username) {
+    const combined = new Uint8Array(atob(encryptedBase64).split("").map(c => c.charCodeAt(0)));
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+
+    const encryptionKey = await deriveEncryptionKey(password, username);
+
+    const decryptedRaw = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        encryptionKey,
+        ciphertext
+    );
+
+    return await window.crypto.subtle.importKey(
+        "pkcs8",
+        decryptedRaw,
+        { 
+            name: "ECDH", 
+            namedCurve: "P-256" 
+        },
+        true,
+        ["deriveKey", "deriveBits"]
+    );
+}
+
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function validateAndSubmit(el) {
+    const form = el.closest('form'); 
+    const usernameInput = form.querySelector('input[name="username"]');
+    const passwordInput = form.querySelector('input[name="password"]');
+    const csrfInput = form.querySelector('input[name="csrf_token"]');
+
+    const username = usernameInput.value.trim();
+    let passwordValue = passwordInput.value.trim();
+
+    if (username === "" || passwordValue === "") {
+        d_alert("Ошибка d101", "Введите логин и пароль", "ok");
+        return;
+    }
+
+    const hashedForServer = await hashPassword(passwordValue);
+
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', hashedForServer);
+    formData.append('csrf_token', csrfInput.value);
+
+    try {
+        const response = await fetch('/login', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === "success") {
+            const privateKeyObject = await decryptAndImportKey(data.priv_key, passwordValue, username);
+            passwordValue = null;
+            passwordInput.value = "";
+            await saveUserData(data.user_data, privateKeyObject);
+            window.location.href = "/";
+        } else {
+            if (data.message === "d102") {
+                d_alert("Ошибка d102", "Неверный логин или пароль. Из-за безопасности, чо верно чо нет, сказать не могу:D", "ok");
+            } else if (data.message === "d101") {
+                d_alert("Ошибка d101", "Введите логин и пароль в поля ввода", "ok");
+            } else if (data.message === "d103") {
+                d_alert("Ошибка d103", "Ошибка базы данных", "ok");
+            }
+        }
+    } catch (err) {
+        console.log(err);
+        d_alert("Ошибка d104", "Ошибка сервера", "ok");
+    }
+}
+</script>
+{% endblock %}

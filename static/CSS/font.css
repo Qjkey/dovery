@@ -1,0 +1,113 @@
+@font-face {
+    font-family: "Roboto";
+    src: url("font/Roboto.ttf") format("truetype");
+    font-display: block;
+}
+
+@font-face{
+    font-family: "SF ro display";
+    font-style: normal;
+    src: url("font/SF-Pro-Display-Bold.woff2") format("woff2");
+}
+
+.headline-sf {
+    font-family: "SF pro display";
+    font-weight: bold;
+    font-size: 30px;
+}
+
+.headline6 {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 20px;
+}
+
+.headline5 {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 18px;
+}
+
+.body1 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 16px;
+}
+
+.body1-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.subtitle1 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 15px;
+}
+
+.subtitle1-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.subtitle2 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 14px;
+}
+
+.subtitle2-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.button1-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.button1 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 15px;
+}
+
+.caption1 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 13px;
+}
+
+.caption1-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.caption2 {
+    font-family: "Roboto";
+    font-weight: 400;
+    font-size: 12px;
+}
+
+.caption2-medium {
+    font-family: "Roboto";
+    font-weight: 500;
+    font-size: 12px;
+}
+
+#msgInput {
+    font-family: "Roboto", sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+}
+
+#msgInput::placeholder {
+    font-family: "Roboto", sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+}

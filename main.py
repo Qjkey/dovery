@@ -41,9 +41,6 @@ app.config.update(
 csrf = CSRFProtect(app)
 socketio = SocketIO(app)
 
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
 @app.after_request
 def add_security_headers(response):
     csp = (

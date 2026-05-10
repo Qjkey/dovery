@@ -274,6 +274,7 @@ async function calc_key_chat(myPrivateKey, opponentPublicKey) {
     );
 }
 </script>
+<!-- Поиск -->
 <script>
 let debounceTimer;
 
@@ -364,7 +365,7 @@ async function startChat(userId, userName) {
         if (response.ok) {
             closeSearch();
             await loadMyChats(); // Обновляем список в боковой панели
-            await openDirectWindow(userName); // Открываем интерфейс переписки
+            await openDirectWindow(userId); // Открываем интерфейс переписки
         }
     } catch (err) {
         console.error("Ошибка при создании чата:", err);
@@ -448,8 +449,10 @@ async function openDirectWindow(userId) {
 <div id="tagDropdown" class="tag-dropdown">
 </div> 
 <!-- Подключения -->
- <script src="/static/js/sockets.js"></script>
+<script src="/static/js/sockets.js"></script>
 <script src="/static/js/html_canvas.js"></script>
+<!-- Подключение сокета -->
+<script>const socket = io();</script>
 <!-- Копирование и удаление сообщения -->
 <script>
 function copy_message(id) {
@@ -478,77 +481,97 @@ function copy_message(id) {
 
 window.snapDelete = async function(id) {
     const cleanId = id.trim();
-    const messageElement = document.querySelector(`[data-id="${cleanId}"]`);
-    if (!messageElement) return;
-    const wrapper = messageElement.closest('.message-wrapper');
-    if (!wrapper) return;
 
     if (typeof hideDropdown === 'function') hideDropdown();
-
-    try {
-        // Использование самого быстрого метода захвата
-        const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
-        
-        const width = wrapper.offsetWidth;
-        const height = wrapper.offsetHeight;
-        const rect = wrapper.getBoundingClientRect();
-
-        // Мгновенно скрываем оригинал
-        wrapper.style.visibility = 'hidden';
-
-        const layersCount = 20; // Минимум для Android
-        const layers = [];
-        
-        // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
-        for (let i = 0; i < layersCount; i++) {
-            const c = document.createElement('canvas');
-            c.width = width;
-            c.height = height;
-            c.className = 'dust';
-            c.style.cssText = `
-                position: absolute;
-                left: ${rect.left}px;
-                top: ${rect.top + window.scrollY}px;
-                width: ${width}px;
-                height: ${height}px;
-                pointer-events: none;
-                z-index: 9999;
-                transition: transform 0.8s ease-out, opacity 0.6s ease-out;
-            `;
-            document.body.appendChild(c);
-            layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
-        }
-
-        // Быстрое распределение
-        for (let i = 0; i < pixels.length; i += 12) { 
-            const x = (i / 4) % width;
-            const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
-            const d = layers[lIdx].imgData.data;
-
-            // Копируем основной пиксель
-            d[i] = pixels[i]; 
-            d[i+1] = pixels[i+1]; 
-            d[i+2] = pixels[i+2]; 
-            d[i+3] = pixels[i+3];
-        }
-
-        layers.forEach((l, i) => {
-            l.ctx.putImageData(l.imgData, 0, 0);
-            requestAnimationFrame(() => {
-                const x = (i - layersCount / 2) * 10;
-                const y = 0 - Math.random() * 40;
-                l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
-                l.c.style.opacity = '0';
-            });
-            setTimeout(() => l.c.remove(), 1000);
-        });
-
-        setTimeout(() => wrapper.remove(), 500);
-
-    } catch (err) {
-        wrapper.remove();
-    }
+    socket.emit('delete_message', { msg_id: cleanId });
 };
+
+socket.on('message_deleted', async (data) => {
+    if (typeof chatCache !== 'undefined' && chatCache) {
+        Object.keys(chatCache).forEach(chatId => {
+            const messages = chatCache[chatId].messages;
+            if (Array.isArray(messages)) {
+                // Фильтруем массив, оставляя только те сообщения, чей ID не совпадает с удаленным
+                const initialLength = messages.length;
+                chatCache[chatId].messages = messages.filter(msg => String(msg.msg_id) !== String(data.msg_id));
+                
+                if (messages.length < initialLength) {
+                    console.log(`Сообщение удалено из chatCache [${chatId}]`);
+                }
+            }
+        });
+    }
+
+    const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
+    if (messageElement) {
+        const wrapper = messageElement.closest('.message-wrapper');
+        if (wrapper) {
+            try {
+                // Использование самого быстрого метода захвата
+                const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
+                
+                const width = wrapper.offsetWidth;
+                const height = wrapper.offsetHeight;
+                const rect = wrapper.getBoundingClientRect();
+
+                // Мгновенно скрываем оригинал
+                wrapper.style.visibility = 'hidden';
+
+                const layersCount = 20; // Минимум для Android
+                const layers = [];
+                
+                // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
+                for (let i = 0; i < layersCount; i++) {
+                    const c = document.createElement('canvas');
+                    c.width = width;
+                    c.height = height;
+                    c.className = 'dust';
+                    c.style.cssText = `
+                        position: absolute;
+                        left: ${rect.left}px;
+                        top: ${rect.top + window.scrollY}px;
+                        width: ${width}px;
+                        height: ${height}px;
+                        pointer-events: none;
+                        z-index: 9999;
+                        transition: transform 0.8s ease-out, opacity 0.6s ease-out;
+                    `;
+                    document.body.appendChild(c);
+                    layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
+                }
+
+                // Быстрое распределение
+                for (let i = 0; i < pixels.length; i += 12) { 
+                    const x = (i / 4) % width;
+                    const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
+                    const d = layers[lIdx].imgData.data;
+
+                    // Копируем основной пиксель
+                    d[i] = pixels[i]; 
+                    d[i+1] = pixels[i+1]; 
+                    d[i+2] = pixels[i+2]; 
+                    d[i+3] = pixels[i+3];
+                }
+
+                layers.forEach((l, i) => {
+                    l.ctx.putImageData(l.imgData, 0, 0);
+                    requestAnimationFrame(() => {
+                        const x = (i - layersCount / 2) * 10;
+                        const y = 0 - Math.random() * 40;
+                        l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
+                        l.c.style.opacity = '0';
+                    });
+                    setTimeout(() => l.c.remove(), 1000);
+                });
+
+                setTimeout(() => wrapper.remove(), 500);
+
+            } catch (err) {
+                wrapper.remove();
+            }
+        }
+    }
+});
 </script>
 <!-- Изменение размера поля ввода -->
 <script>
@@ -599,8 +622,6 @@ async function decryptText(encryptedBase64) {
 
     return new TextDecoder().decode(decryptedContent);
 }
-
-const socket = io();
 
 // --- ФУНКЦИЯ ОТПРАВКИ ---
 async function sendMessage() {
@@ -653,6 +674,26 @@ async function sendMessage() {
     // textContent превратит любой <html> в обычную строку текста
     wrapper.querySelector('.message-content').textContent = text;
 
+    if (typeof chatCache !== 'undefined') {
+        // Определяем, в какой чат положить сообщение. 
+        // Если мы получили сообщение, значит ID чата — это sender_id отправителя.
+        const chatId = data.sender_id; 
+        
+        if (chatCache[chatId]) {
+            // Создаем объект сообщения в том же формате, что хранит кэш
+            const newCacheMsg = {
+                msg_id: data.msg_id,
+                sender_id: data.sender_id,
+                text: data.text, // сохраняем зашифрованным, как в БД
+                time: data.time
+            };
+            
+            // Добавляем в начало или конец (зависит от твоей логики отображения)
+            chatCache[chatId].messages.push(newCacheMsg);
+            console.log("Сообщение добавлено в chatCache");
+        }
+    }
+
     messagesArea.prepend(wrapper);
     
     msgInput.value = '';
@@ -664,6 +705,23 @@ socket.on('new_message', async (data) => {
     try {
         const receiverId = document.getElementById('id_ept').innerText;
         const decryptedText = await decryptText(data.text);
+        if (typeof chatCache !== 'undefined') {
+            const chatId = data.sender_id; 
+            
+            if (chatCache[chatId]) {
+                const newCacheMsg = {
+                    msg_id: data.msg_id,
+                    sender_id: data.sender_id,
+                    text: data.text,
+                    time: data.time
+                };
+                
+                // Добавляем в начало или конец (зависит от твоей логики отображения)
+                chatCache[chatId].messages.push(newCacheMsg);
+                console.log("Сообщение добавлено в chatCache");
+            }
+        }
+
         if (receiverId == data.sender_id) {
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper received new-msg';
@@ -710,44 +768,42 @@ msgInput.addEventListener('keydown', async (e) => {
 </script>
 <!-- Отображение сообщений -->
 <script>
+const chatCache = {};
 async function loadChat(userId) {
     const messagesArea = document.getElementById('messages-area');
-    
-    // 1. Очищаем экран
-    messagesArea.innerHTML = '';
     const receiverId = userId;
+    if (chatCache[userId]) {
+        renderChat(messagesArea, chatCache[userId].messages, receiverId, userId);
+        return;
+    }
     try {
         // 2. Fetch запрос к серверу
         const response = await fetch(`/get_history_messages/${receiverId}`);
         const messages = await response.json();
 
-        // 3. Цикл по сообщениям
-        for (const msg of messages) {
-            await renderMessage(msg, receiverId);
-        }
-
-        // 4. Скролл вниз
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-
+        const decryptedMessages = await Promise.all(messages.map(async (msg) => {
+            try {
+                const text = await decryptText(msg.message_text);
+                return { ...msg, decryptedText: text };
+            } catch (e) {
+                return { ...msg, decryptedText: "[Ошибка расшифровки]" };
+            }
+        }));
+        renderChat(messagesArea, decryptedMessages, receiverId, userId);
     } catch (err) {
         console.error("Ошибка загрузки истории:", err);
     }
 }
 
-async function renderMessage(msg, receiverId) {
-    const messagesArea = document.getElementById('messages-area');
-    
-    try {
-        const decryptedText = await decryptText(msg.message_text);
-        console.log(decryptedText);
-
+function renderChat(messagesArea, messages, receiverId, userId) {
+    messagesArea.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    messages.forEach(msg => {
         const mne = msg.sender_id != receiverId;
         const typeClass = mne ? 'sent' : 'received';
 
         const wrapper = document.createElement('div');
         wrapper.className = 'message-wrapper ' + typeClass;
-        
-        // Твой шаблон
         wrapper.innerHTML = `
             <div class="message-bubble ${typeClass}" id="cntxt_menu_btn_03" data-id="${msg.id}">
                 <div class="message-content body1" style="white-space: pre-wrap;"></div>
@@ -756,13 +812,17 @@ async function renderMessage(msg, receiverId) {
                 </div>
             </div>
         `;
+        wrapper.querySelector('.message-content').textContent = msg.decryptedText;
+        chatCache[userId] = {
+            id: userId,
+            messages: messages
+        };
+        console.log(chatCache);
+        fragment.prepend(wrapper);
+    });
 
-        // Безопасно вставляем текст
-        wrapper.querySelector('.message-content').textContent = decryptedText;
-        messagesArea.prepend(wrapper);
-    } catch (e) {
-        console.warn("Не удалось расшифровать сообщение ID:", e, msg.id);
-    }
+    messagesArea.appendChild(fragment);
+    messagesArea.scrollTop = messagesArea.scrollHeight;
 }
 
 // Помощник для времени (обрабатывает ISO строку из базы)

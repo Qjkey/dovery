@@ -39,7 +39,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=True
 )
 csrf = CSRFProtect(app)
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 
 @app.after_request
 def add_security_headers(response):
@@ -101,7 +101,7 @@ def save_session(raw_token, user_id):
         return False
 
 # Сохранение сообщения
-def save_message(sender_id, receiver_id, encrypted_text):
+def save_message(sender_id, receiver_id, encrypted_text, msg_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -109,12 +109,13 @@ def save_message(sender_id, receiver_id, encrypted_text):
             time_iso = utc_now.isoformat()
 
             cursor.execute('''
-                INSERT INTO message (sender_id, receiver_id, message_text, time)
-                VALUES (?, ?, ?, ?)
-            ''', (sender_id, receiver_id, encrypted_text, time_iso))
+                INSERT INTO message (id, sender_id, receiver_id, message_text, time)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (msg_id, sender_id, receiver_id, encrypted_text, time_iso))
             conn.commit()
             return True
     except Exception as e:
+        print(e)
         return False
 
 # Получение id текущего пользователя
@@ -186,6 +187,22 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
     except Exception as e:
         print(e)
         return False, "d204"
+
+def delete_message(msg_id):
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT receiver_id FROM message WHERE id = ?", (msg_id,))
+            row = cursor.fetchone()
+            if not row: return False
+            receiver_id = row[0]
+            
+            cursor.execute("DELETE FROM message WHERE id = ?", (msg_id,))
+            conn.commit()
+            return receiver_id
+    except Exception as e:
+        print(e)
+        return False
 
 # Существует ли пользователь?
 def get_user_by_username(username):
@@ -394,6 +411,7 @@ def handle_message(data):
     # Данные от клиента
     receiver_id = data.get('receiver_id')
     encrypted_text = data.get('text')
+    msg_id = data.get('msgId')
     
     # Определяем отправителя (через сессию Flask или кастомный метод)
     sender_id = get_current_user_id()
@@ -402,7 +420,7 @@ def handle_message(data):
         return
 
     # 1. Сохраняем в БД зашифрованную строку
-    save_message(sender_id, receiver_id, encrypted_text)
+    save_message(sender_id, receiver_id, encrypted_text, msg_id)
 
     # 2. Пересылаем получателю в его персональную комнату
     emit('new_message', {
@@ -410,6 +428,16 @@ def handle_message(data):
         'sender_id': sender_id,
         'time': datetime.now().strftime('%H:%M')
     }, to=f"user_{receiver_id}")
+
+@socketio.on('delete_message')
+def handle_delete(data):
+    msg_id = data.get('msg_id')
+    sender_id = get_current_user_id()
+
+    id = delete_message(msg_id)
+    if id:
+        emit('message_deleted', {'msg_id': msg_id}, to=f"user_{id}")
+        emit('message_deleted', {'msg_id': msg_id}, to=f"user_{sender_id}")
 
 # Получить историю чата
 @app.route('/get_history_messages/<int:second_id>')
@@ -439,4 +467,4 @@ def get_history(second_id):
         print(f"Ошибка базы данных: {e}")
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port="8080")
+    socketio.run(app, host='0.0.0.0', port=8080, debug=True)

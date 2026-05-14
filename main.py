@@ -113,7 +113,7 @@ def save_message(sender_id, receiver_id, encrypted_text, msg_id):
                 VALUES (?, ?, ?, ?, ?)
             ''', (msg_id, sender_id, receiver_id, encrypted_text, time_iso))
             conn.commit()
-            return True
+            return time_iso
     except Exception as e:
         print(e)
         return False
@@ -405,7 +405,7 @@ def get_my_chats():
 def handle_csrf_error(e):
     return jsonify({"status": "error", "message": "d207"})
 
-# Сокеты 
+# Сокеты отправка сообщения
 @socketio.on('send_direct_message')
 def handle_message(data):
     # Данные от клиента
@@ -420,15 +420,17 @@ def handle_message(data):
         return
 
     # 1. Сохраняем в БД зашифрованную строку
-    save_message(sender_id, receiver_id, encrypted_text, msg_id)
+    time = save_message(sender_id, receiver_id, encrypted_text, msg_id)
 
     # 2. Пересылаем получателю в его персональную комнату
     emit('new_message', {
+        'msg_id': msg_id,
         'text': encrypted_text,
         'sender_id': sender_id,
-        'time': datetime.now().strftime('%H:%M')
+        'time': time
     }, to=f"user_{receiver_id}")
 
+# Удаление сообщения сокет
 @socketio.on('delete_message')
 def handle_delete(data):
     msg_id = data.get('msg_id')

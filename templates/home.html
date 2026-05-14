@@ -7,6 +7,7 @@ Dovery
 {% block body %}
 <link href="static/CSS/textarea-mess.css" rel="stylesheet" type="text/css">
 <link href="static/CSS/message.css" rel="stylesheet" type="text/css">
+<link href="static/CSS/overlay.css" rel="stylesheet" type="text/css">
 <style>
 html, body {
     margin: 0;
@@ -27,6 +28,19 @@ html, body {
     pointer-events: none;
     z-index: 9999;
     transition: transform 1.5s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 1.5s ease-out;
+}
+
+.e2ee {
+    text-align: center;
+    padding-top: 3px;
+    padding-bottom: 5px;
+    background-color: var(--tg-theme-bg-color);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+}
+
+.e2ee.hidden-animation {
+    opacity: 0;
 }
 
 .app-wrapper {
@@ -180,6 +194,9 @@ html, body {
                     </div>
                 </div>
             </div>
+        <div class="e2ee clicked" id="overlay_profile">
+            <div class="active caption1-medium">Сквозное шифрование E2EE</div> 
+        </div>
         </header>
 
         <!-- СЮДА БУДУТ ПАДАТЬ СООБЩЕНИЯ -->
@@ -227,6 +244,44 @@ function toggleChat(isSelected) {
 }
 </script>
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<!-- Блок с информацией для E2EE -->
+<div class="overlay-container">
+    <div class="profile-modal">
+        <section class="before_for">
+            <div class="item">
+                <div onclick="closeOverlay();" class="left"> 
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18.295 7.115C18.6844 6.72564 18.6844 6.09436 18.295 5.705C17.9056 5.31564 17.2744 5.31564 16.885 5.705L12 10.59L7.115 5.705C6.72564 5.31564 6.09436 5.31564 5.705 5.705C5.31564 6.09436 5.31564 6.72564 5.705 7.115L10.59 12L5.705 16.885C5.31564 17.2744 5.31564 17.9056 5.705 18.295C6.09436 18.6844 6.72564 18.6844 7.115 18.295L12 13.41L16.885 18.295C17.2744 18.6844 17.9056 18.6844 18.295 18.295C18.6844 17.9056 18.6844 17.2744 18.295 16.885L13.41 12L18.295 7.115Z" fill="var(--tg-theme-text-color)"/>
+                    </svg>
+                </div>
+                <div class="right">
+                    <div class="text header"> 
+                        <div class="label headline6">Сквозное шифрование E2EE</div> 
+                    </div>
+                </div>
+            </div>
+            <div class="info_block">
+                <div class="icon_info_block"><svg  viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10545" inkscape:label="surface10545" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10545" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 332.48,218.56 C 332.48,218.56 163.52,218.56 163.52,218.56 C 143.72,218.56 127.68,234.6 127.68,254.4 C 127.68,254.4 127.68,384.96 127.68,384.96 C 127.68,404.76 143.72,420.8 163.52,420.8 C 163.52,420.8 348.48,420.8 348.48,420.8 C 368.28000000000003,420.8 384.32,404.76 384.32,384.96 C 384.32,384.96 384.32,254.4 384.32,254.4 C 384.32,234.6 368.28000000000003,218.56 348.48,218.56 C 348.48,218.56 332.48,218.56 332.48,218.56 Z M 332.48,218.56 C 332.48,218.56 332.48,167.68 332.48,167.68 C 332.48,125.44 298.24,91.2 256,91.2 C 213.76,91.2 179.52,125.44 179.52,167.68 C 179.52,167.68 179.52,218.56 179.52,218.56 "/> </g> <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 211.2,240.24 C 211.2,250.85000000000002 202.61,259.44 192,259.44 C 181.39,259.44 172.8,250.85000000000002 172.8,240.24 C 172.8,229.64000000000001 181.39,221.04 192,221.04 C 202.61,221.04 211.2,229.64000000000001 211.2,240.24 " style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> </g> </g> </svg></div>
+                <div class="text_info_block">
+                    <div class="label button1-medium">Безопасность</div>
+                    <div class="subtitle subtitle2">Прочитать переписку можете только вы и ваш собеседник</div>
+                </div>
+
+                <div class="icon_info_block"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="g_1" transform="matrix(5.12, 0.0, 0.0, 5.12, 0.0, 0.0)" inkscape:label="PreCompLayer"> <g inkscape:groupmode="layer" id="g_2" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" inkscape:label="ShapeLayer"> <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color);fill-rule:evenodd"> <path d="M 45.774,28.791 C 53.194,21.371000000000002 65.224,21.371000000000002 72.644,28.791 C 80.06400000000001,36.211 80.06400000000001,48.241 72.644,55.661 C 67.09700000000001,61.208 58.967000000000006,62.613 52.111000000000004,59.857 C 50.099000000000004,59.047 47.643,59.958 46.816,62.173 C 46.816,62.173 44.976,67.098 44.976,67.098 C 44.976,67.098 36.906,67.298 36.906,67.298 C 35.43488069662806,67.3346877956907 34.098223692250926,68.18035151842541 33.435,69.494 C 33.435,69.494 29.852000000000004,76.592 29.852000000000004,76.592 C 29.852000000000004,76.592 21.868000000000002,76.592 21.868000000000002,76.592 C 21.868000000000002,76.592 22.041,69.554 22.041,69.554 C 22.06042515747856,68.75900521891403 22.395177473719723,68.003472840645 22.971,67.455 C 22.971,67.455 40.277,50.965 40.277,50.965 C 41.10144664429708,50.17898359275447 41.409947543939154,48.98849649388377 41.071,47.901 C 39.034,41.365 40.607,33.958000000000006 45.774,28.791000000000004 C 45.774,28.791000000000004 45.774,28.791 45.774,28.791 Z M 76.887,24.549 C 67.124,14.785 51.294,14.785 41.531,24.549 C 35.205999999999996,30.874 32.982,39.742 34.847,47.852000000000004 C 34.847,47.852000000000004 18.832,63.112 18.832,63.112 C 17.10525675920291,64.75669038960999 16.101064359747422,67.02206206063968 16.042,69.406 C 16.042,69.406 15.870000000000001,76.44500000000001 15.870000000000001,76.44500000000001 C 15.789358183947842,79.73551461157479 18.57748538842523,82.51135818394785 21.868000000000002,82.59200000000001 C 21.868000000000002,82.59200000000001 29.852000000000004,82.59200000000001 29.852000000000004,82.59200000000001 C 32.11274358151618,82.59194203267319 34.1891582263383,81.31414840509034 35.208000000000006,79.296 C 35.208000000000006,79.296 38.252,73.266 38.252,73.266 C 38.252,73.266 46.476,73.06200000000001 46.476,73.06200000000001 C 48.10535910540895,73.02147318911582 49.55405186812273,71.98896189990096 50.124,70.46200000000002 C 50.124,70.46200000000002 51.756,66.09400000000002 51.756,66.09400000000002 C 60.338,68.76600000000002 70.083,66.70800000000003 76.886,59.904000000000025 C 86.64999999999999,50.14100000000003 86.64999999999999,34.312000000000026 76.886,24.548000000000023 C 76.886,24.548000000000023 76.887,24.549 76.887,24.549 Z M 58.944,42.49 C 60.894667098110006,44.46719269763082 64.12680730236917,44.4890199677249 66.104,42.5383528696149 C 68.08119269763083,40.587685771504894 68.05466709811,37.30719269763082 66.104,35.33 C 64.13600297628223,33.38840520858484 60.922935283568194,33.39925431975226 58.96809480166022,35.35409480166025 C 57.01325431975225,37.308935283568246 57.00240520858483,40.52200297628224 58.944,42.489999999999995 C 58.944,42.489999999999995 58.944,42.49 58.944,42.49 Z" style="fill-opacity:1.0;fill:var(--tg-theme-text-color);fill-rule:evenodd"/> </g> </g> </g> </svg></div>
+                <div class="text_info_block">
+                    <div class="label button1-medium">Взломать невозможно</div>
+                    <div class="subtitle subtitle2">Без вашего аккаунта и аккаунта вашего собеседника получить доступ к сообщениям невозможно</div>
+                </div>
+
+                <div class="icon_info_block"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="g_1" transform="matrix(5.069306930693069, 0.0, 0.0, 5.069306930693069, 0.0, 0.0)" inkscape:label="PreCompLayer"> <g inkscape:groupmode="layer" id="g_2" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" inkscape:label="ShapeLayer"> <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color);fill-rule:evenodd"> <path d="M 23.999,43.961 C 23.999,43.961 23.999,32.403 23.999,32.403 C 23.99927317781296,30.712843401311822 25.070754207115883,29.19708975010397 26.663999999999998,28.633 C 26.663999999999998,28.633 45.260999999999996,22.046999999999997 45.260999999999996,22.046999999999997 C 48.71548631862723,20.823807853096827 52.48751368137276,20.823807853096827 55.94199999999999,22.046999999999997 C 55.94199999999999,22.046999999999997 74.53999999999999,28.631999999999998 74.53999999999999,28.631999999999998 C 76.13285456215479,29.19642670981905 77.20387651047099,30.71209966220346 77.204,32.402 C 77.204,32.402 77.204,43.961 77.204,43.961 C 77.20410515115631,56.510529082769324 70.98746637305312,68.27801935908992 60.620999999999995,75.351 C 60.620999999999995,75.351 56.800999999999995,77.957 56.800999999999995,77.957 C 53.069767675587265,80.50270342885065 48.133232324412724,80.50270342885065 44.401999999999994,77.957 C 44.401999999999994,77.957 40.581999999999994,75.351 40.581999999999994,75.351 C 30.215621699666897,68.27759547272406 23.999339264861796,56.509695224806606 24,43.96 C 24,43.96 23.999,43.961 23.999,43.961 Z M 43.259,16.391 C 48.00880534124292,14.709199260919627 53.19519465875708,14.709199260919629 57.945,16.391 C 57.945,16.391 76.542,22.976 76.542,22.976 C 80.52560252172199,24.386635009067042 83.20423699089602,28.177011343636767 83.20400000000001,32.403 C 83.20400000000001,32.403 83.20400000000001,43.96 83.20400000000001,43.96 C 83.20387515452855,58.49103997034662 76.00542436328179,72.11643797322648 64.00200000000001,80.306 C 64.00200000000001,80.306 60.18200000000001,82.91199999999999 60.18200000000001,82.91199999999999 C 54.41579130901346,86.84577611377782 46.78720869098656,86.84577611377782 41.02100000000001,82.91199999999999 C 41.02100000000001,82.91199999999999 37.20100000000001,80.306 37.20100000000001,80.306 C 25.1975756366612,72.11643797331007 17.999124845572645,58.49103997034662 17.999,43.96 C 17.999,43.96 17.999,32.403 17.999,32.403 C 17.998763009103467,28.17701134363677 20.677397478278184,24.386635009067536 24.660999999999998,22.976 C 24.660999999999998,22.976 43.257999999999996,16.391 43.257999999999996,16.391 C 43.257999999999996,16.391 43.259,16.391 43.259,16.391 Z M 53.616,31.543 C 52.525,28.825 48.676,28.825 47.585,31.543 C 47.585,31.543 44.037,40.378 44.037,40.378 C 44.037,40.378 34.537,41.022 34.537,41.022 C 31.615,41.221 30.426,44.881 32.674,46.759 C 32.674,46.759 39.98,52.863 39.98,52.863 C 39.98,52.863 37.657,62.096000000000004 37.657,62.096000000000004 C 36.943,64.938 40.056,67.2 42.537,65.64200000000001 C 42.537,65.64200000000001 50.6,60.58 50.6,60.58 C 50.6,60.58 58.664,65.642 58.664,65.642 C 61.145,67.2 64.258,64.938 63.544000000000004,62.096999999999994 C 63.544000000000004,62.096999999999994 61.221000000000004,52.86299999999999 61.221000000000004,52.86299999999999 C 61.221000000000004,52.86299999999999 68.527,46.75899999999999 68.527,46.75899999999999 C 70.775,44.88099999999999 69.587,41.22099999999999 66.663,41.02199999999999 C 66.663,41.02199999999999 57.163999999999994,40.37799999999999 57.163999999999994,40.37799999999999 C 57.163999999999994,40.37799999999999 53.61599999999999,31.542999999999992 53.61599999999999,31.542999999999992 C 53.61599999999999,31.542999999999992 53.616,31.543 53.616,31.543 Z M 48.614,43.74 C 48.614,43.74 50.599999999999994,38.793 50.599999999999994,38.793 C 50.599999999999994,38.793 52.586999999999996,43.74 52.586999999999996,43.74 C 53.051247527954466,44.89556782703425 54.14051301190339,45.68680466462376 55.382999999999996,45.771 C 55.382999999999996,45.771 60.70099999999999,46.131 60.70099999999999,46.131 C 60.70099999999999,46.131 56.61099999999999,49.549 56.61099999999999,49.549 C 55.65484635501514,50.34732739016159 55.23835792457678,51.62796113277233 55.54199999999999,52.836 C 55.54199999999999,52.836 56.84299999999999,58.006 56.84299999999999,58.006 C 56.84299999999999,58.006 52.32799999999999,55.171 52.32799999999999,55.171 C 51.27320737952519,54.50882001674924 49.926792620474785,54.50882001674924 48.871999999999986,55.171 C 48.871999999999986,55.171 44.35799999999998,58.006 44.35799999999998,58.006 C 44.35799999999998,58.006 45.65799999999998,52.836 45.65799999999998,52.836 C 45.961874735179734,51.62815440610776 45.54578879941545,50.3475603322714 44.58999999999998,49.549 C 44.58999999999998,49.549 40.499999999999986,46.132 40.499999999999986,46.132 C 40.499999999999986,46.132 45.817999999999984,45.772 45.817999999999984,45.772 C 47.06072418686981,45.68762965812812 48.15005382234287,44.89595661832796 48.61399999999998,43.739999999999995 C 48.61399999999998,43.739999999999995 48.614,43.74 48.614,43.74 Z" style="fill-opacity:1.0;fill:var(--tg-theme-text-color);fill-rule:evenodd"/> </g> </g> </g> </svg></div>
+                <div class="text_info_block">
+                    <div class="label button1-medium">Мы не можем</div>
+                    <div class="subtitle subtitle2">Даже создатели мессенджера не могут видеть что вы пишите</div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
 <!-- Безопасность чата -->
 <script>
 async function get_public_key(pem) {
@@ -487,20 +542,11 @@ window.snapDelete = async function(id) {
 };
 
 socket.on('message_deleted', async (data) => {
-    if (typeof chatCache !== 'undefined' && chatCache) {
-        Object.keys(chatCache).forEach(chatId => {
-            const messages = chatCache[chatId].messages;
-            if (Array.isArray(messages)) {
-                // Фильтруем массив, оставляя только те сообщения, чей ID не совпадает с удаленным
-                const initialLength = messages.length;
-                chatCache[chatId].messages = messages.filter(msg => String(msg.msg_id) !== String(data.msg_id));
-                
-                if (messages.length < initialLength) {
-                    console.log(`Сообщение удалено из chatCache [${chatId}]`);
-                }
-            }
-        });
-    }
+    Object.keys(chatHash).forEach(chatId => {
+        const initialLength = chatHash[chatId].messages.length;
+        
+        chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
+    });
 
     const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
     if (messageElement) {
@@ -571,7 +617,7 @@ socket.on('message_deleted', async (data) => {
             }
         }
     }
-});
+}); 
 </script>
 <!-- Изменение размера поля ввода -->
 <script>
@@ -585,6 +631,24 @@ tx.addEventListener('input', function() {
 </script>
 <!-- Логика отправки -->
 <script>
+let userId = null;
+const request = indexedDB.open("Dovery");
+
+request.onsuccess = (event) => {
+  const db = event.target.result;
+  const transaction = db.transaction("secrets", "readonly");
+  const store = transaction.objectStore("secrets");
+
+  const getRequest = store.get("user_profile");
+
+  getRequest.onsuccess = () => {
+    const data = getRequest.result;
+    if (data) {
+      userId = data.id;
+    }
+  };
+};
+
 const msgInput = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
 const messagesArea = document.getElementById('messages-area');
@@ -623,6 +687,15 @@ async function decryptText(encryptedBase64) {
     return new TextDecoder().decode(decryptedContent);
 }
 
+function getPreciseISOString() {
+    const date = new Date();
+    const isoString = date.toISOString(); // "2026-05-11T09:15:32.815Z"
+    
+    const microseconds = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    return isoString.replace('Z', microseconds + '+00:00');
+}
+
 // --- ФУНКЦИЯ ОТПРАВКИ ---
 async function sendMessage() {
     const text = msgInput.value;
@@ -647,7 +720,6 @@ async function sendMessage() {
         return result;
     };
 
-
     const msgId = "msg_" + generateId(15);
 
     const receiverId = document.getElementById('id_ept').innerText;
@@ -659,43 +731,29 @@ async function sendMessage() {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'message-wrapper sent new-msg';
-
-    // 1. Создаем структуру без текста сообщения внутри innerHTML
+    const time = getPreciseISOString(); 
     wrapper.innerHTML = `
         <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${msgId}">
             <div class="message-content body1" style="white-space: pre-wrap;"></div>
             <div class="message-info">
-                <span class="message-time caption2">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span class="message-time caption2">${formatTime(time) || ''}</span>
             </div>
         </div>
     `;
 
-    // 2. Находим пустой контейнер для контента и безопасно вставляем текст
-    // textContent превратит любой <html> в обычную строку текста
     wrapper.querySelector('.message-content').textContent = text;
 
-    if (typeof chatCache !== 'undefined') {
-        // Определяем, в какой чат положить сообщение. 
-        // Если мы получили сообщение, значит ID чата — это sender_id отправителя.
-        const chatId = data.sender_id; 
-        
-        if (chatCache[chatId]) {
-            // Создаем объект сообщения в том же формате, что хранит кэш
-            const newCacheMsg = {
-                msg_id: data.msg_id,
-                sender_id: data.sender_id,
-                text: data.text, // сохраняем зашифрованным, как в БД
-                time: data.time
-            };
-            
-            // Добавляем в начало или конец (зависит от твоей логики отображения)
-            chatCache[chatId].messages.push(newCacheMsg);
-            console.log("Сообщение добавлено в chatCache");
-        }
+    messagesArea.prepend(wrapper);
+
+    if (chatHash[receiverId]) {
+        chatHash[receiverId].messages.push({
+            id: msgId,
+            message_text: encryptedText,
+            sender_id: userId,
+            time: time
+        });
     }
 
-    messagesArea.prepend(wrapper);
-    
     msgInput.value = '';
     msgInput.style.height = 'auto';
     msgInput.focus();
@@ -705,33 +763,25 @@ socket.on('new_message', async (data) => {
     try {
         const receiverId = document.getElementById('id_ept').innerText;
         const decryptedText = await decryptText(data.text);
-        if (typeof chatCache !== 'undefined') {
-            const chatId = data.sender_id; 
-            
-            if (chatCache[chatId]) {
-                const newCacheMsg = {
-                    msg_id: data.msg_id,
-                    sender_id: data.sender_id,
-                    text: data.text,
-                    time: data.time
-                };
-                
-                // Добавляем в начало или конец (зависит от твоей логики отображения)
-                chatCache[chatId].messages.push(newCacheMsg);
-                console.log("Сообщение добавлено в chatCache");
-            }
-        }
 
+        const chatId = data.sender_id; 
+        if (chatHash[chatId]) {
+            chatHash[chatId].messages.push({
+                id: data.msg_id,
+                message_text: data.text,
+                sender_id: data.sender_id,
+                time: data.time
+            });
+        }
         if (receiverId == data.sender_id) {
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper received new-msg';
             
-            // Вставляем твою структуру
             wrapper.innerHTML = `
-                <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id || ''}">
+                <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
                     <div class="message-content body1" style="white-space: pre-wrap;"></div>
                     <div class="message-info">
-                        <span class="message-time caption2">${data.time || ''}</span>
+                        <span class="message-time caption2">${formatTime(data.time) || ''}</span>
                     </div>
                 </div>
             `;
@@ -743,12 +793,10 @@ socket.on('new_message', async (data) => {
     }
 });
 
-// Клик по кнопке
 sendBtn.addEventListener('click', async () => {
     await sendMessage();
 });
 
-// Enter для отправки
 msgInput.addEventListener('keydown', async (e) => {
     // Проверяем, что нажата Enter без Shift
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -764,42 +812,65 @@ msgInput.addEventListener('keydown', async (e) => {
         // Если это мобилка, ничего не делаем — сработает стандартный перенос строки
     }
 });
-
 </script>
 <!-- Отображение сообщений -->
 <script>
-const chatCache = {};
+const chatHash = {};
+
 async function loadChat(userId) {
     const messagesArea = document.getElementById('messages-area');
-    const receiverId = userId;
-    if (chatCache[userId]) {
-        renderChat(messagesArea, chatCache[userId].messages, receiverId, userId);
-        return;
-    }
-    try {
-        // 2. Fetch запрос к серверу
-        const response = await fetch(`/get_history_messages/${receiverId}`);
-        const messages = await response.json();
+    messagesArea.innerHTML = '';
 
-        const decryptedMessages = await Promise.all(messages.map(async (msg) => {
-            try {
-                const text = await decryptText(msg.message_text);
-                return { ...msg, decryptedText: text };
-            } catch (e) {
-                return { ...msg, decryptedText: "[Ошибка расшифровки]" };
-            }
-        }));
-        renderChat(messagesArea, decryptedMessages, receiverId, userId);
-    } catch (err) {
-        console.error("Ошибка загрузки истории:", err);
+    if (chatHash[userId]) {
+        const messages = await decryptAll(chatHash[userId].messages);
+        renderChat(messagesArea, messages, userId);
+        return;
+    } else {
+        try {
+            const server = await fetch(`/get_history_messages/${userId}`);
+            const messages = await server.json();
+            const safe = Array.isArray(messages) ? messages : [];
+
+            chatHash[userId] = {
+                id: userId,
+                messages: safe.map(msg => ({
+                    id: msg.id,
+                    message_text: msg.message_text,
+                    sender_id: msg.sender_id,
+                    time: msg.time
+                }))
+            };
+
+            const decrypted = await decryptAll(chatHash[userId].messages);
+            renderChat(messagesArea, decrypted, userId);
+        } catch (err) {
+            console.error("Ошибка загрузки истории:", err);
+        }
     }
 }
 
-function renderChat(messagesArea, messages, receiverId, userId) {
-    messagesArea.innerHTML = '';
+async function decryptAll(messages) {
+    return Promise.all(messages.map(async (msg) => {
+        try {
+            const text = await decryptText(msg.message_text);
+            return { ...msg, decryptedText: text };
+        } catch (e) {
+            return { ...msg, decryptedText: "[Ошибка расшифровки]" };
+        }
+    }));
+}
+
+function renderChat(messagesArea, messages, userId) {
     const fragment = document.createDocumentFragment();
-    messages.forEach(msg => {
-        const mne = msg.sender_id != receiverId;
+
+    const sortedMessages = [...messages].sort((a, b) => {
+        const dateA = new Date(a.time);
+        const dateB = new Date(b.time);
+        return dateB - dateA;
+    });
+
+    sortedMessages.forEach(msg => {
+        const mne = msg.sender_id != userId;
         const typeClass = mne ? 'sent' : 'received';
 
         const wrapper = document.createElement('div');
@@ -813,24 +884,17 @@ function renderChat(messagesArea, messages, receiverId, userId) {
             </div>
         `;
         wrapper.querySelector('.message-content').textContent = msg.decryptedText;
-        chatCache[userId] = {
-            id: userId,
-            messages: messages
-        };
-        console.log(chatCache);
-        fragment.prepend(wrapper);
+        fragment.appendChild(wrapper);
     });
 
-    messagesArea.appendChild(fragment);
+    messagesArea.prepend(fragment);
     messagesArea.scrollTop = messagesArea.scrollHeight;
 }
 
-// Помощник для времени (обрабатывает ISO строку из базы)
 function formatTime(timeStr) {
     const date = new Date(timeStr);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
 </script>
 <!-- Контекстные меню -->
 <script>
@@ -914,4 +978,5 @@ inputField.addEventListener('contextmenu', async function(e) { // Добавил
 
 </script>
 <script src="/static/js/context menu.js"></script>
+<script src="/static/js/overlay.js"></script>
 {% endblock %}

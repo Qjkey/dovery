@@ -16,7 +16,47 @@
 <script src="/static/js/alert.js"></script>
 <script src="/static/js/click.js"></script>
 <script src="/static/js/input.js"></script>
-<!-- <script src="/static/js/overlay.js"></script> -->
+<script>
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+    }, { capture: true });
+</script>
+<script>
+    document.ondragstart = noselect;
+    document.onselectstart = noselect;
+    document.oncontextmenu = noselect;
+
+    function noselect(event) {
+        // Защита от ошибок: если target это текстовый узел, берем его родительский элемент
+        let target = event.target;
+        if (target.nodeType === 3) {
+            target = target.parentNode;
+        }
+
+        // Если у элемента вообще нет метода closest (на всякий случай), разрешаем действие
+        if (!target || typeof target.closest !== 'function') {
+            return true;
+        }
+
+        // 1. Проверяем разрешенные блоки по ID
+        const isAllowedId = target.closest('#messages-area, #cntxt_menu_msg');
+        
+        // 2. Проверяем текстовые поля input и textarea
+        const isInputField = target.closest('textarea') || 
+                             (target.closest('input') && target.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"])'));
+
+        // 3. Проверяем элементы с атрибутом contenteditable="true" (редакторы текста)
+        const isEditable = target.closest('[contenteditable="true"]');
+
+        // Если элемент подходит под любое из условий — разрешаем действие
+        if (isAllowedId || isInputField || isEditable) {
+            return true;
+        }
+        
+        // В остальных случаях — блокируем
+        return false;
+    }
+</script>
 <!-- <script src="/static/js/tabs.js"></script> -->
 <body>
 {% block body %}{% endblock %}

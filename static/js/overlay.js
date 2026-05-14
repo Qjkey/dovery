@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300); // Должно соответствовать длительности transition
     }
 
+    window.closeOverlay = closeOverlay; 
+
     // Открытие окна по клику на кнопку
     overlayButton.addEventListener('click', openOverlay);
 

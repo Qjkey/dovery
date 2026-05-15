@@ -43,6 +43,13 @@ html, body {
     opacity: 0;
 }
 
+#div-classic { 
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden; 
+}
+
 .app-wrapper {
   display: flex;
   width: 100vw;
@@ -71,6 +78,11 @@ html, body {
   }
 }
 
+#chats-list {
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
 /* ТЕЛЕФОНЫ */
 @media (max-width: 700px) {
   .sidebar, .chat-window {
@@ -89,6 +101,55 @@ html, body {
   }
 }
 
+/* Стили для разделителя */
+.resizer {
+  width: 1px;
+  cursor: col-resize;
+  background-color: transparent;
+  border: 0;
+  transition: background-color 0.1s;
+  z-index: 20;
+  flex-shrink: 0;
+  right: -5;
+}
+
+.resizer:hover, .resizer.dragging {
+  background-color: var(--tg-theme-section-separator-color);
+}
+
+/* Изменения в медиа-запросах для ПК */
+@media (min-width: 700px) {
+  .sidebar {
+    /* Меняем фиксированную ширину на min/max ограничения */
+    width: 350px; 
+    min-width: 250px;
+    max-width: 600px;
+    border-right: none;
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .resizer {
+    display: block;
+    border-right: 1px solid var(--tg-theme-section-separator-color);
+  }
+  .chat-window {
+    flex-grow: 1;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Отключение разделителя на мобильных устройствах */
+@media (max-width: 700px) {
+  .resizer {
+    display: none;
+  }
+}
+
+
 .empty-state {
   display: flex;
   align-items: center;
@@ -104,6 +165,10 @@ html, body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden; 
+}
+
+.item-header {
+    flex-shrink: 0;
 }
 
 /* ИСПРАВЛЕННЫЙ HEADER */
@@ -162,7 +227,7 @@ html, body {
         <div id="search-results"></div>
     </div>
   </aside>
-
+  <button class="resizer" id="dragbar"></button>
   <main class="chat-window">
     <!-- Окно не выбранного чата -->
     <div id="empty-state" class="headline6 empty-state">
@@ -435,6 +500,23 @@ async function loadMyChats() {
         
         listContainer.innerHTML = ''; 
 
+        if (!chats || chats.length === 0) {
+            const item = document.createElement('div');
+            item.className = 'item clicked';
+            item.onclick = openSearch(true);
+            item.innerHTML = `
+                <div class="right">
+                    <div class="text oneline"> 
+                        <div class="label body1">Ищите чаты через поиск</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        }
+
         chats.forEach(chat => {
             const item = document.createElement('div');
             item.className = 'item clicked';
@@ -498,6 +580,48 @@ async function openDirectWindow(userId) {
     loadChat(userId);
     toggleChat(true);
 }
+
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+  const resizer = document.getElementById('dragbar');
+  const sidebar = document.querySelector('.sidebar');
+  
+  if (!resizer || !sidebar) return;
+
+  let isResizing = false;
+
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isResizing = true;
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    // Отключаем выделение текста при перетаскивании
+    document.body.style.userSelect = 'none'; 
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    // Вычисляем новую ширину на основе координаты курсора X
+    let newWidth = e.clientX;
+    
+    // Ограничения безопасности (дублируют min-width и max-width из CSS)
+    if (newWidth < 250) newWidth = 250;
+    if (newWidth > 600) newWidth = 600;
+    
+    sidebar.style.width = `${newWidth}px`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
+});
 
 </script>
 <!-- Контейнер с элементами контекстного меню -->
@@ -896,13 +1020,47 @@ function formatTime(timeStr) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 </script>
+<!-- Удаление чата -->
+<script>
+
+function delete_chat() {
+    const targetElement = document.getElementById('id_ept');
+    if (!targetElement) return;
+    
+    const chatId = targetElement.textContent.trim();
+
+    socket.emit('delete_chat', { id: chatId });
+
+    // Удаление объекта из локального списка chatHash
+    if (typeof chatHash !== 'undefined' && chatHash[chatId]) {
+        delete chatHash[chatId];
+    }
+}
+window.delete_chat = delete_chat; 
+
+socket.on('chat_deleted', async (data) => {
+    try {
+        const deletedChatId = data.chat_s;
+
+        if (typeof chatHash !== 'undefined' && chatHash[deletedChatId]) {
+            delete chatHash[deletedChatId];
+        }
+
+        toggleChat(false);
+        await loadMyChats();
+    } catch (error) {
+        console.error('Ошибка при обработке удаления чата на клиенте:', error);
+    }
+});
+
+</script>
 <!-- Контекстные меню -->
 <script>
 var list_items_icon_01 = [            
     { label: "Мой профиль", link: "#", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface346" inkscape:label="surface346" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface346" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 307.68,220.94 C 307.68,249.79 284.29,273.18 255.44,273.18 C 226.59,273.18 203.2,249.79 203.2,220.94 C 203.2,192.09 226.59,168.7 255.44,168.7 C 284.29,168.7 307.68,192.09 307.68,220.94 "/> </g> <g id="g_4" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 160.5,380.08 C 164.43,364.91999999999996 170.89999999999998,354.06 178.01,346.27 C 197.98,324.43 228.55999999999997,326.71 256.02,326.71 C 283.47999999999996,326.71 314.05999999999995,324.43 334.03,346.27 C 341.15,354.06 347.61,364.91999999999996 351.54,380.08 "/> </g> </g> </g> </svg>' }
 ];
 var list_items_icon_02 = [            
-    { label: "Удалить чат", danger: true, link: "#", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface1491" inkscape:label="surface1491" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface1491" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-destructive-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 143.04,196.16 C 143.04,196.16 161.18,392.9 161.18,392.9 C 162.64000000000001,408.71 175.9,420.8 191.77,420.8 C 191.77,420.8 320.23,420.8 320.23,420.8 C 336.1,420.8 349.36,408.71 350.82,392.9 C 350.82,392.9 368.96,196.16 368.96,196.16 M 394.96,144.32 C 394.96,144.32 308.56,144.32 308.56,144.32 M 117.04,144.32 C 117.04,144.32 308.56,144.32 308.56,144.32 M 308.56,144.32 C 308.56,144.32 308.56,121.92 308.56,121.92 C 308.56,104.95 294.80999999999995,91.2 277.84,91.2 C 277.84,91.2 234.16,91.2 234.16,91.2 C 217.19,91.2 203.44,104.95 203.44,121.92 C 203.44,121.92 203.44,144.32 203.44,144.32 "/> </g> </g> </g> </svg>' }
+    { label: "Удалить чат", danger: true, onclick:"delete_chat();", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface1491" inkscape:label="surface1491" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface1491" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-destructive-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 143.04,196.16 C 143.04,196.16 161.18,392.9 161.18,392.9 C 162.64000000000001,408.71 175.9,420.8 191.77,420.8 C 191.77,420.8 320.23,420.8 320.23,420.8 C 336.1,420.8 349.36,408.71 350.82,392.9 C 350.82,392.9 368.96,196.16 368.96,196.16 M 394.96,144.32 C 394.96,144.32 308.56,144.32 308.56,144.32 M 117.04,144.32 C 117.04,144.32 308.56,144.32 308.56,144.32 M 308.56,144.32 C 308.56,144.32 308.56,121.92 308.56,121.92 C 308.56,104.95 294.80999999999995,91.2 277.84,91.2 C 277.84,91.2 234.16,91.2 234.16,91.2 C 217.19,91.2 203.44,104.95 203.44,121.92 C 203.44,121.92 203.44,144.32 203.44,144.32 "/> </g> </g> </g> </svg>' }
 ];
 var list_items_icon_03 = [ 
     { label: "Копировать", onclick:"copy_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' }, 

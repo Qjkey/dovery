@@ -445,28 +445,82 @@ def handle_delete(data):
 @app.route('/get_history_messages/<int:second_id>')
 def get_history(second_id):
     user_id = get_current_user_id()
+    
+    # Получаем ID самого старого сообщения на фронтенде (если оно есть)
+    last_id = request.args.get('last_id', default=None, type=int)
+    
     try:
         conn = get_db_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT id, sender_id, message_text, time 
-            FROM message 
-            WHERE (sender_id = ? AND receiver_id = ?) 
-            OR (sender_id = ? AND receiver_id  = ?)
-            ORDER BY id DESC 
-            LIMIT 15
-        ''', (user_id, second_id, second_id, user_id))
-
+        if last_id is not None:
+            # Подгрузка истории: выбираем сообщения МЕНЬШЕ, чем last_id
+            cursor.execute('''
+                SELECT id, sender_id, message_text, time 
+                FROM message 
+                WHERE ((sender_id = ? AND receiver_id = ?) 
+                OR (sender_id = ? AND receiver_id  = ?))
+                AND id < ?
+                ORDER BY id DESC 
+                LIMIT 15
+            ''', (user_id, second_id, second_id, user_id, last_id))
+        else:
+            # Первая загрузка чата: берем просто последние 15 сообщений
+            cursor.execute('''
+                SELECT id, sender_id, message_text, time 
+                FROM message 
+                WHERE (sender_id = ? AND receiver_id = ?) 
+                OR (sender_id = ? AND receiver_id  = ?)
+                ORDER BY id DESC 
+                LIMIT 15
+            ''', (user_id, second_id, second_id, user_id))
         
         rows = cursor.fetchall()
-        # Разворачиваем, чтобы новые были внизу, и превращаем в список словарей
         messages = [dict(row) for row in reversed(rows)]
         
         return jsonify(messages)
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
+        return jsonify([]), 500
+
+@socketio.on('delete_chat')
+def delete_chat(data):
+    try:
+        user_id = data.get('id')
+        if not user_id:
+            return
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA foreign_keys = ON;")
+
+        userid = get_current_user_id()
+
+        cursor.execute(
+            """
+            DELETE FROM message 
+            WHERE (sender_id = ? AND receiver_id = ?) 
+            OR (sender_id = ? AND receiver_id = ?);
+            """, 
+            (user_id, userid, userid, user_id)
+        )
+        cursor.execute(
+            """
+            DELETE FROM chats 
+            WHERE (user_one_id = ? AND user_two_id = ?) 
+            OR (user_one_id = ? AND user_two_id = ?);
+            """, 
+            (user_id, userid, userid, user_id)
+        )
+        
+        conn.commit()
+        conn.close() 
+        
+        emit('chat_deleted', {'chat_s': user_id}, to=f"user_{userid}")
+        emit('chat_deleted', {'chat_s': userid}, to=f"user_{user_id}")
+    except Exception as e:
+        print(f"Ошибка при удалении чата через сокет: {e}")
 
 if __name__ == "__main__":
     socketio.run(app, host='0.0.0.0', port=8080, debug=True)

@@ -8,6 +8,7 @@ Dovery
 <link href="static/CSS/textarea-mess.css" rel="stylesheet" type="text/css">
 <link href="static/CSS/message.css" rel="stylesheet" type="text/css">
 <link href="static/CSS/overlay.css" rel="stylesheet" type="text/css">
+<link href="static/CSS/profile.css" rel="stylesheet" type="text/css">
 <style>
 html, body {
     margin: 0;
@@ -179,6 +180,34 @@ html, body {
     flex-shrink: 0; /* Чтобы не сжимался */
 }
 </style>
+<style>
+/* Стили приветственной панели */
+#welcome-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  transform: translate(-50%, -50%);
+  padding-left: 10px;
+  padding-right: 10px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px); /* Поддержка Safari */
+  border-radius: 10px;
+  z-index: 10;
+}
+
+.as {
+    margin-bottom: 10px;
+}
+
+/* Класс для скрытия элементов */
+.hidden {
+  display: none !important;
+}
+</style>
 <div class="app-wrapper" id="app">
   <aside class="sidebar">
     <!-- Dovery header -->
@@ -226,6 +255,40 @@ html, body {
         </div>
         <div id="search-results"></div>
     </div>
+
+    <section>
+        <div id="profile-block" style="position: relative;" class="hidden">
+            <div class="item-header" style="position: absolute; z-index: 2;">
+                <div onclick="closeProfile();" class="left"> 
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
+                    </svg>
+                </div>
+            </div>
+            <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
+                <div class="avatar"><img src=""></div>
+                <div class="defult headline6">Алексей Дроков</div>
+                <div class="subname subtitle1">был(а) недавно</div>
+            </div>
+        </div>
+    </section>
+    <section class="bottom">
+        <div class="item">
+            <div class="right">
+                <div class="title oneline"> 
+                    <div class="button1-medium">Информация</div> 
+                </div>
+            </div>
+        </div>
+        <div class="item clicked">
+            <div class="right separator">
+                <div class="text twoline"> 
+                    <div class="label body1">@drokov</div> 
+                    <div class="label subtitle subtitle1">username</div> 
+                </div>
+            </div>
+        </div>
+    </section>
   </aside>
   <button class="resizer" id="dragbar"></button>
   <main class="chat-window">
@@ -246,7 +309,7 @@ html, body {
                 <div class="second-left"> 
                     <img src="" class="ava">
                 </div>
-                <div class="right">
+                <div class="right" onclick="openProfile()">
                     <div class="text twoline"> 
                         <div class="label-header body1-medium" id="chat-name">Имя пользователя</div> 
                         <div class="label-header-subtitle subtitle1">был(а) недавно</div> 
@@ -266,6 +329,11 @@ html, body {
 
         <!-- СЮДА БУДУТ ПАДАТЬ СООБЩЕНИЯ -->
         <div class="messages-area" id="messages-area">
+        </div>
+
+        <div id="welcome-panel" class="hidden">
+            <div class="caption1-medium label-header as">Добро пожаловать!</div>
+            <div class="caption1-medium label-header">Здесь пока ничего нет. Начните общение.</div>
         </div>
 
         <!-- ПАНЕЛЬ ВВОДА (ВНУТРИ ОКНА, В САМОМ НИЗУ) -->
@@ -308,6 +376,11 @@ function toggleChat(isSelected) {
   }
 }
 </script>
+<!-- Подключения -->
+<script src="/static/js/sockets.js"></script>
+<script src="/static/js/html_canvas.js"></script>
+<!-- Подключение сокета -->
+<script>const socket = io();</script>
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <!-- Блок с информацией для E2EE -->
 <div class="overlay-container">
@@ -347,6 +420,33 @@ function toggleChat(isSelected) {
         </section>
     </div>
 </div>
+<!-- Если чат пустой -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const messageArea = document.getElementById("messages-area");
+  const welcomePanel = document.getElementById("welcome-panel");
+
+  if (!messageArea || !welcomePanel) return;
+
+  function checkMessageArea() {
+    if (messageArea.children.length === 0) {
+      welcomePanel.classList.remove("hidden");
+    } else {
+      welcomePanel.classList.add("hidden");
+    }
+  }
+
+  checkMessageArea();
+
+  const observer = new MutationObserver(() => {
+    checkMessageArea();
+  });
+
+  observer.observe(messageArea, { 
+    childList: true 
+  });
+});
+</script>
 <!-- Безопасность чата -->
 <script>
 async function get_public_key(pem) {
@@ -404,6 +504,16 @@ function openSearch() {
     document.getElementById('div-classic').style.display = 'none';
     document.getElementById('search-panel').classList.remove('hidden');
     document.getElementById('search-field').focus();
+}
+
+function openProfile() {
+    document.getElementById('div-classic').style.display = 'none';
+    document.getElementById('profile-block').classList.remove('hidden');
+}
+
+function closeProfile() {
+    document.getElementById('div-classic').style.display = 'block';
+    document.getElementById('search-panel').classList.add('hidden');
 }
 
 function closeSearch() {
@@ -471,6 +581,11 @@ function renderResults(users) {
 
 // --- ЛОГИКА ЧАТОВ ---
 
+socket.on("chat_created", (data) => {
+    console.log("Вас добавили в новый чат!", data);
+    loadMyChats(); 
+});
+
 async function startChat(userId, userName) {
     try {
         const csrfElement = document.querySelector('meta[name="csrf-token"]');
@@ -503,7 +618,7 @@ async function loadMyChats() {
         if (!chats || chats.length === 0) {
             const item = document.createElement('div');
             item.className = 'item clicked';
-            item.onclick = openSearch(true);
+            item.onclick = () => openSearch(true);
             item.innerHTML = `
                 <div class="right">
                     <div class="text oneline"> 
@@ -568,12 +683,11 @@ async function openDirectWindow(userId) {
     if (headerAvatar) {
         headerAvatar.src = `static/files/avatars/${user.avatar}`;
     }
-
     try {
         const private_key = await get_private_key(); 
         const public_key = await get_public_key(user.publicKey);
         window.keychat = await calc_key_chat(private_key, public_key);
-
+        chatsData[userId].keychat = window.keychat;
     } catch (err) {
         console.error("Ошибка установки защищенного соединения:", err);
     }
@@ -627,11 +741,6 @@ async function openDirectWindow(userId) {
 <!-- Контейнер с элементами контекстного меню -->
 <div id="tagDropdown" class="tag-dropdown">
 </div> 
-<!-- Подключения -->
-<script src="/static/js/sockets.js"></script>
-<script src="/static/js/html_canvas.js"></script>
-<!-- Подключение сокета -->
-<script>const socket = io();</script>
 <!-- Копирование и удаление сообщения -->
 <script>
 function copy_message(id) {
@@ -666,80 +775,84 @@ window.snapDelete = async function(id) {
 };
 
 socket.on('message_deleted', async (data) => {
-    Object.keys(chatHash).forEach(chatId => {
-        const initialLength = chatHash[chatId].messages.length;
-        
-        chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
-    });
+    try {
+        Object.keys(chatHash).forEach(chatId => {
+            const initialLength = chatHash[chatId].messages.length;
+            
+            chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
+        });
 
-    const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
-    if (messageElement) {
-        const wrapper = messageElement.closest('.message-wrapper');
-        if (wrapper) {
-            try {
-                // Использование самого быстрого метода захвата
-                const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
-                
-                const width = wrapper.offsetWidth;
-                const height = wrapper.offsetHeight;
-                const rect = wrapper.getBoundingClientRect();
+        const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
+        if (messageElement) {
+            const wrapper = messageElement.closest('.message-wrapper');
+            if (wrapper) {
+                try {
+                    // Использование самого быстрого метода захвата
+                    const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
+                    
+                    const width = wrapper.offsetWidth;
+                    const height = wrapper.offsetHeight;
+                    const rect = wrapper.getBoundingClientRect();
 
-                // Мгновенно скрываем оригинал
-                wrapper.style.visibility = 'hidden';
+                    // Мгновенно скрываем оригинал
+                    wrapper.style.visibility = 'hidden';
 
-                const layersCount = 20; // Минимум для Android
-                const layers = [];
-                
-                // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
-                for (let i = 0; i < layersCount; i++) {
-                    const c = document.createElement('canvas');
-                    c.width = width;
-                    c.height = height;
-                    c.className = 'dust';
-                    c.style.cssText = `
-                        position: absolute;
-                        left: ${rect.left}px;
-                        top: ${rect.top + window.scrollY}px;
-                        width: ${width}px;
-                        height: ${height}px;
-                        pointer-events: none;
-                        z-index: 9999;
-                        transition: transform 0.8s ease-out, opacity 0.6s ease-out;
-                    `;
-                    document.body.appendChild(c);
-                    layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
-                }
+                    const layersCount = 20; // Минимум для Android
+                    const layers = [];
+                    
+                    // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
+                    for (let i = 0; i < layersCount; i++) {
+                        const c = document.createElement('canvas');
+                        c.width = width;
+                        c.height = height;
+                        c.className = 'dust';
+                        c.style.cssText = `
+                            position: absolute;
+                            left: ${rect.left}px;
+                            top: ${rect.top + window.scrollY}px;
+                            width: ${width}px;
+                            height: ${height}px;
+                            pointer-events: none;
+                            z-index: 9999;
+                            transition: transform 0.8s ease-out, opacity 0.6s ease-out;
+                        `;
+                        document.body.appendChild(c);
+                        layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
+                    }
 
-                // Быстрое распределение
-                for (let i = 0; i < pixels.length; i += 12) { 
-                    const x = (i / 4) % width;
-                    const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
-                    const d = layers[lIdx].imgData.data;
+                    // Быстрое распределение
+                    for (let i = 0; i < pixels.length; i += 12) { 
+                        const x = (i / 4) % width;
+                        const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
+                        const d = layers[lIdx].imgData.data;
 
-                    // Копируем основной пиксель
-                    d[i] = pixels[i]; 
-                    d[i+1] = pixels[i+1]; 
-                    d[i+2] = pixels[i+2]; 
-                    d[i+3] = pixels[i+3];
-                }
+                        // Копируем основной пиксель
+                        d[i] = pixels[i]; 
+                        d[i+1] = pixels[i+1]; 
+                        d[i+2] = pixels[i+2]; 
+                        d[i+3] = pixels[i+3];
+                    }
 
-                layers.forEach((l, i) => {
-                    l.ctx.putImageData(l.imgData, 0, 0);
-                    requestAnimationFrame(() => {
-                        const x = (i - layersCount / 2) * 10;
-                        const y = 0 - Math.random() * 40;
-                        l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
-                        l.c.style.opacity = '0';
+                    layers.forEach((l, i) => {
+                        l.ctx.putImageData(l.imgData, 0, 0);
+                        requestAnimationFrame(() => {
+                            const x = (i - layersCount / 2) * 10;
+                            const y = 0 - Math.random() * 40;
+                            l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
+                            l.c.style.opacity = '0';
+                        });
+                        setTimeout(() => l.c.remove(), 1000);
                     });
-                    setTimeout(() => l.c.remove(), 1000);
-                });
 
-                setTimeout(() => wrapper.remove(), 500);
+                    setTimeout(() => wrapper.remove(), 500);
 
-            } catch (err) {
-                wrapper.remove();
+                } catch (err) {
+                    wrapper.remove();
+                }
             }
         }
+    } catch (err) {
+        console.error("Ошибка при удалении сообщения:", err);
     }
 }); 
 </script>
@@ -805,6 +918,22 @@ async function decryptText(encryptedBase64) {
     const decryptedContent = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: iv },
         window.keychat,
+        data
+    );
+
+    return new TextDecoder().decode(decryptedContent);
+}
+
+async function decryptText_new_message(encryptedBase64, userid) {
+    const keychat = chatsData[userid].keychat;
+    if (!keychat) throw new Error("Ключ не инициализирован");
+    const combined = new Uint8Array(atob(encryptedBase64).split("").map(c => c.charCodeAt(0)));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+
+    const decryptedContent = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        keychat,
         data
     );
 
@@ -886,11 +1015,11 @@ async function sendMessage() {
 socket.on('new_message', async (data) => {
     try {
         const receiverId = document.getElementById('id_ept').innerText;
-        const decryptedText = await decryptText(data.text);
+        const userid = data.sender_id; 
+        const decryptedText = await decryptText_new_message(data.text, userid);
 
-        const chatId = data.sender_id; 
-        if (chatHash[chatId]) {
-            chatHash[chatId].messages.push({
+        if (chatHash[userid]) {
+            chatHash[userid].messages.push({
                 id: data.msg_id,
                 message_text: data.text,
                 sender_id: data.sender_id,

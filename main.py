@@ -41,6 +41,16 @@ app.config.update(
 csrf = CSRFProtect(app)
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 
+logging.basicConfig(level=logging.INFO)
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    ping_timeout=5, 
+    ping_interval=2,
+    logger=True,          # <--- Вернет логи сокетов
+    engineio_logger=True  # <--- Вернет логи трафика (подключения/отключения)
+)
+
 @app.after_request
 def add_security_headers(response):
     csp = (
@@ -188,18 +198,22 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
         print(e)
         return False, "d204"
 
+# Удаление сообщения
 def delete_message(msg_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT receiver_id FROM message WHERE id = ?", (msg_id,))
+            cursor.execute("SELECT receiver_id, sender_id FROM message WHERE id = ?", (msg_id,)) 
             row = cursor.fetchone()
-            if not row: return False
-            receiver_id = row[0]
+        
+            if not row: 
+                return False
+            
+            receiver_id, sender_id = row[0], row[1]
             
             cursor.execute("DELETE FROM message WHERE id = ?", (msg_id,))
             conn.commit()
-            return receiver_id
+            return receiver_id, sender_id
     except Exception as e:
         print(e)
         return False
@@ -370,6 +384,8 @@ def add_to_chats():
         u1, u2 = sorted([int(current_user_id), int(target_id)])
         conn.execute('''INSERT or IGNORE INTO chats (user_one_id, user_two_id) VALUES (?, ?)''', (u1, u2,))
         conn.commit()
+        socketio.emit('chat_created', to=f"user_{target_id}")
+        
         return jsonify({"status": "ok"})
     except Exception as e:
         print(f"Ошибка сохранения чата: {e}")
@@ -434,9 +450,8 @@ def handle_message(data):
 @socketio.on('delete_message')
 def handle_delete(data):
     msg_id = data.get('msg_id')
-    sender_id = get_current_user_id()
 
-    id = delete_message(msg_id)
+    id, sender_id = delete_message(msg_id)
     if id:
         emit('message_deleted', {'msg_id': msg_id}, to=f"user_{id}")
         emit('message_deleted', {'msg_id': msg_id}, to=f"user_{sender_id}")
@@ -484,6 +499,7 @@ def get_history(second_id):
         print(f"Ошибка базы данных: {e}")
         return jsonify([]), 500
 
+# Удалить чат
 @socketio.on('delete_chat')
 def delete_chat(data):
     try:
@@ -523,4 +539,5 @@ def delete_chat(data):
         print(f"Ошибка при удалении чата через сокет: {e}")
 
 if __name__ == "__main__":
+    print("Запуск сервера...")
     socketio.run(app, host='0.0.0.0', port=8080, debug=True)

@@ -9,7 +9,7 @@ Dovery
 <link href="static/CSS/message.css" rel="stylesheet" type="text/css">
 <link href="static/CSS/overlay.css" rel="stylesheet" type="text/css">
 <link href="static/CSS/profile.css" rel="stylesheet" type="text/css">
-<style>
+<style> 
 html, body {
     margin: 0;
     padding: 0;
@@ -21,7 +21,7 @@ html, body {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .hidden {
-    display: none !important;
+    display: none;
 }
 
 .dust {
@@ -143,6 +143,11 @@ html, body {
   }
 }
 
+.profile-blocks {
+    height: 100%;
+    background-color: var(--tg-theme-secondary-bg-color);
+}
+
 /* Отключение разделителя на мобильных устройствах */
 @media (max-width: 700px) {
   .resizer {
@@ -223,100 +228,118 @@ html, body {
                 </svg>
             </div>
             <div class="element" id="cntxt_menu_btn_01">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12.5218 8C13.6696 8 14.6087 7.1 14.6087 6C14.6087 4.9 13.6696 4 12.5218 4C11.3739 4 10.4348 4.9 10.4348 6C10.4348 7.1 11.3739 8 12.5218 8ZM12.5218 10C11.3739 10 10.4348 10.9 10.4348 12C10.4348 13.1 11.3739 14 12.5218 14C13.6696 14 14.6087 13.1 14.6087 12C14.6087 10.9 13.6696 10 12.5218 10ZM12.5218 16C11.3739 16 10.4348 16.9 10.4348 18C10.4348 19.1 11.3739 20 12.5218 20C13.6696 20 14.6087 19.1 14.6087 18C14.6087 16.9 13.6696 16 12.5218 16Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
                 </svg>
             </div>
         </div>
       </div>
-      <div id="chats-list"></div>
+      <section>
+        <div id="chats-list"></div>
+      </section>
     </div>
 
     <!-- Окно поиска -->
-    <div id="search-panel" class="hidden">
-        <div class="item-header">
-            <div onclick="closeSearch();" class="left"> 
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
-                </svg>
-              </div>
-            <div class="right">
-                <div class="text header"> 
-                    <div class="label-header headline6">Поиск</div> 
-                </div>
-            </div>
-        </div>
-        <div class="search-container">
-          <div class="input-container">
-              <input id="search-field" type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
-              <label class="input-label" >Username</label>
-              <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
-          </div>
-        </div>
-        <div id="search-results"></div>
-    </div>
-
     <section>
-        <div id="profile-block" style="position: relative;" class="hidden">
-            <div class="item-header" style="position: absolute; z-index: 2;">
-                <div onclick="closeProfile();" class="left"> 
+        <div id="search-panel" class="hidden">
+            <div class="item-header">
+                <div onclick="closeSearch();" class="left"> 
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
                     </svg>
                 </div>
-            </div>
-            <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
-                <div class="avatar"><img src=""></div>
-                <div class="defult headline6">Алексей Дроков</div>
-                <div class="subname subtitle1">был(а) недавно</div>
-            </div>
-        </div>
-    </section>
-    <section class="bottom">
-        <div class="item">
-            <div class="right">
-                <div class="title oneline"> 
-                    <div class="button1-medium">Информация</div> 
+                <div class="right">
+                    <div class="text header"> 
+                        <div class="label-header headline6">Поиск</div> 
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="item clicked">
-            <div class="right separator">
-                <div class="text twoline"> 
-                    <div class="label body1">@drokov</div> 
-                    <div class="label subtitle subtitle1">username</div> 
-                </div>
+            <div class="search-container">
+            <div class="input-container">
+                <input id="search-field" type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
+                <label class="input-label" >Username</label>
+                <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
             </div>
+            </div>
+            <div id="search-results"></div>
         </div>
     </section>
   </aside>
   <button class="resizer" id="dragbar"></button>
   <main class="chat-window">
+    <!-- Окно профиля -->
+    <div id="profile-block" class="profile-blocks hidden">
+        <section>
+            <div style="position: relative;">
+                <div class="item-header" style="position: absolute; z-index: 2;">
+                    <div onclick="closeProfile();" class="left"> 
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
+                        </svg>
+                    </div>
+                </div>
+                <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
+                    <div class="avatar"><img id="profile-ava" src=""></div>
+                    <div class="defult headline6" id="profile-name"></div>
+                    <div class="subname subtitle1" id="profile-status">был(а) недавно</div>
+                </div>
+            </div>
+        </section>
+        <section class="bottom">
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline second-title"> 
+                        <div class="button1-medium">Информация</div> 
+                    </div>
+                    <a class="second-title element">
+                        <div class="button1">⠀</div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="item clicked" id="cntxt_menu_btn_05">
+                <div class="right">
+                    <div class="text twoline"> 
+                        <div class="label body1" id="profile-username"></div> 
+                        <div class="label subtitle subtitle1">Username</div> 
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section>
+            <div class="item clicked" id="profile-open-chat">
+                <div class="right">
+                    <div class="text oneline"> 
+                        <div class="label body1">Открыть чат</div> 
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
     <!-- Окно не выбранного чата -->
     <div id="empty-state" class="headline6 empty-state">
       <p>Выберете чат, либо используйте поиск</p>
     </div>
     <!-- КОНТЕЙНЕР АКТИВНОГО ЧАТА -->
     <div id="chat-active-content" class="chat-active-content" style="display: none;">
-        <!-- ШАПКА ЧАТА (ВНУТРИ ОКНА) -->
         <header class="chat-header">
             <div class="item-header">
-                <div onclick="toggleChat(false)" class="left"> 
+                <div class="left" onclick="toggleChat(false);"> 
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="var(--tg-theme-bg-color)"/>
                     </svg>
                 </div>
-                <div class="second-left"> 
+                <div class="second-left" id="chat-headers"> 
                     <img src="" class="ava">
                 </div>
-                <div class="right" onclick="openProfile()">
-                    <div class="text twoline"> 
-                        <div class="label-header body1-medium" id="chat-name">Имя пользователя</div> 
+                <div class="right">
+                    <div class="text twoline" id="chat-headers1"> 
+                        <div class="label-header body1-medium" id="chat-name"></div> 
                         <div class="label-header-subtitle subtitle1">был(а) недавно</div> 
                         <div style="display: none;" id="id_ept"></div>
                     </div>
                     <div class="element" id="cntxt_menu_btn_02">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12.5218 8C13.6696 8 14.6087 7.1 14.6087 6C14.6087 4.9 13.6696 4 12.5218 4C11.3739 4 10.4348 4.9 10.4348 6C10.4348 7.1 11.3739 8 12.5218 8ZM12.5218 10C11.3739 10 10.4348 10.9 10.4348 12C10.4348 13.1 11.3739 14 12.5218 14C13.6696 14 14.6087 13.1 14.6087 12C14.6087 10.9 13.6696 10 12.5218 10ZM12.5218 16C11.3739 16 10.4348 16.9 10.4348 18C10.4348 19.1 11.3739 20 12.5218 20C13.6696 20 14.6087 19.1 14.6087 18C14.6087 16.9 13.6696 16 12.5218 16Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
                         </svg>
                     </div>
@@ -502,18 +525,31 @@ let debounceTimer;
 
 function openSearch() {
     document.getElementById('div-classic').style.display = 'none';
+    document.getElementById('profile-block').classList.add('hidden');
     document.getElementById('search-panel').classList.remove('hidden');
     document.getElementById('search-field').focus();
 }
 
-function openProfile() {
-    document.getElementById('div-classic').style.display = 'none';
+function openProfile(userId) {
+    const user = chatsData[userId];
+
+    document.getElementById('chat-active-content').style.display = 'none';
     document.getElementById('profile-block').classList.remove('hidden');
+
+    document.getElementById('profile-name').textContent = user.name;
+    document.getElementById('profile-username').textContent = '@' + user.username;
+    document.getElementById('profile-ava').src = '/static/files/avatars/' + user.avatar;
+
+    // Назначаем клик для открытия чата
+    document.getElementById('profile-open-chat').onclick = function() {
+        closeProfile();
+        openDirectWindow(userId);
+    };
 }
 
 function closeProfile() {
-    document.getElementById('div-classic').style.display = 'block';
-    document.getElementById('search-panel').classList.add('hidden');
+    document.getElementById('chat-active-content').style.display = 'flex';
+    document.getElementById('profile-block').classList.add('hidden');
 }
 
 function closeSearch() {
@@ -582,7 +618,6 @@ function renderResults(users) {
 // --- ЛОГИКА ЧАТОВ ---
 
 socket.on("chat_created", (data) => {
-    console.log("Вас добавили в новый чат!", data);
     loadMyChats(); 
 });
 
@@ -680,6 +715,12 @@ async function openDirectWindow(userId) {
     const container = document.getElementById('id_ept');
     container.textContent = userId; 
     const headerAvatar = document.querySelector('.chat-header img.ava');
+    const chatHeader = document.getElementById('chat-headers');
+    const chatHeader1 = document.getElementById('chat-headers1');
+    if (chatHeader) {
+        chatHeader.onclick = () => {openProfile(userId);};
+        chatHeader1.onclick = () => {openProfile(userId);};
+    }   
     if (headerAvatar) {
         headerAvatar.src = `static/files/avatars/${user.avatar}`;
     }
@@ -696,6 +737,7 @@ async function openDirectWindow(userId) {
 }
 
 </script>
+<!-- Размер боковой панели -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
   const resizer = document.getElementById('dragbar');
@@ -765,6 +807,16 @@ function copy_message(id) {
     } else {
         console.error(`Сообщение ${id} не найдено в DOM`);
     }
+}
+
+function copy_username() {
+    const userId = document.getElementById('id_ept').innerText;
+    const user = chatsData[userId];
+    navigator.clipboard.writeText(user.username).then(() => {
+        hideDropdown();
+    }).catch(err => {
+        console.error("Ошибка при копировании:", err);
+    });
 }
 
 window.snapDelete = async function(id) {
@@ -1198,6 +1250,9 @@ var list_items_icon_03 = [
 
 var list_items_icon_04 = [ 
     { label: "Вставить", onclick:"paste_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10510" inkscape:label="surface10510" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10510" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:round"> <path d="M 286.08,140.8 C 286.08,140.8 155.52,140.8 155.52,140.8 C 135.72,140.8 119.68,156.83999999999997 119.68,176.64 C 119.68,176.64 119.68,384 119.68,384 C 119.68,403.79 135.72,419.84 155.52,419.84 C 155.52,419.84 356.48,419.84 356.48,419.84 C 376.28000000000003,419.84 392.32,403.79 392.32,384 C 392.32,384 392.32,176.64 392.32,176.64 C 392.32,156.83999999999997 376.28000000000003,140.8 356.48,140.8 C 356.48,140.8 286.08,140.8 286.08,140.8 Z M 286.08,140.8 C 286.08,140.8 286.08,121.6 286.08,121.6 C 286.08,104.99 272.61,91.52 256,91.52 C 239.39,91.52 225.92,104.99 225.92,121.6 C 225.92,121.6 225.92,140.8 225.92,140.8 M 324.48,220.16 C 324.48,220.16 187.52,220.16 187.52,220.16 M 324.48,279.04 C 324.48,279.04 187.52,279.04 187.52,279.04 M 293.12,338.56 C 293.12,338.56 218.88,338.56 218.88,338.56 "/> </g> </g> </g> </svg>' }
+];
+var list_items_icon_05 = [ 
+    { label: "Копировать", onclick:"copy_username();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' }
 ];
 </script>
 <!-- Копирование/вставить для поля ввода -->

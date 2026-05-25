@@ -92,6 +92,10 @@ section.bottom {
     padding-right: var(--otstup);
     width: 100%;
 }
+.right-header {
+    display: flex;
+    width: 100%;
+}
 .left {
     display: flex;
     place-items: center;
@@ -250,5 +254,4 @@ section.bottom {
     margin-top: 2px;
     color: var(--tg-theme-subtitle-text-color);
     cursor: default;
-
 }

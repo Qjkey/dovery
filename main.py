@@ -539,5 +539,4 @@ def delete_chat(data):
         print(f"Ошибка при удалении чата через сокет: {e}")
 
 if __name__ == "__main__":
-    print("Запуск сервера...")
     socketio.run(app, host='0.0.0.0', port=8080, debug=True)

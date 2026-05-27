@@ -185,7 +185,7 @@ async function validateAndSubmit(el) {
         }
     } catch (err) {
         console.log(err);
-        d_alert("Ошибка d104", "Ошибка сервера", "ok");
+        d_alert("Ошибка d104", `Ошибка сервера ${err}`, "ok");
     }
 }
 </script>

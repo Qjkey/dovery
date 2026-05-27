@@ -24,6 +24,10 @@ html, body {
     display: none;
 }
 
+.open_chat {
+    background-color: var(--tg-theme-secondary-bg-color);
+}
+
 .dust {
     position: absolute;
     pointer-events: none;
@@ -234,9 +238,7 @@ html, body {
             </div>
         </div>
       </div>
-      <section>
-        <div id="chats-list"></div>
-      </section>
+    <div id="chats-list"></div>
     </div>
 
     <!-- Окно поиска -->
@@ -272,7 +274,7 @@ html, body {
         <section>
             <div style="position: relative;">
                 <div class="item-header" style="position: absolute; z-index: 2;">
-                    <div onclick="closeProfile();" class="left"> 
+                    <div id="close-profile" class="left"> 
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
                         </svg>
@@ -323,7 +325,7 @@ html, body {
     <!-- КОНТЕЙНЕР АКТИВНОГО ЧАТА -->
     <div id="chat-active-content" class="chat-active-content" style="display: none;">
         <header class="chat-header">
-            <div class="item-header">
+            <div class="item-header clicked">
                 <div class="left" onclick="toggleChat(false);"> 
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="var(--tg-theme-bg-color)"/>
@@ -392,20 +394,22 @@ function toggleChat(isSelected) {
     chatContent.style.display = 'flex';
   } else {
     app.classList.remove('is-chat-open');
-    if (window.innerWidth > 700) {
-        emptyState.style.display = 'flex';
-        chatContent.style.display = 'none';
-    }
+    emptyState.style.display = 'flex';
+    chatContent.style.display = 'none';
+    document.querySelectorAll('.open_chat').forEach(elem => {
+        elem.classList.remove('open_chat');
+    });
   }
 }
 </script>
-<!-- Подключения -->
+<!-- Доп подключения -->
 <script src="/static/js/sockets.js"></script>
 <script src="/static/js/html_canvas.js"></script>
 <!-- Подключение сокета -->
 <script>const socket = io();</script>
+<!-- csrf токен -->
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<!-- Блок с информацией для E2EE -->
+<!-- Блок с информацией для E2EE TMA ui kit 2.0 -->
 <div class="overlay-container">
     <div class="profile-modal">
         <section class="before_for">
@@ -530,21 +534,37 @@ function openSearch() {
     document.getElementById('search-field').focus();
 }
 
-function openProfile(userId) {
+function openProfile(userId, is_my_profile) {
+    const chat = document.querySelector('.chat-active-content');
+    const open = window.getComputedStyle(chat).display;
+    if (is_my_profile) {
+        userId = window.userId;
+        toggleChat(true);
+    }
     const user = chatsData[userId];
-
     document.getElementById('chat-active-content').style.display = 'none';
-    document.getElementById('profile-block').classList.remove('hidden');
+    document.getElementById('empty-state').style.display = 'none';
 
     document.getElementById('profile-name').textContent = user.name;
     document.getElementById('profile-username').textContent = '@' + user.username;
     document.getElementById('profile-ava').src = '/static/files/avatars/' + user.avatar;
+
+    if (is_my_profile) {
+        document.getElementById('profile-open-chat').classList.add('hidden');
+    }
+    document.getElementById('close-profile').onclick = function() {
+        closeProfile();
+        if (open == 'none') {
+            toggleChat(false);
+        }
+    }
 
     // Назначаем клик для открытия чата
     document.getElementById('profile-open-chat').onclick = function() {
         closeProfile();
         openDirectWindow(userId);
     };
+    document.getElementById('profile-block').classList.remove('hidden');
 }
 
 function closeProfile() {
@@ -650,7 +670,7 @@ async function loadMyChats() {
         
         listContainer.innerHTML = ''; 
 
-        if (!chats || chats.length === 0) {
+        if (!chats || chats.length === 1) {
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.onclick = () => openSearch(true);
@@ -668,14 +688,15 @@ async function loadMyChats() {
         }
 
         chats.forEach(chat => {
-            const item = document.createElement('div');
-            item.className = 'item clicked';
             chatsData[chat.id] = {
                 username: chat.username,
                 name: chat.name,
                 avatar: chat.avatar,
                 publicKey: chat.public_key
             };
+            if (chat.id === window.userId) return;
+            const item = document.createElement('div');
+            item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
             item.innerHTML = `
                 <div class="left"> 
@@ -706,8 +727,17 @@ window.keychat = null;
 
 async function openDirectWindow(userId) {
     const user = chatsData[userId];
+    closeProfile();
     if (!user) { 
         return;
+    }
+
+    document.querySelectorAll('.open_chat').forEach(elem => {
+        elem.classList.remove('open_chat');
+    });
+    const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+    if (currentChatElem) {
+        currentChatElem.classList.add('open_chat');
     }
 
     const headerTitle = document.querySelector('.chat-header .label-header');
@@ -718,8 +748,8 @@ async function openDirectWindow(userId) {
     const chatHeader = document.getElementById('chat-headers');
     const chatHeader1 = document.getElementById('chat-headers1');
     if (chatHeader) {
-        chatHeader.onclick = () => {openProfile(userId);};
-        chatHeader1.onclick = () => {openProfile(userId);};
+        chatHeader.onclick = () => {openProfile(userId, false);};
+        chatHeader1.onclick = () => {openProfile(userId, false);};
     }   
     if (headerAvatar) {
         headerAvatar.src = `static/files/avatars/${user.avatar}`;
@@ -780,7 +810,7 @@ async function openDirectWindow(userId) {
 });
 
 </script>
-<!-- Контейнер с элементами контекстного меню -->
+<!-- Контейнер с элементами контекстного меню TMA ui kit 2.0 -->
 <div id="tagDropdown" class="tag-dropdown">
 </div> 
 <!-- Копирование и удаление сообщения -->
@@ -809,14 +839,22 @@ function copy_message(id) {
     }
 }
 
-function copy_username() {
-    const userId = document.getElementById('id_ept').innerText;
-    const user = chatsData[userId];
-    navigator.clipboard.writeText(user.username).then(() => {
+function copy_who(who) {
+    const username = document.getElementById('profile-username').innerText;
+    const u_username = username.slice(1);
+    navigator.clipboard.writeText(who + u_username).then(() => {
         hideDropdown();
     }).catch(err => {
         console.error("Ошибка при копировании:", err);
     });
+}
+
+function copy_username() {
+    copy_who('@');
+}
+
+function copy_link_username() {
+    copy_who('https://dovery.space/');
 }
 
 window.snapDelete = async function(id) {
@@ -920,7 +958,7 @@ tx.addEventListener('input', function() {
 </script>
 <!-- Логика отправки -->
 <script>
-let userId = null;
+window.userId = null; 
 const request = indexedDB.open("Dovery");
 
 request.onsuccess = (event) => {
@@ -1238,7 +1276,7 @@ socket.on('chat_deleted', async (data) => {
 <!-- Контекстные меню -->
 <script>
 var list_items_icon_01 = [            
-    { label: "Мой профиль", link: "#", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface346" inkscape:label="surface346" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface346" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 307.68,220.94 C 307.68,249.79 284.29,273.18 255.44,273.18 C 226.59,273.18 203.2,249.79 203.2,220.94 C 203.2,192.09 226.59,168.7 255.44,168.7 C 284.29,168.7 307.68,192.09 307.68,220.94 "/> </g> <g id="g_4" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 160.5,380.08 C 164.43,364.91999999999996 170.89999999999998,354.06 178.01,346.27 C 197.98,324.43 228.55999999999997,326.71 256.02,326.71 C 283.47999999999996,326.71 314.05999999999995,324.43 334.03,346.27 C 341.15,354.06 347.61,364.91999999999996 351.54,380.08 "/> </g> </g> </g> </svg>' }
+    { label: "Мой профиль", onclick:"openProfile(123, true);", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface346" inkscape:label="surface346" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface346" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 307.68,220.94 C 307.68,249.79 284.29,273.18 255.44,273.18 C 226.59,273.18 203.2,249.79 203.2,220.94 C 203.2,192.09 226.59,168.7 255.44,168.7 C 284.29,168.7 307.68,192.09 307.68,220.94 "/> </g> <g id="g_4" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 160.5,380.08 C 164.43,364.91999999999996 170.89999999999998,354.06 178.01,346.27 C 197.98,324.43 228.55999999999997,326.71 256.02,326.71 C 283.47999999999996,326.71 314.05999999999995,324.43 334.03,346.27 C 341.15,354.06 347.61,364.91999999999996 351.54,380.08 "/> </g> </g> </g> </svg>' }
 ];
 var list_items_icon_02 = [            
     { label: "Удалить чат", danger: true, onclick:"delete_chat();", icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface1491" inkscape:label="surface1491" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface1491" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-destructive-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 143.04,196.16 C 143.04,196.16 161.18,392.9 161.18,392.9 C 162.64000000000001,408.71 175.9,420.8 191.77,420.8 C 191.77,420.8 320.23,420.8 320.23,420.8 C 336.1,420.8 349.36,408.71 350.82,392.9 C 350.82,392.9 368.96,196.16 368.96,196.16 M 394.96,144.32 C 394.96,144.32 308.56,144.32 308.56,144.32 M 117.04,144.32 C 117.04,144.32 308.56,144.32 308.56,144.32 M 308.56,144.32 C 308.56,144.32 308.56,121.92 308.56,121.92 C 308.56,104.95 294.80999999999995,91.2 277.84,91.2 C 277.84,91.2 234.16,91.2 234.16,91.2 C 217.19,91.2 203.44,104.95 203.44,121.92 C 203.44,121.92 203.44,144.32 203.44,144.32 "/> </g> </g> </g> </svg>' }
@@ -1252,7 +1290,8 @@ var list_items_icon_04 = [
     { label: "Вставить", onclick:"paste_text();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10510" inkscape:label="surface10510" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10510" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:round"> <path d="M 286.08,140.8 C 286.08,140.8 155.52,140.8 155.52,140.8 C 135.72,140.8 119.68,156.83999999999997 119.68,176.64 C 119.68,176.64 119.68,384 119.68,384 C 119.68,403.79 135.72,419.84 155.52,419.84 C 155.52,419.84 356.48,419.84 356.48,419.84 C 376.28000000000003,419.84 392.32,403.79 392.32,384 C 392.32,384 392.32,176.64 392.32,176.64 C 392.32,156.83999999999997 376.28000000000003,140.8 356.48,140.8 C 356.48,140.8 286.08,140.8 286.08,140.8 Z M 286.08,140.8 C 286.08,140.8 286.08,121.6 286.08,121.6 C 286.08,104.99 272.61,91.52 256,91.52 C 239.39,91.52 225.92,104.99 225.92,121.6 C 225.92,121.6 225.92,140.8 225.92,140.8 M 324.48,220.16 C 324.48,220.16 187.52,220.16 187.52,220.16 M 324.48,279.04 C 324.48,279.04 187.52,279.04 187.52,279.04 M 293.12,338.56 C 293.12,338.56 218.88,338.56 218.88,338.56 "/> </g> </g> </g> </svg>' }
 ];
 var list_items_icon_05 = [ 
-    { label: "Копировать", onclick:"copy_username();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' }
+    { label: "Ссылку", onclick:"copy_link_username();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' },
+    { label: "Username", onclick:"copy_username();", icon: '<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>' }
 ];
 </script>
 <!-- Копирование/вставить для поля ввода -->
@@ -1319,6 +1358,7 @@ inputField.addEventListener('contextmenu', async function(e) { // Добавил
 });
 
 </script>
+<!-- Доп подключения -->
 <script src="/static/js/context menu.js"></script>
 <script src="/static/js/overlay.js"></script>
 {% endblock %}

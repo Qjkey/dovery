@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Слишком много попыток
+{% endblock %}
+
+{% block body %}
+
+<section class="bottom">
+<div class="big-header">
+    <img src="static/img/error.png">
+    <div class="big-header-title label headline6">
+        {% if error == 429 %}
+            Слишком много запросов
+        {% else %}
+            404 Страница не найдена
+        {% endif %}
+    </div>
+
+    <div class="label body1">
+        {% if error == 429 %}
+            С вашего IP поступает слишком много запросов на сервер. Пожалуйста, подождите! Лимит — 10 запросов в час.
+        {% else %}
+            Страница не найдена, переключитесь на другую
+        {% endif %}
+    </div>
+</div>
+</section>
+
+{% endblock %}

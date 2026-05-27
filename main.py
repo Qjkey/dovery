@@ -174,6 +174,11 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
+            cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+            if cursor.fetchone():
+                return False, "d203"
+
             step = 0
             user_id = None
             while step < 100:
@@ -298,7 +303,7 @@ def signup():
     if request.method == 'GET':
         return render_template('signup.html')
     name = request.form.get('name')
-    username = request.form.get('username').lower()
+    username = request.form.get('username')
     client_hash = request.form.get('password') 
     pub_key = request.form.get('public_key')
     priv_key = request.form.get('encrypted_private_key')
@@ -338,6 +343,14 @@ def signup():
     
     return jsonify({"status": "error", "message": message})
     
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template('error.html', error="429"), 429
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('error.html', error="404"), 404
+
 # Поиск
 @app.route('/search_users')
 def search_users():
@@ -401,7 +414,9 @@ def get_my_chats():
         return jsonify([]), 401
 
     conn = get_db_connection()
-    query = '''
+    
+    # 1. Получаем список собеседников
+    query_chats = '''
         SELECT 
             u.id, 
             u.username, 
@@ -412,9 +427,24 @@ def get_my_chats():
         JOIN users u ON u.id = (CASE WHEN c.user_one_id = ? THEN c.user_two_id ELSE c.user_one_id END)
         WHERE c.user_one_id = ? OR c.user_two_id = ?
     '''
-    chats = conn.execute(query, (current_user_id, current_user_id, current_user_id)).fetchall()
+    chats_rows = conn.execute(query_chats, (current_user_id, current_user_id, current_user_id)).fetchall()
+    chats = [dict(chat) for chat in chats_rows]
+
+    # 2. Получаем данные самого пользователя
+    query_self = '''
+        SELECT id, username, name, avatar, public_key 
+        FROM users 
+        WHERE id = ?
+    '''
+    self_row = conn.execute(query_self, (current_user_id,)).fetchone()
+    
     conn.close()
-    return jsonify([dict(chat) for chat in chats])
+
+    # 3. Добавляем себя в список, если пользователь найден в БД
+    if self_row:
+        chats.append(dict(self_row))
+
+    return jsonify(chats)
 
 # Защита CSRF
 @app.errorhandler(CSRFError)

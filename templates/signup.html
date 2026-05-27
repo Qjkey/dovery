@@ -229,7 +229,7 @@ async function validateAndSubmit(el) {
 
         const formData = new FormData();
         formData.append('name', name);
-        formData.append('username', username.toLowerCase());
+        formData.append('username', username);
         formData.append('password', hashedPass);
         formData.append('public_key', pubBase64);
         formData.append('encrypted_private_key', privBase64);

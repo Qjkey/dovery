@@ -201,7 +201,7 @@ html, body {
   padding-left: 10px;
   padding-right: 10px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.25);
+  background: #63996f75;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px); /* Поддержка Safari */
   border-radius: 10px;
@@ -215,6 +215,23 @@ html, body {
 /* Класс для скрытия элементов */
 .hidden {
   display: none !important;
+}
+
+.chat-date-group {
+    width: 100%;
+    text-align: center;
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+
+.chat-date-header {
+    display: inline-block;
+    padding: 3px 7px;
+    background: #63996f75;
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 50px;
+    color: var(--tg-theme-bg-color);
 }
 </style>
 <div class="app-wrapper" id="app">
@@ -908,10 +925,32 @@ window.snapDelete = async function(id) {
 
 socket.on('message_deleted', async (data) => {
     try {
+        // Получаем ID текущего открытого чата
+        const activeChatUserId = document.getElementById('id_ept') ? document.getElementById('id_ept').innerText : null;
+        let shouldRemoveDateHeader = false;
+        let dateLabelToRemove = null;
+
         Object.keys(chatHash).forEach(chatId => {
-            const initialLength = chatHash[chatId].messages.length;
+            // Находим удаляемое сообщение в хэше, чтобы узнать его время
+            const msgToDelete = chatHash[chatId].messages.find(msg => msg.id === data.msg_id);
             
-            chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
+            if (msgToDelete) {
+                dateLabelToRemove = getShortDateLabel(msgToDelete.time);
+                
+                // Фильтруем сообщения, удаляя нужное
+                chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
+                
+                // Если это текущий активный чат, проверяем, остались ли сообщения с такой же датой
+                if (chatId === activeChatUserId) {
+                    const hasMoreMessagesThisDay = chatHash[chatId].messages.some(
+                        msg => getShortDateLabel(msg.time) === dateLabelToRemove
+                    );
+                    // Если сообщений этого дня больше не осталось — помечаем плашку на удаление
+                    if (!hasMoreMessagesThisDay) {
+                        shouldRemoveDateHeader = true;
+                    }
+                }
+            }
         });
 
         const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
@@ -919,6 +958,19 @@ socket.on('message_deleted', async (data) => {
             const wrapper = messageElement.closest('.message-wrapper');
             if (wrapper) {
                 try {
+                    // ЕСЛИ НУЖНО УДАЛИТЬ ДАТУ: Ищем соответствующую плашку в DOM
+                    let dateHeaderElement = null;
+                    if (shouldRemoveDateHeader && dateLabelToRemove) {
+                        // Ищем плашку, текст внутри которой совпадает с нашей датой
+                        const headers = messagesArea.querySelectorAll('.chat-date-group');
+                        for (let header of headers) {
+                            if (header.textContent.trim() === dateLabelToRemove) {
+                                dateHeaderElement = header;
+                                break;
+                            }
+                        }
+                    }
+
                     // Использование самого быстрого метода захвата
                     const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
                     
@@ -926,8 +978,14 @@ socket.on('message_deleted', async (data) => {
                     const height = wrapper.offsetHeight;
                     const rect = wrapper.getBoundingClientRect();
 
-                    // Мгновенно скрываем оригинал
+                    // Мгновенно скрываем оригинал сообщения
                     wrapper.style.visibility = 'hidden';
+                    
+                    // Если нашли плашку даты, тоже плавно её скрываем (растворяем через opacity)
+                    if (dateHeaderElement) {
+                        dateHeaderElement.style.transition = 'opacity 0.2s ease-out, transform 0.5s ease-out';
+                        dateHeaderElement.style.opacity = '0';
+                    }
 
                     const layersCount = 20; // Минимум для Android
                     const layers = [];
@@ -976,17 +1034,31 @@ socket.on('message_deleted', async (data) => {
                         setTimeout(() => l.c.remove(), 1000);
                     });
 
-                    setTimeout(() => wrapper.remove(), 500);
+                    // Удаляем элементы из DOM по окончании анимации
+                    setTimeout(() => {
+                        wrapper.remove();
+                        if (dateHeaderElement) {
+                            dateHeaderElement.remove();
+                        }
+                    }, 500);
 
                 } catch (err) {
                     wrapper.remove();
+                    // Если в блоке анимации упала ошибка, аварийно удаляем и плашку тоже
+                    const headers = messagesArea.querySelectorAll('.chat-date-group');
+                    for (let header of headers) {
+                        if (header.textContent.trim() === dateLabelToRemove) {
+                            header.remove();
+                            break;
+                        }
+                    }
                 }
             }
         }
     } catch (err) {
         console.error("Ошибка при удалении сообщения:", err);
     }
-}); 
+});
 </script>
 <!-- Изменение размера поля ввода -->
 <script>
@@ -1002,6 +1074,34 @@ tx.addEventListener('input', function() {
 <script>
 window.userId = null; 
 const request = indexedDB.open("Dovery");
+
+function getShortDateLabel(timeString) {
+    const date = new Date(timeString);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function insertNewMessageWithDateCheck(messagesArea, messageWrapper, msgTime) {
+    const dateLabel = getShortDateLabel(msgTime);
+    
+    // Ищем самую верхнюю плашку даты, которая сейчас есть в DOM
+    const topHeader = messagesArea.querySelector('.chat-date-group .chat-date-header');
+    const lastVisualDate = topHeader ? topHeader.innerText : null;
+
+    // Если наступил новый день (или это вообще первое сообщение в чате)
+    if (dateLabel !== lastVisualDate) {
+        const dateHeader = document.createElement('div');
+        dateHeader.className = 'chat-date-group';
+        dateHeader.innerHTML = `<span class="chat-date-header caption1-medium">${dateLabel}</span>`;
+        
+        // СНАЧАЛА делаем prepend даты. Она падает в самый низ (визуально)
+        messagesArea.prepend(dateHeader); 
+    }
+
+    // ЗАТЕМ делаем prepend сообщения. 
+    // В DOM оно встанет НАД датой, а браузер из-за column-reverse 
+    // отобразит его СНИЗУ под датой!
+    messagesArea.prepend(messageWrapper); 
+}
 
 request.onsuccess = (event) => {
   const db = event.target.result;
@@ -1129,7 +1229,7 @@ async function sendMessage() {
 
     wrapper.querySelector('.message-content').textContent = text;
 
-    messagesArea.prepend(wrapper);
+    insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
     if (chatHash[receiverId]) {
         chatHash[receiverId].messages.push({
@@ -1212,7 +1312,7 @@ socket.on('new_message', async (data) => {
             }
 
             wrapper.querySelector('.message-content').textContent = decryptedText;
-            messagesArea.prepend(wrapper);
+            insertNewMessageWithDateCheck(messagesArea, wrapper, data.time);
         }
 
     } catch (err) {
@@ -1239,9 +1339,7 @@ msgInput.addEventListener('keydown', async (e) => {
         // Если это мобилка, ничего не делаем — сработает стандартный перенос строки
     }
 });
-</script>
-<!-- Отображение сообщений -->
-<script>
+
 const chatHash = {};
 
 async function loadChat(userId) {
@@ -1289,14 +1387,13 @@ async function decryptAll(messages) {
 
 function renderChat(messagesArea, messages, userId) {
     const fragment = document.createDocumentFragment();
-
     const sortedMessages = [...messages].sort((a, b) => {
         const dateA = new Date(a.time);
         const dateB = new Date(b.time);
         return dateB - dateA;
     });
 
-    sortedMessages.forEach(msg => {
+    sortedMessages.forEach((msg, index) => {
         const mne = msg.sender_id != userId;
         const typeClass = mne ? 'sent' : 'received';
 
@@ -1312,6 +1409,20 @@ function renderChat(messagesArea, messages, userId) {
         `;
         wrapper.querySelector('.message-content').textContent = msg.decryptedText;
         fragment.appendChild(wrapper);
+
+        const currentDateLabel = getShortDateLabel(msg.time);
+        const nextMsg = sortedMessages[index + 1];
+        const nextDateLabel = nextMsg ? getShortDateLabel(nextMsg.time) : null;
+        // Если следующего сообщения нет (это конец массива) ИЛИ у следующего сообщения уже другая дата
+        if (!nextMsg || currentDateLabel !== nextDateLabel) {
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'chat-date-group';
+            dateHeader.innerHTML = `<span class="chat-date-header caption1-medium">${currentDateLabel}</span>`;
+            
+            // Добавляем плашку даты во фрагмент СРАЗУ за последним сообщением этого дня.
+            // При итоговом prepend() этот блок окажется визуально ВЫШЕ этих сообщений.
+            fragment.appendChild(dateHeader);
+        }
     });
 
     messagesArea.prepend(fragment);

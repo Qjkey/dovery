@@ -8,13 +8,11 @@
     flex: 1 1 auto;
     display: flex;
     flex-direction: column-reverse;
-    /* Убираем justify-content: flex-end, он ломает скролл! */
     gap: 10px;
     padding: 20px;
     background: radial-gradient(circle, #99BF8D 20%, transparent 40%), conic-gradient(#BDC985,#84B28D,#CDD6B0, #84B28D, #BDC985);
     overflow-y: auto;
     box-sizing: border-box;
-    /* Фикс для Safari и некоторых версий Chrome */
     min-height: 0; 
 }
 

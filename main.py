@@ -40,7 +40,7 @@ app.config.update(
 )
 csrf = CSRFProtect(app)
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
-
+online_users = {}
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
     app, 
@@ -169,6 +169,48 @@ def process_avatar(file_storage):
         print(f"Ошибка: {e}")
         return "default.png"
 
+# Получение id чатов пользователя
+def get_user_s_chats(user_id):
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        pass
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT 
+            CASE 
+                WHEN user_one_id = ? THEN user_two_id 
+                ELSE user_one_id 
+            END AS contact_id
+        FROM chats 
+        WHERE user_one_id = ? OR user_two_id = ?
+    """
+    
+    try:
+        cursor.execute(query, (user_id, user_id, user_id))
+        rows = cursor.fetchall()
+        contact_ids = [str(row['contact_id']) for row in rows]
+        return contact_ids
+    except sqlite3.OperationalError as e:
+        print(f"[SQLite Error] Ошибка при чтении контактов: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+# Отправка статуса пользователя в сети / был(а) недавно
+def send_user_status(user_id, status):
+    chats = get_user_s_chats(user_id)
+    for i in chats:
+        socketio.emit(
+            'user_status_update', 
+            {'user_id': user_id, 'status': status}, 
+            to=f"user_{i}"
+        )
+
 # Функция сохранения пользователя
 def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
     try:
@@ -239,6 +281,24 @@ def handle_connect():
     user_id = get_current_user_id()
     if user_id:
         join_room(f"user_{user_id}")
+        if user_id not in online_users:
+            online_users[user_id] = set()
+            send_user_status(user_id, 'в сети')
+
+        online_users[user_id].add(request.sid)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    user_id = get_current_user_id()
+    if not user_id:
+        return
+
+    if user_id in online_users:
+        online_users[user_id].discard(request.sid)
+        if not online_users[user_id]:
+            del online_users[user_id]
+            print(*online_users)
+            send_user_status(user_id, 'был(а) недавно')
 
 # Главная страница
 @app.route("/")
@@ -342,11 +402,13 @@ def signup():
             return jsonify({"status": "error", "message": "d204"})
     
     return jsonify({"status": "error", "message": message})
-    
+
+# Обработчик ошибки 429
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return render_template('error.html', error="429"), 429
 
+# Обработчик ошибки 404
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('error.html', error="404"), 404
@@ -412,7 +474,6 @@ def get_my_chats():
     current_user_id = get_current_user_id()
     if not current_user_id:
         return jsonify([]), 401
-
     conn = get_db_connection()
     
     # 1. Получаем список собеседников
@@ -422,7 +483,8 @@ def get_my_chats():
             u.username, 
             u.name, 
             u.avatar,
-            u.public_key
+            u.public_key,
+            u.last_seen
         FROM chats c
         JOIN users u ON u.id = (CASE WHEN c.user_one_id = ? THEN c.user_two_id ELSE c.user_one_id END)
         WHERE c.user_one_id = ? OR c.user_two_id = ?
@@ -432,7 +494,7 @@ def get_my_chats():
 
     # 2. Получаем данные самого пользователя
     query_self = '''
-        SELECT id, username, name, avatar, public_key 
+        SELECT id, username, name, avatar, public_key, last_seen
         FROM users 
         WHERE id = ?
     '''
@@ -443,6 +505,13 @@ def get_my_chats():
     # 3. Добавляем себя в список, если пользователь найден в БД
     if self_row:
         chats.append(dict(self_row))
+
+    for chat in chats:
+        user_id_str = int(chat['id'])
+        if user_id_str in online_users:
+            chat['status'] = 'в сети'
+        else:
+            chat['status'] = 'был(а) недавно'
 
     return jsonify(chats)
 
@@ -468,13 +537,17 @@ def handle_message(data):
     # 1. Сохраняем в БД зашифрованную строку
     time = save_message(sender_id, receiver_id, encrypted_text, msg_id)
 
-    # 2. Пересылаем получателю в его персональную комнату
-    emit('new_message', {
+    data_mess = {
         'msg_id': msg_id,
         'text': encrypted_text,
         'sender_id': sender_id,
+        'receiver_id': receiver_id,
         'time': time
-    }, to=f"user_{receiver_id}")
+    }
+
+    emit('new_message', data_mess, to=f"user_{receiver_id}")
+
+    emit('new_message', data_mess, to=f"user_{sender_id}")
 
 # Удаление сообщения сокет
 @socketio.on('delete_message')

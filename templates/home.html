@@ -283,7 +283,8 @@ html, body {
                 <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
                     <div class="avatar"><img id="profile-ava" src=""></div>
                     <div class="defult headline6" id="profile-name"></div>
-                    <div class="subname subtitle1" id="profile-status">был(а) недавно</div>
+                    <div class="subname subtitle1" id="profile-status"></div>
+                    <div class="hidden" id="profile-id"></div>
                 </div>
             </div>
         </section>
@@ -337,7 +338,7 @@ html, body {
                 <div class="right">
                     <div class="text twoline" id="chat-headers1"> 
                         <div class="label-header body1-medium" id="chat-name"></div> 
-                        <div class="label-header-subtitle subtitle1">был(а) недавно</div> 
+                        <div class="label-header-subtitle subtitle1" id="status_of_user"></div> 
                         <div style="display: none;" id="id_ept"></div>
                     </div>
                     <div class="element" id="cntxt_menu_btn_02">
@@ -546,6 +547,8 @@ function openProfile(userId, is_my_profile) {
     document.getElementById('empty-state').style.display = 'none';
 
     document.getElementById('profile-name').textContent = user.name;
+    document.getElementById('profile-id').textContent = userId;
+    document.getElementById('profile-status').textContent = user.status;
     document.getElementById('profile-username').textContent = '@' + user.username;
     document.getElementById('profile-ava').src = '/static/files/avatars/' + user.avatar;
 
@@ -640,6 +643,7 @@ function renderResults(users) {
 socket.on("chat_created", (data) => {
     loadMyChats(); 
 });
+const chatsData = {};
 
 async function startChat(userId, userName) {
     try {
@@ -661,7 +665,36 @@ async function startChat(userId, userName) {
         console.error("Ошибка при создании чата:", err);
     }
 }
-const chatsData = {};
+
+socket.on("user_status_update", (data) => {
+    const userId = String(data.user_id);
+    const idEpt = document.getElementById('id_ept');
+    
+    if (chatsData[userId]) {
+        chatsData[userId].status = data.status;
+    }
+
+    if (idEpt && userId === idEpt.textContent) {
+        const currentStatus = document.getElementById('status_of_user');
+        if (currentStatus) currentStatus.textContent = data.status;
+    }
+
+    const profile = document.getElementById("profile-id").textContent;
+    if (profile === userId) {
+        document.getElementById("profile-status").textContent = data.status;
+    }
+
+    const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+    if (currentChatElem) {
+        const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
+        if (statusInList) {
+            const str_status = data.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
+            statusInList.className = `label status_of_user_in_list_chats ${str_status}`;
+            statusInList.textContent = data.status;
+        }
+    }
+});
+
 async function loadMyChats() {
     try {
         const response = await fetch('/get_my_chats');
@@ -688,16 +721,20 @@ async function loadMyChats() {
         }
 
         chats.forEach(chat => {
+            const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
+
             chatsData[chat.id] = {
                 username: chat.username,
                 name: chat.name,
                 avatar: chat.avatar,
-                publicKey: chat.public_key
+                publicKey: chat.public_key,
+                status: currentStatus
             };
             if (chat.id === window.userId) return;
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
+            const str_status = chat.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
             item.innerHTML = `
                 <div class="left"> 
                     <img src="static/files/avatars/${chat.avatar}" class="ava"> 
@@ -705,7 +742,7 @@ async function loadMyChats() {
                 <div class="right separator">
                     <div class="text twoline"> 
                         <div class="label body1">${chat.name}</div> 
-                        <div class="label subtitle subtitle1">был(а) недавно</div> 
+                        <div class="label status_of_user_in_list_chats ${str_status}">${currentStatus}</div> 
                     </div>
                 </div>
             `;
@@ -746,6 +783,10 @@ async function openDirectWindow(userId) {
     container.textContent = userId; 
     const headerAvatar = document.querySelector('.chat-header img.ava');
     const chatHeader = document.getElementById('chat-headers');
+    const status_of_user = document.getElementById('status_of_user');
+    if (status_of_user) {
+        status_of_user.innerText = user.status;
+    }
     const chatHeader1 = document.getElementById('chat-headers1');
     if (chatHeader) {
         chatHeader.onclick = () => {openProfile(userId, false);};
@@ -762,6 +803,7 @@ async function openDirectWindow(userId) {
     } catch (err) {
         console.error("Ошибка установки защищенного соединения:", err);
     }
+    msgInput.value = '';
     loadChat(userId);
     toggleChat(true);
 }
@@ -1066,6 +1108,7 @@ async function sendMessage() {
     const msgId = "msg_" + generateId(15);
 
     const receiverId = document.getElementById('id_ept').innerText;
+
     socket.emit('send_direct_message', {
         receiver_id: receiverId,
         text: encryptedText,
@@ -1104,35 +1147,76 @@ async function sendMessage() {
 
 socket.on('new_message', async (data) => {
     try {
-        const receiverId = document.getElementById('id_ept').innerText;
-        const userid = data.sender_id; 
-        const decryptedText = await decryptText_new_message(data.text, userid);
+        // Текущий открытый чат на этой вкладке
+        const activeChatUserId = document.getElementById('id_ept') ? document.getElementById('id_ept').innerText : null;
+        
+        const isMe = (data.sender_id == window.userId);
+        
+        const chatPartnerId = isMe ? data.receiver_id : data.sender_id;
 
-        if (chatHash[userid]) {
-            chatHash[userid].messages.push({
-                id: data.msg_id,
-                message_text: data.text,
-                sender_id: data.sender_id,
-                time: data.time
-            });
-        }
-        if (receiverId == data.sender_id) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper received new-msg';
+        if (chatHash[chatPartnerId]) {
+            const isAlreadyExists = chatHash[chatPartnerId].messages.some(m => m.id === data.msg_id);
             
-            wrapper.innerHTML = `
-                <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
-                    <div class="message-content body1" style="white-space: pre-wrap;"></div>
-                    <div class="message-info">
-                        <span class="message-time caption2">${formatTime(data.time) || ''}</span>
+            if (!isAlreadyExists) {
+                chatHash[chatPartnerId].messages.push({
+                    id: data.msg_id,
+                    message_text: data.text,
+                    sender_id: data.sender_id,
+                    time: data.time
+                });
+            } else if (isMe) {
+
+                return;
+            }
+        }
+
+        // 2. Рендерим в DOM только если этот чат сейчас открыт перед глазами
+        if (activeChatUserId == chatPartnerId) {
+            const keyOwnerId = isMe ? data.receiver_id : data.sender_id;
+            console.log(keyOwnerId);
+            console.log(chatsData[keyOwnerId]);
+            if (!chatsData[keyOwnerId] || !chatsData[keyOwnerId].keychat) {
+                if (!chatsData[keyOwnerId].keychat) {
+                    console.warn(`Нету ключа чата`);
+                }
+                console.warn(`Не найден ключ для дешифровки чата ${keyOwnerId}. Возможно чат еще не инициализирован.`);
+                return;
+            }
+
+            const decryptedText = await decryptText_new_message(data.text, keyOwnerId);
+
+            const wrapper = document.createElement('div');
+            
+            if (isMe) {
+                // Отрисовка на ТВОИХ соседних вкладках (как исходящее)
+                wrapper.className = 'message-wrapper sent new-msg';
+                wrapper.innerHTML = `
+                    <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
+                        <div class="message-content body1" style="white-space: pre-wrap;"></div>
+                        <div class="message-info">
+                            <span class="message-time caption2">${formatTime(data.time) || ''}</span>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Отрисовка у ПОЛУЧАТЕЛЯ (как входящее)
+                wrapper.className = 'message-wrapper received new-msg';
+                wrapper.innerHTML = `
+                    <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
+                        <div class="message-content body1" style="white-space: pre-wrap;"></div>
+                        <div class="message-info">
+                            <span class="message-time caption2">${formatTime(data.time) || ''}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
             wrapper.querySelector('.message-content').textContent = decryptedText;
             messagesArea.prepend(wrapper);
         }
+
     } catch (err) {
-        console.error("Не удалось расшифровать сообщение. Возможно, ключи не совпадают.", err);
+        console.error("Критическая ошибка обработки сокета new_message:", err);
     }
 });
 

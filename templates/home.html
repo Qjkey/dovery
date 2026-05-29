@@ -28,6 +28,28 @@ html, body {
     background-color: var(--tg-theme-secondary-bg-color);
 }
 
+.letter-ava {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    user-select: none;
+    text-transform: uppercase;
+}
+
+.letter-ava1 {
+    width: 95px;
+    height: 95px;
+    font-size: 34px;
+    border-radius: 50%; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    user-select: none;
+    text-transform: uppercase;
+}
+
 .dust {
     position: absolute;
     pointer-events: none;
@@ -233,6 +255,13 @@ html, body {
     border-radius: 50px;
     color: var(--tg-theme-bg-color);
 }
+
+@media (min-width: 1000px) {
+    .chat-date-group {
+        text-align: left;
+        padding-left: 200px;
+    }
+}
 </style>
 <div class="app-wrapper" id="app">
   <aside class="sidebar">
@@ -298,7 +327,7 @@ html, body {
                     </div>
                 </div>
                 <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
-                    <div class="avatar"><img id="profile-ava" src=""></div>
+                    <div class="avatar" id="profile-avatar"></div>
                     <div class="defult headline6" id="profile-name"></div>
                     <div class="subname subtitle1" id="profile-status"></div>
                     <div class="hidden" id="profile-id"></div>
@@ -350,7 +379,6 @@ html, body {
                     </svg>
                 </div>
                 <div class="second-left" id="chat-headers"> 
-                    <img src="" class="ava">
                 </div>
                 <div class="right">
                     <div class="text twoline" id="chat-headers1"> 
@@ -567,7 +595,26 @@ function openProfile(userId, is_my_profile) {
     document.getElementById('profile-id').textContent = userId;
     document.getElementById('profile-status').textContent = user.status;
     document.getElementById('profile-username').textContent = '@' + user.username;
-    document.getElementById('profile-ava').src = '/static/files/avatars/' + user.avatar;
+    const avatar = document.getElementById('profile-avatar');
+    if (avatar && chatsData[userId]?.avatar) {
+        avatar.querySelector('.ava')?.remove();
+
+        // Парсим строку HTML из chatsData в реальный элемент
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(chatsData[userId].avatar, 'text/html');
+        const avatarElement = doc.body.firstChild;
+
+        // Если у элемента есть класс letter-ava, меняем его на letter-ava1
+        if (avatarElement && avatarElement.classList.contains('letter-ava')) {
+            avatarElement.classList.replace('letter-ava', 'letter-ava1');
+            avatarElement.classList.replace('letter-ava', 'letter-ava1');
+        }
+
+        // Вставляем измененный элемент внутрь контейнера
+        avatar.prepend(avatarElement);
+    }
+
+
 
     if (is_my_profile) {
         document.getElementById('profile-open-chat').classList.add('hidden');
@@ -594,7 +641,7 @@ function closeProfile() {
 
 function closeSearch() {
     document.getElementById('search-panel').classList.add('hidden');
-    document.getElementById('div-classic').style.display = 'block';
+    document.getElementById('div-classic').style.display = 'flex';
     document.getElementById('search-field').value = '';
     document.getElementById('search-results').innerHTML = '';
 }
@@ -740,10 +787,18 @@ async function loadMyChats() {
         chats.forEach(chat => {
             const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
 
+            let avatarHtml = '';
+            if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
+                avatarHtml = `<img src="static/files/avatars/${chat.avatar}" class="ava">`;
+            } else {
+                const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
+                avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+            }
+
             chatsData[chat.id] = {
                 username: chat.username,
                 name: chat.name,
-                avatar: chat.avatar,
+                avatar: avatarHtml,
                 publicKey: chat.public_key,
                 status: currentStatus
             };
@@ -752,9 +807,10 @@ async function loadMyChats() {
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
             const str_status = chat.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
+
             item.innerHTML = `
                 <div class="left"> 
-                    <img src="static/files/avatars/${chat.avatar}" class="ava"> 
+                    ${avatarHtml}
                 </div>
                 <div class="right separator">
                     <div class="text twoline"> 
@@ -798,7 +854,7 @@ async function openDirectWindow(userId) {
     if (headerTitle) headerTitle.innerText = user.name;
     const container = document.getElementById('id_ept');
     container.textContent = userId; 
-    const headerAvatar = document.querySelector('.chat-header img.ava');
+    const headerAvatar = document.getElementById('chat-headers');
     const chatHeader = document.getElementById('chat-headers');
     const status_of_user = document.getElementById('status_of_user');
     if (status_of_user) {
@@ -809,8 +865,9 @@ async function openDirectWindow(userId) {
         chatHeader.onclick = () => {openProfile(userId, false);};
         chatHeader1.onclick = () => {openProfile(userId, false);};
     }   
-    if (headerAvatar) {
-        headerAvatar.src = `static/files/avatars/${user.avatar}`;
+    if (headerAvatar && chatsData[userId]?.avatar) {
+        headerAvatar.querySelector('.ava')?.remove();
+        headerAvatar.insertAdjacentHTML('afterbegin', chatsData[userId].avatar);
     }
     try {
         const private_key = await get_private_key(); 

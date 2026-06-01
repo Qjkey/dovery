@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session, redirect, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
@@ -18,6 +18,8 @@ import hashlib
 from PIL import Image, ImageOps
 from datetime import datetime, timezone
 import logging
+import json
+import base64
 
 base = Path(__file__).resolve().parent
 env_path = base / 'db' / 'info.env'
@@ -297,7 +299,6 @@ def handle_disconnect():
         online_users[user_id].discard(request.sid)
         if not online_users[user_id]:
             del online_users[user_id]
-            print(*online_users)
             send_user_status(user_id, 'был(а) недавно')
 
 # Главная страница
@@ -470,7 +471,7 @@ def add_to_chats():
 
 # Получить чаты
 @app.route('/get_my_chats')
-def get_my_chats():
+def get_my_chats(): 
     current_user_id = get_current_user_id()
     if not current_user_id:
         return jsonify([]), 401
@@ -581,7 +582,6 @@ def get_history(second_id):
                 OR (sender_id = ? AND receiver_id  = ?))
                 AND id < ?
                 ORDER BY id DESC 
-                LIMIT 15
             ''', (user_id, second_id, second_id, user_id, last_id))
         else:
             # Первая загрузка чата: берем просто последние 15 сообщений
@@ -591,7 +591,6 @@ def get_history(second_id):
                 WHERE (sender_id = ? AND receiver_id = ?) 
                 OR (sender_id = ? AND receiver_id  = ?)
                 ORDER BY id DESC 
-                LIMIT 15
             ''', (user_id, second_id, second_id, user_id))
         
         rows = cursor.fetchall()
@@ -601,6 +600,46 @@ def get_history(second_id):
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
         return jsonify([]), 500
+
+# Анализ username
+@app.route('/<string:username>')
+def get_user_profile(username):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        return render_template('error.html', error="404"), 404
+
+    return redirect(url_for('index', profile='true', user_id=user['id']))
+
+@app.route('/get_use_profile/<int:user_id>')
+def get_user_data_api(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user_id_int = int(user['id'])
+    
+    if user_id_int in online_users:
+        status = 'в сети'
+    else:
+        status = 'был(а) недавно'
+    return jsonify({
+        "id": user['id'],
+        "username": user['username'],
+        "name": user['name'],
+        "avatar": user['avatar'] if user['avatar'] else "",
+        "public_key": user['public_key'],
+        "status": status
+    })
 
 # Удалить чат
 @socketio.on('delete_chat')

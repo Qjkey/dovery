@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Слишком много попыток
+{% if error == 429 %}
+    error 429
+{% else %}
+    error 404
+{% endif %}
 {% endblock %}
 
 {% block body %}

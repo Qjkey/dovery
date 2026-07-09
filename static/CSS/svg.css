@@ -1,0 +1,53 @@
+svg.link {
+    width: 7px;
+    height: 12px;
+    fill: none;
+}
+
+svg.back {
+    width: 24px;
+    height: 24px;
+    fill: none;
+}
+
+svg.search {
+    width: 24px;
+    height: 24px;
+    fill: none;
+}
+
+svg.menu {
+    width: 24px;
+    height: 24px;
+    fill: none;
+}
+
+svg.grid {
+    width: 25px;
+    height: 25px;
+    fill: none;
+}
+
+svg.close {
+    width: 28px;
+    height: 28px;
+    fill: none;
+}
+
+svg.close1 {
+    width: 19px;
+    height: 19px;
+    fill: none;
+}
+
+svg.close2 {
+    width: 14px;
+    height: 14px;
+    fill: var(--tg-theme-hint-color);
+}
+
+svg.lock, svg.copy, svg.settings3, svg.diamond, svg.delete, svg.settings, svg.pop, svg.chat {
+    width: 30px;
+    height: 30px;
+    fill: none;
+}

@@ -1,37 +1,187 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Приветствуем!
+Добро пожаловать
 {% endblock %}
 
 {% block body %}
-<section class="bottom">
-<div class="big-header">
-    <img src="static/img/first_page.png">
-    <div class="big-header-title label headline6">Добро пожаловать в Dovery</div>
-    <div class="label body1">Войдите или создайте аккаунт в мессенджере со сквозным шифрованием</div>
+
+<div class="page secondary_bg">
+    <div class="big-header">
+        <img src="static/img/first_page.png">
+        <div class="big-header-title label headline6">Добро пожаловать в Dovery</div>
+        <div class="label body1">Войдите или создайте аккаунт в мессенджере со сквозным шифрованием</div>
+    </div>
+    <section>
+        <a data-open-screen="1" class="item clicked">
+            <div class="right separator">
+                <div class="text oneline"> 
+                    <div class="label body1">Вход в аккаунт</div> 
+                </div>
+                <div class="element"> 
+                    <svg class="link"><use href="#link"></use></svg>
+                </div>
+            </div>
+        </a>
+        <a data-open-screen="2" class="item clicked">
+            <div class="right">
+                <div class="text oneline"> 
+                    <div class="label body1">Регистрация</div> 
+                </div>
+                <div class="element"> 
+                    <svg class="link"><use href="#link"></use></svg>
+                </div>
+            </div>
+        </a>
+    </section>
+    <!-- Вход в аккаунт -->
+    <div data-screen="1" class="screen hidden">
+        <div class="header-wrapper header-bg">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="1">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-center">
+                    <div class="label headline6">Вход в аккаунт</div>
+                </div>
+            </div>
+        </div>
+        <form action="/" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <section class="bottom">
+                <div class="item">
+                    <div class="right">
+                        <div class="title oneline"> 
+                            <div class="button1-medium">Ввод данных</div> 
+                        </div>
+                    </div>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Label" name="username">
+                    <label class="input-label">Username</label>
+                    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Label" name="password">
+                    <label class="input-label">Пароль</label>
+                    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+                </div>
+            </section>
+            <section>
+            <div class="item clicked" onclick="validateAndSubmit_login(this);">
+                <div class="right">
+                    <div class="text oneline"> 
+                        <div class="label body1">Продолжить</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+            </div>
+            </section>
+        </form>
+    </div>
+    <!-- Регистрация -->
+    <div data-screen="2" class="screen hidden">
+        <div class="header-wrapper header-bg">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="2">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-center">
+                    <div class="label headline6">Регистрация</div>
+                </div>
+            </div>
+        </div>
+        <section>
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline"> 
+                        <div class="button1-medium">Аватарка</div> 
+                    </div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left"> 
+                    <img src="static/img/signup_avatarka.png" class="ava"> 
+                </div>
+                <div class="right">
+                    <div class="text oneline"> 
+                        <div class="label body1">Добавить аватар</div> 
+                    </div>
+                    <div class="element"> 
+                        <a id="overlay_profile" class="button subtitle2-medium">Выбрать</a>
+                        <input type="file" id="avatar_input" style="display: none;" accept="image/*">
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="item footer">
+            <div class="right"> 
+                <div class="subtitle2">Аватарку указывать не обязательно</div> 
+            </div>
+        </div>
+        <form action="/" method="POST" id="regForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <section class="bottom">
+                <div class="item">
+                    <div class="right">
+                        <div class="title oneline"> 
+                            <div class="button1-medium">Ввод данных</div> 
+                        </div>
+                    </div>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Имя" name="name">
+                    <label class="input-label">Имя</label>
+                    <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="16" spellcheck="false" placeholder="Username" name="username">
+                    <label class="input-label">Username</label>
+                    <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Пароль" name="password">
+                    <label class="input-label">Пароль</label>
+                    <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="input-field" data-limit="64" spellcheck="false" placeholder="Повторите пароль" name="rep_pass">
+                    <label class="input-label">Повторите пароль</label>
+                    <button type="button" class="clear-button"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M13.295 2.115C13.6844 1.72564 13.6844 1.09436 13.295 0.705C12.9056 0.315639 12.2744 0.315639 11.885 0.705L7 5.59L2.115 0.705C1.72564 0.315639 1.09436 0.315639 0.705 0.705C0.315639 1.09436 0.315639 1.72564 0.705 2.115L5.59 7L0.705 11.885C0.315639 12.2744 0.315639 12.9056 0.705 13.295C1.09436 13.6844 1.72564 13.6844 2.115 13.295L7 8.41L11.885 13.295C12.2744 13.6844 12.9056 13.6844 13.295 13.295C13.6844 12.9056 13.6844 12.2744 13.295 11.885L8.41 7L13.295 2.115Z"/> </svg></button>
+                </div>
+            </section>
+            <div class="item footer">
+                <div class="right"> 
+                    <div class="subtitle2">Все поля обязательны для заполнения</div> 
+                </div>
+            </div>
+            <section class="bottom">
+            <div class="item clicked" onclick="validateAndSubmit(this);">
+                <div class="right">
+                    <div class="text oneline"> 
+                        <div class="label body1">Продолжить</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                </div>
+            </div>
+            </section>
+        </form>
+    </div>
 </div>
-</section>
-<section class="bottom">
-<a href="/login" class="item clicked">
-    <div class="right separator">
-        <div class="text oneline"> 
-            <div class="label body1">Войти</div> 
-        </div>
-        <div class="element"> 
-            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-    </div>
-</a>
-<a href="/signup" class="item clicked">
-    <div class="right">
-        <div class="text oneline"> 
-            <div class="label body1">Зарегистрироваться</div> 
-        </div>
-        <div class="element"> 
-            <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-    </div>
-</a>
-</section>
+<script src="/static/js/first.js"></script>
+<script src="/static/js/tma-ui-kit-3-0.js"></script>
 {% endblock %}

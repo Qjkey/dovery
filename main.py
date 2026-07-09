@@ -38,8 +38,15 @@ limiter = Limiter(
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=True
+    SESSION_COOKIE_SECURE=True,
+    MAX_CONTENT_LENGTH=5 * 1024 * 1024
 )
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 csrf = CSRFProtect(app)
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 online_users = {}
@@ -49,8 +56,8 @@ socketio = SocketIO(
     cors_allowed_origins="*", 
     ping_timeout=5, 
     ping_interval=2,
-    logger=True,          # <--- Вернет логи сокетов
-    engineio_logger=True  # <--- Вернет логи трафика (подключения/отключения)
+    logger=True,      
+    engineio_logger=True 
 )
 
 @app.after_request
@@ -127,7 +134,6 @@ def save_message(sender_id, receiver_id, encrypted_text, msg_id):
             conn.commit()
             return time_iso
     except Exception as e:
-        print(e)
         return False
 
 # Получение id текущего пользователя
@@ -154,22 +160,33 @@ def get_current_user_id():
 
 # Аватарус
 def process_avatar(file_storage):
-    if not file_storage or file_storage.filename == '':
-        return "default.png"
+    # Дополнительная проверка на расширение файла перед обработкой
+    if not file_storage or file_storage.filename == '' or not allowed_file(file_storage.filename):
+        return "avatarkins.png"
     try:
         file_storage.seek(0)
         img = Image.open(file_storage)
+        
+        # Защита от декомпрессионных бомб (Pillow делает это частично сам, но лимит важен)
+        img.verify() # Проверяем, что файл не битый
+        file_storage.seek(0)
+        img = Image.open(file_storage) # Переоткрываем для обработки
         
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
         img = ImageOps.fit(img, (512, 512), Image.Resampling.LANCZOS)
         
         filename = secrets.token_hex(16) + ".webp"
-        img.save(os.path.join('static/files/avatars/', filename), "WEBP", quality=85)
+        avatar_path = os.path.join('static/files/avatars/', filename)
+        
+        # Создаем директорию, если её нет
+        os.makedirs(os.path.dirname(avatar_path), exist_ok=True)
+        
+        img.save(avatar_path, "WEBP", quality=85)
         return filename
     except Exception as e:
-        print(f"Ошибка: {e}")
-        return "default.png"
+        print(f"Ошибка обработки изображения: {e}")
+        return "avatarkins.png"
 
 # Получение id чатов пользователя
 def get_user_s_chats(user_id):
@@ -213,16 +230,20 @@ def send_user_status(user_id, status):
             to=f"user_{i}"
         )
 
+def check_username(username):
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+        if cursor.fetchone():
+            return False
+        else:
+            return True 
+
 # Функция сохранения пользователя
 def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-
-            cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,))
-            if cursor.fetchone():
-                return False, "d203"
-
             step = 0
             user_id = None
             while step < 100:
@@ -238,13 +259,15 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
 
             cursor.execute(
                 "INSERT INTO users (id, name, username, password, public_key, private_key, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, name, username, secure_db_hash, pub_key, priv_key, ava,)
+                (user_id, name, username, secure_db_hash, pub_key, priv_key, ava)
             )
+            conn.commit() 
             return True, user_id
+            
     except sqlite3.IntegrityError:
         return False, "d203"
     except Exception as e:
-        print(e)
+        print(f"Ошибка БД: {e}")
         return False, "d204"
 
 # Удаление сообщения
@@ -304,6 +327,7 @@ def handle_disconnect():
 # Главная страница
 @app.route("/")
 def index():
+    # return render_template("firstt.html")
     raw_token = session.get('auth_token')
     if not raw_token:
         return render_template("first.html")
@@ -326,12 +350,11 @@ def index():
         return render_template("first.html")
 
 # Вход в аккаунт
-@app.route("/login", methods=['GET', 'POST'])
+@app.route("/login", methods=['POST'])
 @limiter.limit("10 per hour")
+@limiter.limit("5 per minute", key_func=lambda: request.form.get('username', 'unknown').lower())
 def login():
-    if request.method == 'GET':
-        return render_template('login.html')
-    username = request.form.get('username').lower()
+    username = request.form.get('username', '').lower()
     client_hash = request.form.get('password')
 
     if not username or not client_hash:
@@ -358,32 +381,36 @@ def login():
     return jsonify({"status": "error", "message": "d102"})
 
 # Регистрация
-@app.route('/signup', methods=['GET', 'POST'])
-@limiter.limit("10 per hour")
+@app.route('/signup', methods=['POST'])
+@limiter.limit("20 per hour")
 def signup():
-    if request.method == 'GET':
-        return render_template('signup.html')
     name = request.form.get('name')
     username = request.form.get('username')
     client_hash = request.form.get('password') 
     pub_key = request.form.get('public_key')
     priv_key = request.form.get('encrypted_private_key')
-
     avatar_file = request.files.get('avatar')
+
+    if not name or not username or not client_hash:
+        return jsonify({"status": "error", "message": "d201"}), 400
+        
+    if not (4 <= len(username) <= 16):
+        return jsonify({"status": "error", "message": "d208"}), 400
+        
+    if not re.fullmatch(r"^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$", username):
+        return jsonify({"status": "error", "message": "d206"}), 400
+    
+    if not check_username(username):
+        return jsonify({"status": "error", "message": "d203"}), 400
+
     avatar_name = "avatarkins.png"
     if avatar_file and avatar_file.filename != '':
         processed_name = process_avatar(avatar_file)
         if processed_name:
             avatar_name = processed_name
 
-    if not name or not username or not client_hash:
-        return jsonify({"status": "error", "message": "d201"})
-    if not re.fullmatch(r"^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$", username):
-        return jsonify({"status": "error", "message": "d206"})
-    if not (4 <= len(username) <= 16):
-        return jsonify({"status": "error", "message": "d208"})
-
     secure_db_hash = generate_password_hash(client_hash)
+    
     success, message = save_user(name, username, secure_db_hash, pub_key, priv_key, avatar_name)
 
     if success:
@@ -400,9 +427,10 @@ def signup():
                 "user_data": {"id": user_id, "username": username}
             })
         else:
-            return jsonify({"status": "error", "message": "d204"})
+            return jsonify({"status": "error", "message": "d204"}), 500
     
-    return jsonify({"status": "error", "message": message})
+    status_code = 409 if message == "d203" else 400
+    return jsonify({"status": "error", "message": message}), status_code
 
 # Обработчик ошибки 429
 @app.errorhandler(429)
@@ -420,7 +448,7 @@ def search_users():
     query = request.args.get('q', '').lower()
     if not query:
         return jsonify([])
-
+    current_user_id = int(get_current_user_id())
     try:
         conn = get_db_connection()
         users = conn.execute(
@@ -431,12 +459,14 @@ def search_users():
 
         results = []
         for user in users:
-            results.append({
-                'id': user['id'],
-                'name': user['name'],
-                'ava': user['avatar'],
-                'username': user['username']
-            })
+            user_id = int(user['id'])
+            if user_id != current_user_id:
+                results.append({
+                    'id': user['id'],
+                    'name': user['name'],
+                    'ava': user['avatar'],
+                    'username': user['username']
+                })
             
         return jsonify(results)
     
@@ -477,15 +507,13 @@ def get_my_chats():
         return jsonify([]), 401
     conn = get_db_connection()
     
-    # 1. Получаем список собеседников
     query_chats = '''
         SELECT 
             u.id, 
             u.username, 
             u.name, 
             u.avatar,
-            u.public_key,
-            u.last_seen
+            u.public_key
         FROM chats c
         JOIN users u ON u.id = (CASE WHEN c.user_one_id = ? THEN c.user_two_id ELSE c.user_one_id END)
         WHERE c.user_one_id = ? OR c.user_two_id = ?
@@ -495,7 +523,7 @@ def get_my_chats():
 
     # 2. Получаем данные самого пользователя
     query_self = '''
-        SELECT id, username, name, avatar, public_key, last_seen
+        SELECT id, username, name, avatar, public_key
         FROM users 
         WHERE id = ?
     '''

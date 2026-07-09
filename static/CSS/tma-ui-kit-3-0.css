@@ -54,7 +54,7 @@
         --rainbow-one: #ff416c;
         --rainbow-two: #8a2387;
         --rainbow-three: #3a7bd5;
-
+        
         --first-gradient: linear-gradient(135deg, 
             color-mix(in srgb, var(--rainbow-one) 30%, transparent) 0%, 
             color-mix(in srgb, var(--rainbow-two) 30%, transparent) 50%, 

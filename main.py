@@ -471,7 +471,6 @@ def search_users():
         return jsonify(results)
     
     except Exception as e:
-        print(f"Ошибка поиска: {e}")
         return jsonify([]), 500
 
 # Добавить чат

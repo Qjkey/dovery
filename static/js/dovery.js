@@ -1,5 +1,14 @@
 const socket = io();
 
+function focusSearch() {
+    setTimeout(() => {
+        const input = document.getElementById('search-field');
+        if (input) {
+            input.focus();
+        }
+    }, 300);
+}
+
 function closeBtnChatUpdate() {
     try {
         const button = document.getElementById('close-chat-btn');
@@ -24,7 +33,10 @@ function closeBtnChatUpdate() {
 }
 
 document.addEventListener('DOMContentLoaded', closeBtnChatUpdate);
+document.addEventListener('DOMContentLoaded', () => {closeBtnChatUpdate(); resizeObserver.observe(document.body);});
 window.addEventListener('resize', closeBtnChatUpdate);
+window.addEventListener('orientationchange', closeBtnChatUpdate);
+const resizeObserver = new ResizeObserver(() => {closeBtnChatUpdate();});
 
 document.addEventListener("DOMContentLoaded", () => {
   const messageArea = document.getElementById("messages-area");
@@ -139,7 +151,7 @@ function openProfile(userId, is_my_profile, url_open) {
     document.getElementById('profile-open-chat').onclick = function() {
         closeProfile();
         if (url_open) {
-            startChat(userId, user.name);
+            startChat(userId);
         }
         openDirectWindow(userId);
     };
@@ -170,7 +182,7 @@ async function fetchUsers(query) {
     try {
         const response = await fetch(`/search_users?q=${encodeURIComponent(query)}`);
         const users = await response.json();
-        renderResults(users);
+        searchRenderResults(users);
     } catch (err) {
         console.error("Ошибка поиска:", err);
     }
@@ -181,11 +193,10 @@ function clearSearch() {
     container.innerHTML = '';
 }
 
-function renderResults(users) {
+function searchRenderResults(users) { 
     const container = document.getElementById('search-results');
     const tag = '<p class="body1" style="padding:var(--margin); color:var(--tg-theme-hint-color);">Ничего не найдено</p>'
     container.innerHTML = '';
-
     if (users.length === 0) {
         container.innerHTML = tag;
         return;
@@ -199,9 +210,18 @@ function renderResults(users) {
         if (!(inx === length - 1)) {
             separator = "separator"
         }
+        console.log(user.ava)
+        let avatar = '';
+        if (user.ava && user.ava !== 'avatarkins.png' && user.ava !== 'null') {
+            avatar = `<img src="static/files/avatars/${user.ava}" class="ava">`;
+        } else {
+            const letter = user.name ? user.name.charAt(0).toUpperCase() : '?';
+            avatar = `<div class="ava defult subtitle2-medium letter-ava">${letter}</div>`;
+        }
+
         div.innerHTML = `
             <div class="left"> 
-                <img src="static/files/avatars/${user.ava}" class="ava"> 
+                ${avatar}
             </div>
             <div class="right ${separator}">
                 <div class="text twoline"> 
@@ -211,7 +231,7 @@ function renderResults(users) {
             </div>
         `;
         div.addEventListener('click', () => {
-            startChat(user.id, user.name);
+            startChat(user.id);
         });
         container.appendChild(div);
         inx++;
@@ -223,7 +243,7 @@ socket.on("chat_created", (data) => {
 });
 const chatsData = {};
 
-async function startChat(userId, userName) {
+async function startChat(userId) {
     try {
         const csrfElement = document.querySelector('meta[name="csrf-token"]');
         const csrfToken = csrfElement.getAttribute('content');

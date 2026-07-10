@@ -13,7 +13,7 @@ html, body {
 }
 
 .open_chat {
-    background-color: var(--tg-theme-secondary-bg-color);
+  background-color: color-mix(in srgb, var(--tg-theme-hint-color) 10%, transparent);
 }
 
 .letter-ava {
@@ -264,4 +264,27 @@ html, body {
         text-align: left;
         padding-left: 200px;
     }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0px 8px;
+  box-sizing: content-box;
+  background: color-mix(in srgb, var(--tg-theme-hint-color) 60%, transparent);
+  color: white;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  border-radius: 100px;
+}
+
+.badge.active {
+  background: var(--tg-theme-button-color);
+}
+
+.badge:empty {
+  display: none;
 }

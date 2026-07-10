@@ -1,14 +1,5 @@
 const socket = io();
 
-function focusSearch() {
-    setTimeout(() => {
-        const input = document.getElementById('search-field');
-        if (input) {
-            input.focus();
-        }
-    }, 300);
-}
-
 function closeBtnChatUpdate() {
     try {
         const button = document.getElementById('close-chat-btn');
@@ -178,69 +169,6 @@ document.getElementById('search-field').addEventListener('input', function(e) {
     }, 500); 
 });
 
-async function fetchUsers(query) {
-    try {
-        const response = await fetch(`/search_users?q=${encodeURIComponent(query)}`);
-        const users = await response.json();
-        searchRenderResults(users);
-    } catch (err) {
-        console.error("Ошибка поиска:", err);
-    }
-}
-
-function clearSearch() {
-    const container = document.getElementById('search-results');
-    container.innerHTML = '';
-}
-
-function searchRenderResults(users) { 
-    const container = document.getElementById('search-results');
-    const tag = '<p class="body1" style="padding:var(--margin); color:var(--tg-theme-hint-color);">Ничего не найдено</p>'
-    container.innerHTML = '';
-    if (users.length === 0) {
-        container.innerHTML = tag;
-        return;
-    }
-    let inx = 0;
-    let length = users.length;
-    users.forEach(user => {
-        const div = document.createElement('div');
-        div.className = 'item clicked';
-        let separator = ""
-        if (!(inx === length - 1)) {
-            separator = "separator"
-        }
-        console.log(user.ava)
-        let avatar = '';
-        if (user.ava && user.ava !== 'avatarkins.png' && user.ava !== 'null') {
-            avatar = `<img src="static/files/avatars/${user.ava}" class="ava">`;
-        } else {
-            const letter = user.name ? user.name.charAt(0).toUpperCase() : '?';
-            avatar = `<div class="ava defult subtitle2-medium letter-ava">${letter}</div>`;
-        }
-
-        div.innerHTML = `
-            <div class="left"> 
-                ${avatar}
-            </div>
-            <div class="right ${separator}">
-                <div class="text twoline"> 
-                    <div class="label body1">${user.name}</div> 
-                    <div class="label subtitle subtitle1">@${user.username}</div> 
-                </div>
-            </div>
-        `;
-        div.addEventListener('click', () => {
-            startChat(user.id);
-        });
-        container.appendChild(div);
-        inx++;
-    });
-}
-
-socket.on("chat_created", (data) => {
-    loadMyChats(); 
-});
 const chatsData = {};
 
 async function startChat(userId) {
@@ -254,9 +182,9 @@ async function startChat(userId) {
         });
 
         if (response.ok) {
-            closeSearch();
+            closeActiveScreen(1);
             await loadMyChats();
-            await openDirectWindow(userId);
+            // await openDirectWindow(userId);
         }
     } catch (err) {
         console.error("Ошибка при создании чата:", err);
@@ -292,84 +220,6 @@ socket.on("user_status_update", (data) => {
     }
 });
 
-async function loadMyChats() {
-    try {
-        const response = await fetch('/get_my_chats');
-        const chats = await response.json();
-        const listContainer = document.getElementById('chats-list');
-        let inx = 1;
-        listContainer.innerHTML = ''; 
-
-        if (!chats || chats.length === 1) {
-            const item = document.createElement('div');
-            item.className = 'item clicked';
-            item.onclick = () => openScreen(1);
-            item.innerHTML = `
-                <div class="right">
-                    <div class="text oneline"> 
-                        <div class="label body1">Ищите чаты через поиск</div> 
-                    </div>
-                    <div class="element"> 
-                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </div>
-                </div>
-            `;
-            listContainer.appendChild(item);
-        }
-
-        chats.forEach(chat => {
-            const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
-
-            let avatarHtml = '';
-            if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
-                avatarHtml = `<img src="static/files/avatars/${chat.avatar}" class="ava">`;
-            } else {
-                const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
-                avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
-            }
-
-            chatsData[chat.id] = {
-                username: chat.username,
-                name: chat.name,
-                avatar: avatarHtml,
-                publicKey: chat.public_key,
-                status: currentStatus
-            };
-            if (chat.id === window.userId) return;
-            const item = document.createElement('div');
-            item.className = 'item clicked';
-            item.setAttribute('data-user-id', chat.id);
-            const str_status = chat.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
-            let sepa = "";
-            if (inx !== chats.length - 1) {
-                sepa = "separator";
-            }
-            item.innerHTML = `
-                <div class="left"> 
-                    ${avatarHtml}
-                </div>
-                <div class="right ${sepa}">
-                    <div class="text twoline"> 
-                        <div class="label body1">${chat.name}</div> 
-                        <div class="label status_of_user_in_list_chats ${str_status}">${currentStatus}</div> 
-                    </div>
-                </div>
-            `;
-            item.onclick = async () => {
-                await openDirectWindow(chat.id);
-            };
-            listContainer.appendChild(item);
-            inx++;
-        });
-    } catch (error) {
-        d_alert("Ошибка", `Ошибка загрузки списка чатов: ${error}`);
-    }
-}
-
-window.onload = () => {
-    loadMyChats();
-};
-
 window.keychat = null;
 
 const tx = document.getElementById('messages-textarea');
@@ -389,30 +239,30 @@ tx.addEventListener('input', function() {
 });
 
 async function openDirectWindow(userId) {
-    // const user = chatsData[userId];
+    const user = chatsData[userId];
     // closeProfile();
-    // if (!user) { 
-    //     return;
-    // }
+    if (!user) { 
+        return;
+    }
 
-    // document.querySelectorAll('.open_chat').forEach(elem => {
-    //     elem.classList.remove('open_chat');
-    // });
-    // const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
-    // if (currentChatElem) {
-    //     currentChatElem.classList.add('open_chat');
-    // }
+    document.querySelectorAll('.open_chat').forEach(elem => {
+        elem.classList.remove('open_chat');
+    });
+    const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+    if (currentChatElem) {
+        currentChatElem.classList.add('open_chat');
+    }
 
-    // const headerTitle = document.querySelector('.chat-header .label-header');
-    // if (headerTitle) headerTitle.innerText = user.name;
+    const headerName = document.getElementById('user-name');
+    const headerStatus = document.getElementById('user-status');
+    const headerAvatar = document.getElementById('user-avatar');
+    if (headerName) headerName.innerText = user.name;
+    if (headerStatus) headerStatus.innerText = user.status;
+    if (headerAvatar) headerAvatar.innerHTML = user.avatar;
+
     // const container = document.getElementById('id_ept');
     // container.textContent = userId; 
-    // const headerAvatar = document.getElementById('chat-headers');
-    // const chatHeader = document.getElementById('chat-headers');
-    // const status_of_user = document.getElementById('status_of_user');
-    // if (status_of_user) {
-    //     status_of_user.innerText = user.status;
-    // }
+
     // const chatHeader1 = document.getElementById('chat-headers1');
     // if (chatHeader) {
     //     chatHeader.onclick = () => {openProfile(userId, false, false);};

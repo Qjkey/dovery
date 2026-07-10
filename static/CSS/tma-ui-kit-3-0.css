@@ -456,6 +456,11 @@ input:checked + .slider:before {
     font-weight: 400;
     font-size: 16px;
 }
+.body1-bold {
+    font-family: "Roboto";
+    font-weight: 450;
+    font-size: 16px;
+}
 .body1-medium {
     font-family: "Roboto";
     font-weight: 500;
@@ -775,8 +780,8 @@ input:focus {
 }
 .item .ava {
     border-radius: 50%;
-    width: 42px;
-    height: 42px;
+    width: 45px;
+    height: 45px;
 }
 .item .icon {
     width: 42px;

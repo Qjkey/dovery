@@ -174,7 +174,7 @@ def process_avatar(file_storage):
         
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
-        img = ImageOps.fit(img, (512, 512), Image.Resampling.LANCZOS)
+        img = ImageOps.fit(img, (256, 256), Image.Resampling.LANCZOS)
         
         filename = secrets.token_hex(16) + ".webp"
         avatar_path = os.path.join('static/files/avatars/', filename)

@@ -3,3 +3,4 @@ venv/
 db/
 info.env
 dovery.db
+static/files

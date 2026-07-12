@@ -5,16 +5,22 @@ function closeBtnChatUpdate() {
         const button = document.getElementById('close-chat-btn');
         const screen = document.getElementById('message-chats');
         const screenWidth = window.innerWidth;
-        
+
         if (screenWidth > 751) {
             button.onclick = function() {
                 document.getElementById('no-chat-content').classList.remove('hidden');
                 document.getElementById('chat-content').classList.add('hidden');
+                document.querySelectorAll('.open_chat').forEach(elem => {
+                    elem.classList.remove('open_chat');
+                });
             };
             screen.removeAttribute('data-swipe');
         } else {
             button.onclick = function() {
                 closeActiveScreen(2);
+                document.querySelectorAll('.open_chat').forEach(elem => {
+                    elem.classList.remove('open_chat');
+                });
             };
             screen.setAttribute('data-swipe', "true");
         }
@@ -192,31 +198,38 @@ async function startChat(userId) {
 }
 
 socket.on("user_status_update", (data) => {
-    const userId = String(data.user_id);
-    const idEpt = document.getElementById('id_ept');
-    
-    if (chatsData[userId]) {
-        chatsData[userId].status = data.status;
-    }
-
-    if (idEpt && userId === idEpt.textContent) {
-        const currentStatus = document.getElementById('status_of_user');
-        if (currentStatus) currentStatus.textContent = data.status;
-    }
-
-    const profile = document.getElementById("profile-id").textContent;
-    if (profile === userId) {
-        document.getElementById("profile-status").textContent = data.status;
-    }
-
-    const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
-    if (currentChatElem) {
-        const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
-        if (statusInList) {
-            const str_status = data.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
-            statusInList.className = `label status_of_user_in_list_chats ${str_status}`;
-            statusInList.textContent = data.status;
+    try {
+        const userId = String(data.user_id);
+        const idEpt = document.getElementById('id_ept');
+        
+        if (chatsData[userId]) {
+            chatsData[userId].status = data.status;
         }
+
+        if (idEpt && userId === idEpt.textContent) {
+            const currentStatus = document.getElementById('user-status');
+            const str_status = data.status === 'в сети' ? 'active' : 'subtitle';
+            currentStatus.className = `subtitle2 ${str_status}`;
+            currentStatus.textContent = data.status;
+        }
+
+        // const profile = document.getElementById("profile-id").textContent;
+        // if (profile === userId) {
+        //     document.getElementById("profile-status").textContent = data.status;
+        // }
+
+        const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+        if (currentChatElem) {
+            const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
+            if (statusInList) {
+                const str_status = data.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
+                statusInList.className = `label status_of_user_in_list_chats ${str_status}`;
+                statusInList.textContent = data.status;
+            }
+        }
+    } catch (err) {
+        console.log(err);
+        d_alert("Ошибка", "Ошибка при изменении статуса пользователя", "ok");
     }
 });
 
@@ -239,52 +252,60 @@ tx.addEventListener('input', function() {
 });
 
 async function openDirectWindow(userId) {
-    const user = chatsData[userId];
-    // closeProfile();
-    if (!user) { 
-        return;
+    try {
+        const user = chatsData[userId];
+        if (!user) { 
+            return;
+        }
+        document.querySelectorAll('.open_chat').forEach(elem => {
+            elem.classList.remove('open_chat');
+        });
+        const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+        const screenWidth = window.innerWidth;
+
+        if (screenWidth > 751) {
+            if (currentChatElem) {
+                currentChatElem.classList.add('open_chat');
+            }
+        }
+
+        const headerPanel = document.getElementById('user-header');
+        const headerName = document.getElementById('user-name');
+        const headerStatus = document.getElementById('user-status');
+        const headerAvatar = document.getElementById('user-avatar');
+        const msgInput = document.getElementById('messages-textarea');
+
+        if (headerName) headerName.innerText = user.name;
+        if (headerStatus) {
+            const str_status = user.status === 'в сети' ? 'active' : 'subtitle';
+            headerStatus.className = `subtitle2 ${str_status}`;
+            headerStatus.innerText = user.status;
+        }
+        if (headerAvatar) headerAvatar.innerHTML = user.avatar;
+
+        const container = document.getElementById('id_ept');
+        container.textContent = userId; 
+
+        if (headerPanel) {
+            headerPanel.onclick = () => {openProfile(userId, false, false);};
+        }   
+        // try {
+        //     const private_key = await get_private_key(); 
+        //     const public_key = await get_public_key(user.publicKey);
+        //     window.keychat = await calc_key_chat(private_key, public_key);
+        //     chatsData[userId].keychat = window.keychat;
+        // } catch (err) {
+        //     console.error("Ошибка установки защищенного соединения:", err);
+        // }
+        msgInput.value = '';
+        // loadChat(userId);
+        document.getElementById('no-chat-content').classList.add('hidden');
+        document.getElementById('chat-content').classList.remove('hidden');
+        openScreen(2);
+    } catch (err) {
+        d_alert("Ошибка", "Ошибка в открытии чата", "ok");
+        console.log(err);
     }
-
-    document.querySelectorAll('.open_chat').forEach(elem => {
-        elem.classList.remove('open_chat');
-    });
-    const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
-    if (currentChatElem) {
-        currentChatElem.classList.add('open_chat');
-    }
-
-    const headerName = document.getElementById('user-name');
-    const headerStatus = document.getElementById('user-status');
-    const headerAvatar = document.getElementById('user-avatar');
-    if (headerName) headerName.innerText = user.name;
-    if (headerStatus) headerStatus.innerText = user.status;
-    if (headerAvatar) headerAvatar.innerHTML = user.avatar;
-
-    // const container = document.getElementById('id_ept');
-    // container.textContent = userId; 
-
-    // const chatHeader1 = document.getElementById('chat-headers1');
-    // if (chatHeader) {
-    //     chatHeader.onclick = () => {openProfile(userId, false, false);};
-    //     chatHeader1.onclick = () => {openProfile(userId, false, false);};
-    // }   
-    // if (headerAvatar && chatsData[userId]?.avatar) {
-    //     headerAvatar.querySelector('.ava')?.remove();
-    //     headerAvatar.insertAdjacentHTML('afterbegin', chatsData[userId].avatar);
-    // }
-    // try {
-    //     const private_key = await get_private_key(); 
-    //     const public_key = await get_public_key(user.publicKey);
-    //     window.keychat = await calc_key_chat(private_key, public_key);
-    //     chatsData[userId].keychat = window.keychat;
-    // } catch (err) {
-    //     console.error("Ошибка установки защищенного соединения:", err);
-    // }
-    // msgInput.value = '';
-    // loadChat(userId);
-    document.getElementById('no-chat-content').classList.add('hidden');
-    document.getElementById('chat-content').classList.remove('hidden');
-    openScreen(2);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -598,7 +619,7 @@ request.onsuccess = (event) => {
   };
 };
 
-const msgInput = document.getElementById('msgInput');
+const msgInput = document.getElementById('messages-textarea');
 const sendBtn = document.getElementById('sendBtn');
 const messagesArea = document.getElementById('messages-area');
 
@@ -938,7 +959,7 @@ socket.on('chat_deleted', async (data) => {
     }
 });
 
-const inputField = document.querySelector('#msgInput');
+const inputField = document.querySelector('#messages-textarea');
 
 function copy_text() {
     const start = inputField.selectionStart;

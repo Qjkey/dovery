@@ -4,6 +4,12 @@ const escapeHtml = (text) => {
     return div.innerHTML;
 };
 
+function cacheImage(src) {
+    if (!src) return;
+    const img = new Image();
+    img.src = src;
+}
+
 async function loadMyChats() {
     try {
         const response = await fetch('/get_my_chats');
@@ -32,7 +38,9 @@ async function loadMyChats() {
 
             let avatarHtml = '';
             if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
-                avatarHtml = `<img src="static/files/avatars/${chat.avatar}" class="ava">`;
+                const avatarSrc = `static/files/avatars/${chat.avatar}`;
+                cacheImage(avatarSrc); 
+                avatarHtml = `<img src="${avatarSrc}" class="ava">`;
             } else {
                 const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
                 avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;

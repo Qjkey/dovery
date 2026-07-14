@@ -169,7 +169,7 @@ Dovery
         <p class="label-no-chats">Выберете чат, либо используйте поиск</p>
     </div>
     <div id="chat-content" class="hidden" style="height: 100%;">
-        <div class="header-wrapper">
+        <div class="header-wrapper header-chat">
             <div class="header">
                 <div class="header-left right-two" id="close-chat-btn">
                     <div class="header-capsule one-btn">
@@ -204,9 +204,30 @@ Dovery
             </div>
         </div>
 
-        <div class="messages-area" id="messages-area"></div>
-        
-        <div class="header-wrapper bottom-bar">
+        <div class="messages-area" id="messages-area">
+            <div class="message-wrapper sent new-msg">
+                <div class="message-bubble sent">
+                    <div class="message-content">
+                        <p>2</p>
+                    </div>
+                    <div class="message-info">
+                        <span>10:31</span>
+                    </div>
+                </div>
+            </div>
+            <div class="message-wrapper received new-msg">
+                <div class="message-bubble received">
+                    <div class="message-content">
+                        <p>2</p>
+                    </div>
+                    <div class="message-info">
+                        <span>10:31</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-wrapper bottom-bar" style="top: calc(100% - 77px);">
             <div class="textarea">
                 <!-- <div class="header-left right-two">
                     <div class="header-capsule one-btn">

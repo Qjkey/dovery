@@ -236,20 +236,31 @@ socket.on("user_status_update", (data) => {
 window.keychat = null;
 
 const tx = document.getElementById('messages-textarea');
+const bottomBar = document.querySelector('.bottom-bar'); // Убедитесь, что селектор вашей панели верный
 
 tx.addEventListener('input', function() {
-    // Временно сбрасываем rows, чтобы браузер пересчитал реальный scrollHeight контента
     this.setAttribute('rows', '1');
-    
-    // Получаем точную высоту одной строки в пикселях (из вашего line-height: 1.5em)
-    const computedLineHeight = parseFloat(window.getComputedStyle(this).lineHeight);
-    
-    // Считаем количество строк
+    const computedStyle = window.getComputedStyle(this);
+    const computedLineHeight = parseFloat(computedStyle.lineHeight);
     const currentRows = Math.round(this.scrollHeight / computedLineHeight);
-    
-    // Устанавливаем итоговый атрибут rows
     this.setAttribute('rows', currentRows);
+    
+    let totalBarHeight;
+
+    if (currentRows <= 1) {
+        totalBarHeight = 77;
+    } else {
+        const textareaHeight = this.offsetHeight; 
+        const barPaddingTop = parseFloat(window.getComputedStyle(bottomBar).paddingTop) || 0;
+        const barPaddingBottom = parseFloat(window.getComputedStyle(bottomBar).paddingBottom) || 0;
+        const totalPadding = barPaddingTop + barPaddingBottom;
+        
+        totalBarHeight = textareaHeight + totalPadding;
+    }
+    bottomBar.style.top = `calc(100% - ${totalBarHeight}px)`;
 });
+
+
 
 async function openDirectWindow(userId) {
     try {

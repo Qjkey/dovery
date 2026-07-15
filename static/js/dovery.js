@@ -236,7 +236,8 @@ socket.on("user_status_update", (data) => {
 window.keychat = null;
 
 const tx = document.getElementById('messages-textarea');
-const bottomBar = document.querySelector('.bottom-bar'); // Убедитесь, что селектор вашей панели верный
+const ma = document.getElementById('messages-area');
+const bottomBar = document.querySelector('.bottom-bar');
 
 tx.addEventListener('input', function() {
     this.setAttribute('rows', '1');
@@ -258,9 +259,8 @@ tx.addEventListener('input', function() {
         totalBarHeight = textareaHeight + totalPadding;
     }
     bottomBar.style.top = `calc(100% - ${totalBarHeight}px)`;
+    ma.style.paddingBottom = `calc(${totalBarHeight}px)`
 });
-
-
 
 async function openDirectWindow(userId) {
     try {

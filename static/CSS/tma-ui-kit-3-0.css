@@ -20,6 +20,10 @@
     --bg-two: #BDC985;
     --bg-three: #84B28D;
 
+    --tg-theme-message-bg-color-sent: #c8ffc2;
+    --tg-theme-message-bg-color-received: var(--tg-theme-bg-color);
+    --tg-theme-message-text-color: var(--tg-theme-text-color);
+
     --first-gradient: linear-gradient(135deg, 
         color-mix(in srgb, var(--bg-one) 54%, transparent) 0%, 
         color-mix(in srgb, var(--bg-two) 54%, transparent) 50%, 
@@ -55,12 +59,16 @@
         --rainbow-two: #8a2387;
         --rainbow-three: #3a7bd5;
         
-        --first-gradient: linear-gradient(135deg, 
+        --tg-theme-message-bg-color-sent: var(--tg-theme-section-header-text-color);
+        --tg-theme-message-bg-color-received: var(--tg-theme-bg-color);
+        --tg-theme-message-text-color: var(--tg-theme-text-color);
+
+        --first-gradient: linear-gradient(135deg, var(--bg-one) 0%, var(--bg-two) 50%, var(--bg-three) 100%);
+        --main-gradient: linear-gradient(135deg, 
             color-mix(in srgb, var(--rainbow-one) 30%, transparent) 0%, 
             color-mix(in srgb, var(--rainbow-two) 30%, transparent) 50%, 
             color-mix(in srgb, var(--rainbow-three) 30%, transparent) 100%
         );
-        --main-gradient: linear-gradient(135deg, var(--bg-one) 0%, var(--bg-two) 50%, var(--bg-three) 100%);
         --blend-mode: exclusion, normal; 
     }
 }
@@ -865,12 +873,12 @@ input:focus {
 }
 
 .message-bubble.received {
-    background-color: var(--message-received-background);
+    background-color: var(--tg-theme-message-bg-color-received);
     border-bottom-left-radius: 0px;
 }
 
 .message-bubble.sent {
-    background-color: var(--message-sent-background);
+    background-color: var(--tg-theme-message-bg-color-sent);
     border-bottom-right-radius: 0px;
 }
 
@@ -895,7 +903,7 @@ input:focus {
     margin-top: 4px;
     font-size: 11px;
     opacity: 0.6;
-    color: #000000;
+    color: var(--tg-theme-subtitle-text-color);
 }
 
 .message-status svg {
@@ -932,6 +940,12 @@ input:focus {
     height: 100dvh;
     box-sizing: border-box;
     overflow-y: auto;
+}
+
+.message-content {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    color: var(--tg-theme-message-text-color);
 }
 
 .messages {

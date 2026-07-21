@@ -1,4 +1,9 @@
-const socket = io();
+const socket = io({
+    reconnection: true, 
+    reconnectionAttempts: Infinity, 
+    reconnectionDelay: 1000,     
+    reconnectionDelayMax: 5000
+});
 
 function closeBtnChatUpdate() {
     try {
@@ -179,11 +184,9 @@ const chatsData = {};
 
 async function startChat(userId) {
     try {
-        const csrfElement = document.querySelector('meta[name="csrf-token"]');
-        const csrfToken = csrfElement.getAttribute('content');
         const response = await fetch('/add', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            headers: { 'Content-Type': 'application/json'},
             body: JSON.stringify({ user_id: userId })
         });
 
@@ -297,22 +300,25 @@ async function openDirectWindow(userId) {
         const container = document.getElementById('id_ept');
         container.textContent = userId; 
 
-        if (headerPanel) {
-            headerPanel.onclick = () => {openProfile(userId, false, false);};
-        }   
-        // try {
-        //     const private_key = await get_private_key(); 
-        //     const public_key = await get_public_key(user.publicKey);
-        //     window.keychat = await calc_key_chat(private_key, public_key);
-        //     chatsData[userId].keychat = window.keychat;
-        // } catch (err) {
-        //     console.error("Ошибка установки защищенного соединения:", err);
-        // }
+        // if (headerPanel) {
+        //     headerPanel.onclick = () => {openProfile(userId, false, false);};
+        // }   
+        try {
+            const private_key = await get_private_key(); 
+            const public_key = await get_public_key(user.publicKey);
+            window.keychat = await calc_key_chat(private_key, public_key);
+            chatsData[userId].keychat = window.keychat;
+        } catch (err) {
+            console.error("Ошибка установки защищенного соединения:", err);
+        }
         msgInput.value = '';
-        // loadChat(userId);
+        loadChat(userId);
         document.getElementById('no-chat-content').classList.add('hidden');
         document.getElementById('chat-content').classList.remove('hidden');
-        openScreen(2);
+        // На планшете/ноуте панель сообщений уже видна — openScreen только блокировал скролл списка
+        if (screenWidth <= 751) {
+            openScreen(2);
+        }
     } catch (err) {
         d_alert("Ошибка", "Ошибка в открытии чата", "ok");
         console.log(err);
@@ -601,18 +607,117 @@ function getShortDateLabel(timeString) {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
+function createDateHeaderElement(dateLabel) {
+    const dateHeader = document.createElement('div');
+    dateHeader.className = 'chat-date-group';
+    dateHeader.dataset.date = dateLabel;
+    dateHeader.innerHTML = `<span class="chat-date-header caption1-medium">${dateLabel}</span>`;
+    return dateHeader;
+}
+
+let stickyDateRaf = null;
+let stickyDateBound = false;
+
+function getStickyDateElements() {
+    return {
+        area: document.getElementById('messages-area'),
+        sticky: document.getElementById('sticky-chat-date'),
+    };
+}
+
+function hideStickyChatDate() {
+    const { sticky } = getStickyDateElements();
+    if (!sticky) return;
+    sticky.hidden = true;
+    sticky.classList.remove('is-visible');
+    const label = sticky.querySelector('.chat-date-header');
+    if (label) label.textContent = '';
+}
+
+function updateStickyChatDate() {
+    const { area, sticky } = getStickyDateElements();
+    if (!area || !sticky) return;
+
+    const messages = area.querySelectorAll('.message-wrapper');
+    const headers = Array.from(area.querySelectorAll('.chat-date-group'));
+    const canScroll = area.scrollHeight > area.clientHeight + 8;
+
+    // Мало сообщений или всё и так видно — достаточно дат в потоке
+    if (messages.length <= 3 || !canScroll || headers.length === 0) {
+        headers.forEach((header) => header.classList.remove('is-covered'));
+        hideStickyChatDate();
+        return;
+    }
+
+    // Линия закрепления совпадает с CSS top плашки (~70px от верха области чата)
+    const areaRect = area.getBoundingClientRect();
+    const stickyLine = areaRect.top + 82;
+
+    let active = null;
+    let activeTop = -Infinity;
+
+    for (const header of headers) {
+        const top = header.getBoundingClientRect().top;
+        if (top <= stickyLine + 2 && top >= activeTop) {
+            active = header;
+            activeTop = top;
+        }
+    }
+
+    if (!active) {
+        active = headers.reduce((best, header) => {
+            const top = header.getBoundingClientRect().top;
+            const bestTop = best.getBoundingClientRect().top;
+            return top > bestTop ? header : best;
+        });
+    }
+
+    const label = (active.dataset.date || active.textContent || '').trim();
+    const labelEl = sticky.querySelector('.chat-date-header');
+    if (labelEl && labelEl.textContent !== label) {
+        labelEl.textContent = label;
+    }
+
+    sticky.hidden = false;
+    sticky.classList.add('is-visible');
+
+    headers.forEach((header) => {
+        const same = (header.dataset.date || header.textContent || '').trim() === label;
+        const top = header.getBoundingClientRect().top;
+        header.classList.toggle('is-covered', same && top <= stickyLine + 8);
+    });
+}
+
+function scheduleStickyChatDateUpdate() {
+    if (stickyDateRaf) return;
+    stickyDateRaf = requestAnimationFrame(() => {
+        stickyDateRaf = null;
+        updateStickyChatDate();
+    });
+}
+
+function bindStickyChatDate() {
+    const { area } = getStickyDateElements();
+    if (!area || stickyDateBound) {
+        scheduleStickyChatDateUpdate();
+        return;
+    }
+    stickyDateBound = true;
+    area.addEventListener('scroll', scheduleStickyChatDateUpdate, { passive: true });
+    window.addEventListener('resize', scheduleStickyChatDateUpdate);
+    scheduleStickyChatDateUpdate();
+}
+
 function insertNewMessageWithDateCheck(messagesArea, messageWrapper, msgTime) {
     const dateLabel = getShortDateLabel(msgTime);
     const topHeader = messagesArea.querySelector('.chat-date-group .chat-date-header');
     const lastVisualDate = topHeader ? topHeader.innerText : null;
     if (dateLabel !== lastVisualDate) {
-        const dateHeader = document.createElement('div');
-        dateHeader.className = 'chat-date-group';
-        dateHeader.innerHTML = `<span class="chat-date-header caption1-medium">${dateLabel}</span>`;
-        messagesArea.prepend(dateHeader); 
+        messagesArea.prepend(createDateHeaderElement(dateLabel));
     }
 
-    messagesArea.prepend(messageWrapper); 
+    messagesArea.prepend(messageWrapper);
+    scheduleStickyChatDateUpdate();
 }
 
 request.onsuccess = (event) => {
@@ -850,6 +955,7 @@ const chatHash = {};
 async function loadChat(userId) {
     const messagesArea = document.getElementById('messages-area');
     messagesArea.innerHTML = '';
+    hideStickyChatDate();
 
     if (chatHash[userId]) {
         const messages = await decryptAll(chatHash[userId].messages);
@@ -904,11 +1010,13 @@ function renderChat(messagesArea, messages, userId) {
 
         const wrapper = document.createElement('div');
         wrapper.className = 'message-wrapper ' + typeClass;
+        wrapper.id = 'cntxt_menu_btn_03';
+        wrapper.dataset.id = msg.id;
         wrapper.innerHTML = `
-            <div class="message-bubble ${typeClass}" id="cntxt_menu_btn_03" data-id="${msg.id}">
-                <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-                <div class="message-info">
-                    <span class="message-time caption2">${formatTime(msg.time)}</span>
+            <div class="message-bubble ${typeClass}">
+                <div class="message-content body1"></div>
+                <div class="message-info caption2">
+                    <span>${formatTime(msg.time)}</span>
                 </div>
             </div>
         `;
@@ -918,20 +1026,14 @@ function renderChat(messagesArea, messages, userId) {
         const currentDateLabel = getShortDateLabel(msg.time);
         const nextMsg = sortedMessages[index + 1];
         const nextDateLabel = nextMsg ? getShortDateLabel(nextMsg.time) : null;
-        // Если следующего сообщения нет (это конец массива) ИЛИ у следующего сообщения уже другая дата
         if (!nextMsg || currentDateLabel !== nextDateLabel) {
-            const dateHeader = document.createElement('div');
-            dateHeader.className = 'chat-date-group';
-            dateHeader.innerHTML = `<span class="chat-date-header caption1-medium">${currentDateLabel}</span>`;
-            
-            // Добавляем плашку даты во фрагмент СРАЗУ за последним сообщением этого дня.
-            // При итоговом prepend() этот блок окажется визуально ВЫШЕ этих сообщений.
-            fragment.appendChild(dateHeader);
+            fragment.appendChild(createDateHeaderElement(currentDateLabel));
         }
     });
 
     messagesArea.prepend(fragment);
     messagesArea.scrollTop = messagesArea.scrollHeight;
+    bindStickyChatDate();
 }
 
 function formatTime(timeStr) {

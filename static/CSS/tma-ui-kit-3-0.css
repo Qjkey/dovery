@@ -565,9 +565,6 @@ textarea::placeholder {
 .header-wrapper.header-bg {
     background: linear-gradient(to bottom, color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%, color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%);
 }
-.header-wrapper.header-bg-messages {
-    background: linear-gradient(to bottom, color-mix(in srgb, var(--bg-one) 50%, transparent) 0%, color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%);
-}
 .header-left, .header-right {
     display: flex;
     z-index: 2;
@@ -1417,7 +1414,6 @@ body.screens-active {
   .messages.screen {
     height: 100dvh;
     background-color: transparent !important; 
-    background-position: center, center, center;
     background-image: var(--first-gradient), 
                       var(--bg-image), 
                       var(--main-gradient);
@@ -1901,8 +1897,14 @@ textarea::placeholder {
     box-sizing: border-box;
     overflow-y: auto; 
     overflow-x: hidden;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     -webkit-overflow-scrolling: touch; 
+}
+.messages-area::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 #chat-content {
     display: flex;

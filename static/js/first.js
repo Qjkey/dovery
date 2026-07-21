@@ -100,7 +100,6 @@ async function validateAndSubmit_login(el) {
     const form = el.closest('form'); 
     const usernameInput = form.querySelector('input[name="username"]');
     const passwordInput = form.querySelector('input[name="password"]');
-    const csrfInput = form.querySelector('input[name="csrf_token"]');
 
     const username = usernameInput.value.trim();
     let passwordValue = passwordInput.value.trim();
@@ -115,7 +114,6 @@ async function validateAndSubmit_login(el) {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', hashedForServer);
-    formData.append('csrf_token', csrfInput.value);
 
     try {
         const response = await fetch('/login', {
@@ -126,7 +124,9 @@ async function validateAndSubmit_login(el) {
         const data = await response.json();
 
         if (response.ok && data.status === "success") {
-            const privateKeyObject = await decryptAndImportKey(data.priv_key, passwordValue, username);
+            // Соль = username как при регистрации (канонический с сервера)
+            const keyUsername = data.user_data.username;
+            const privateKeyObject = await decryptAndImportKey(data.priv_key, passwordValue, keyUsername);
             passwordValue = null;
             passwordInput.value = "";
             await saveUserData(data.user_data, privateKeyObject);
@@ -141,6 +141,9 @@ async function validateAndSubmit_login(el) {
             } else if (data.message === "d103") {
                 d_alert("Ошибка", "Ошибка базы данных", "ok");
                 return;
+            } else if (data.message === "d207" || response.status === 429) {
+                d_pop("Ошибка", "Лимит попыток исчерпан, попробуйте позже", "Хорошо");
+                return;
             } else if (data.message === 413 || response.status === 413) {
                 d_pop("Файл аватарки слишком большой", "Лимит временно 5 мб, пока мы не вырастем", "Хорошо");
                 return;
@@ -149,8 +152,12 @@ async function validateAndSubmit_login(el) {
             d_alert("Ошибка", `${data.message || response.status}`, "ok");
         }
     } catch (err) {
-        console.log(err);
-        d_alert("Ошибка", `Ошибка сервера`, "ok");
+        console.error(err);
+        if (err && err.name === "OperationError") {
+            d_alert("Ошибка", "Не удалось расшифровать ключ. Проверьте пароль.", "ok");
+            return;
+        }
+        d_alert("Ошибка", `Ошибка сервера ${err}`, "ok");
     }
 }
 
@@ -160,8 +167,6 @@ async function validateAndSubmit(el) {
     const username = form.querySelector('input[name="username"]').value.trim();
     const passwordInput = form.querySelector('input[name="password"]');
     const repPassInput = form.querySelector('input[name="rep_pass"]');
-    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-
     const passwordValue = passwordInput.value.trim();
     const repPassValue = repPassInput.value.trim();
 
@@ -169,9 +174,21 @@ async function validateAndSubmit(el) {
         d_pop("Заполните все поля", "", "Хорошо");
         return;
     }
+    if (name.length > 32) {
+        d_pop("Имя слишком длинное", "Максимум 32 символа", "Хорошо");
+        return;
+    }
     const letters = /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$/;
     if (!letters.test(username)) {
         d_alert("Ошибка", "Username может содержать только латинские буквы, цифры и символ подчеркивания, не идущий подряд, в начале или в конце", "ok");
+        return;
+    }
+    if (!(username.length >= 4 && username.length <= 16)) {
+        d_alert("Ошибка", "Username короче 4 символов либо длиннее 16 ", "ok");
+        return;
+    }
+    if (passwordValue.length < 8) {
+        d_pop("Слишком короткий пароль", "Минимум 8 символов", "Хорошо");
         return;
     }
     if (passwordValue !== repPassValue) {
@@ -189,6 +206,7 @@ async function validateAndSubmit(el) {
         const pubExport = await crypto.subtle.exportKey("spki", keyPair.publicKey);
         const pubBase64 = btoa(String.fromCharCode(...new Uint8Array(pubExport)));
 
+        // Соль = username ровно в том регистре, как ввёл пользователь
         const encryptionKey = await deriveEncryptionKey(passwordValue, username);
         const privExport = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
         
@@ -214,7 +232,6 @@ async function validateAndSubmit(el) {
         formData.append('password', hashedPass);
         formData.append('public_key', pubBase64);
         formData.append('encrypted_private_key', privBase64);
-        formData.append('csrf_token', csrfToken);
 
         if (selectedAvatarFile) {
             formData.append('avatar', selectedAvatarFile);

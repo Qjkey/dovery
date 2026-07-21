@@ -773,15 +773,42 @@ function d_pop(label = 'Label', description = 'Description', actionLabel = 'Labe
 
 const openedScreens = [];
 
+const DOVERY_DESKTOP_BREAKPOINT = 751;
+
+function isDoveryChatListLayout() {
+  // Список чатов Dovery на планшете/ноуте всегда виден рядом с перепиской
+  return window.innerWidth >= DOVERY_DESKTOP_BREAKPOINT
+    && !!document.getElementById('chats-list');
+}
+
+function isDoveryMessagesScreen(screen) {
+  return !!(screen && (screen.id === 'message-chats' || screen.classList.contains('messages')));
+}
+
+function shouldPreserveChatsScroll(screen) {
+  return isDoveryChatListLayout() && isDoveryMessagesScreen(screen);
+}
+
+function isChatsScrollContainer(container) {
+  return container.classList.contains('chats')
+    || container.id === 'chats-list'
+    || (container.id === 'app' && container.classList.contains('chats'));
+}
+
 // Включение/выключение внутреннего скролла у контейнеров
-function toggleInnerScroll(root, isDisable) {
+function toggleInnerScroll(root, isDisable, options = {}) {
   if (!root) return;
-  
-  const scrollContainers = root === document 
-    ? document.querySelectorAll('.page, .messages, .chats') 
+
+  const keepChatsScroll = options.keepChatsScroll === true;
+
+  const scrollContainers = root === document
+    ? document.querySelectorAll('.page, .messages, .chats')
     : root.querySelectorAll('.page, .messages, .chats');
-  
+
   scrollContainers.forEach(container => {
+    if (isDisable && keepChatsScroll && isChatsScrollContainer(container)) {
+      return;
+    }
     container.style.overflowY = isDisable ? 'hidden' : 'auto';
   });
 }
@@ -945,20 +972,31 @@ function openScreen(screenId) {
   const screen = document.querySelector(`[data-screen="${screenId}"]`);
   if (!screen) return;
 
+  // Не дублируем уже открытый экран в стеке
+  if (openedScreens[openedScreens.length - 1] === screenId) {
+    return;
+  }
+
   const parentContainer = screen.closest('.page, .messages, .chats');
+  const keepChatsScroll = shouldPreserveChatsScroll(screen);
 
   if (openedScreens.length === 0) {
-    toggleInnerScroll(document, true);
-    document.body.style.overflow = 'hidden'; 
+    if (!keepChatsScroll) {
+      toggleInnerScroll(document, true);
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Dovery desktop: список чатов остаётся скроллируемым
+      toggleInnerScroll(document, true, { keepChatsScroll: true });
+    }
   } else {
     const prevScreenId = openedScreens[openedScreens.length - 1];
     const prevScreen = document.querySelector(`[data-screen="${prevScreenId}"]`);
     if (prevScreen) {
-      toggleInnerScroll(prevScreen, true);
+      toggleInnerScroll(prevScreen, true, { keepChatsScroll });
     }
   }
 
-  if (parentContainer && window.innerWidth > 600) {
+  if (parentContainer && window.innerWidth > 600 && !keepChatsScroll) {
     const currentScroll = parentContainer.scrollTop;
     screen.style.top = `${currentScroll}px`;
   } else {
@@ -1027,25 +1065,38 @@ function closeActiveScreen(screenId, isSwiped = false) {
   }
 }
 
-// --- НОВАЯ ФУНКЦИЯ: ЗАЩИТА ОТ СДВИГА ЭКРАНОВ ПРИ РЕСАЙЗЕ ---
+// --- ЗАЩИТА ОТ СДВИГА ЭКРАНОВ ПРИ РЕСАЙЗЕ ---
 window.addEventListener('resize', () => {
   openedScreens.forEach(screenId => {
     const screen = document.querySelector(`[data-screen="${screenId}"]`);
     if (!screen) return;
 
     if (window.innerWidth <= 600) {
-      // На мобилках позиционирование fixed, top всегда должен быть строго 0
       screen.style.top = '0px';
-    } else {
-      // На ПК пересчитываем top на основе актуального скролла родителя
+    } else if (!shouldPreserveChatsScroll(screen)) {
       const parentContainer = screen.closest('.page, .messages, .chats');
       if (parentContainer) {
         screen.style.top = `${parentContainer.scrollTop}px`;
       } else {
         screen.style.top = '0px';
       }
+    } else {
+      screen.style.top = '0px';
     }
   });
+
+  // При переходе на desktop Dovery — вернуть скролл списку чатов
+  if (isDoveryChatListLayout()) {
+    document.querySelectorAll('.chats').forEach((el) => {
+      const blockingOverlay = openedScreens.some((id) => {
+        const s = document.querySelector(`[data-screen="${id}"]`);
+        return s && !isDoveryMessagesScreen(s);
+      });
+      if (!blockingOverlay) {
+        el.style.overflowY = 'auto';
+      }
+    });
+  }
 });
 
 window.openScreen = openScreen;

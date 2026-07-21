@@ -6,7 +6,6 @@ Dovery
 
 {% block body %}
 <link href="/static/CSS/dovery.css" rel="stylesheet" type="text/css">
-<meta name="csrf-token" content="{{ csrf_token() }}">
 <div class="page chats defult_bg" id="app">
     <div class="header-wrapper header-bg">
         <div class="header">
@@ -19,7 +18,7 @@ Dovery
             </div>
 
             <div class="header-center">
-                <div class="label headline6">Dovery</div>
+                <div class="label headline6" id="title-status">Dovery</div>
             </div>
 
             <div class="header-right">
@@ -169,7 +168,7 @@ Dovery
         <p class="label-no-chats">Выберете чат, либо используйте поиск</p>
     </div>
     <div id="chat-content" class="hidden" style="height: 100%;">
-        <div class="header-wrapper header-chat">
+        <div class="header-wrapper header-chat" id="header-chat">
             <div class="header">
                 <div class="header-left right-two" id="close-chat-btn">
                     <div class="header-capsule one-btn">
@@ -204,6 +203,10 @@ Dovery
             </div>
         </div>
 
+        <div class="sticky-chat-date" id="sticky-chat-date" hidden>
+            <span class="chat-date-header caption1-medium"></span>
+        </div>
+
         <div class="messages-area" id="messages-area">
             <div class="message-wrapper sent new-msg">
                 <div class="message-bubble sent">
@@ -223,7 +226,7 @@ Dovery
             </div>
         </div>
 
-        <div class="header-wrapper bottom-bar" style="top: calc(100% - 77px);">
+        <div class="header-wrapper bottom-bar" id="bottom-header-chat" style="top: calc(100% - 77px);">
             <div class="textarea">
                 <!-- <div class="header-left right-two">
                     <div class="header-capsule one-btn">
@@ -254,6 +257,7 @@ Dovery
 <script src="/static/js/dovery.js"></script>
 <script src="/static/js/search.js"></script>
 <script src="/static/js/chat-list.js"></script>
+<script src="/static/js/check-wifi.js"></script>
 <div class="overlay-container" data-overlay="1">
     <div class="profile-modal">
         <div class="header-wrapper">

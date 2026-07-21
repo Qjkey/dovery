@@ -116,6 +116,23 @@ html, body {
 #chats-list {
     overflow-y: auto;
     box-sizing: border-box;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+#chats-list::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.chats {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.chats::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 /* ТЕЛЕФОНЫ */
@@ -247,22 +264,55 @@ html, body {
     text-align: center;
     margin-top: 3px;
     margin-bottom: 3px;
+    transition: opacity 0.12s ease;
+}
+
+.chat-date-group.is-covered {
+    opacity: 0;
 }
 
 .chat-date-header {
     display: inline-block;
     padding: 3px 7px;
-    background: #63996f75;
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
+    background: linear-gradient(135deg, 
+        color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%, 
+        color-mix(in srgb, var(--bg-two) 54%, black 10%) 100%
+    );
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     border-radius: 50px;
-    color: var(--tg-theme-bg-color);
+    color: #ffffff;
+}
+
+/* Закреплённая дата поверх ленты сообщений */
+.sticky-chat-date {
+    position: absolute;
+    top: 70px;
+    left: 0;
+    right: 0;
+    z-index: 9;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sticky-chat-date.is-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 @media (min-width: 1000px) {
     .chat-date-group {
         text-align: left;
         padding-left: 200px;
+    }
+    .sticky-chat-date {
+        justify-content: flex-start;
+        padding-left: 200px;
+        box-sizing: border-box;
     }
 }
 

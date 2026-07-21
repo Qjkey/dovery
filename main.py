@@ -1,8 +1,6 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_wtf.csrf import CSRFProtect
-from flask_wtf.csrf import CSRFError
 from flask import jsonify
 from flask_socketio import SocketIO, emit, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -13,10 +11,9 @@ import string
 import secrets
 import sqlite3
 import re
-import secrets
 import hashlib
 from PIL import Image, ImageOps
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import json
 import base64
@@ -26,8 +23,14 @@ env_path = base / 'db' / 'info.env'
 if not env_path.exists():
     print(f"Файл .env не найден в {env_path}")
 load_dotenv(dotenv_path=env_path)
+
+# threading + reloader в dev; gevent — для продакшена (DOVERY_DEV=0)
+DEV_MODE = os.getenv('DOVERY_DEV', '1') == '1'
+
 app = Flask(__name__)
 app.secret_key = os.getenv('secret')
+if not app.secret_key:
+    raise RuntimeError("Не задан secret в db/info.env — без него сессии небезопасны")
 db_name = os.getenv('db')
 limiter = Limiter(
     get_remote_address,
@@ -39,25 +42,40 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=True,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     MAX_CONTENT_LENGTH=5 * 1024 * 1024
 )
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$")
+CLIENT_HASH_RE = re.compile(r"^[a-f0-9]{64}$")
+# Заглушка для выравнивания времени ответа при неверном логине
+DUMMY_PASSWORD_HASH = generate_password_hash("dovery-dummy-password-not-used")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-csrf = CSRFProtect(app)
-socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
+def is_valid_base64(value, min_len=32, max_len=4096):
+    if not value or not isinstance(value, str):
+        return False
+    if not (min_len <= len(value) <= max_len):
+        return False
+    try:
+        base64.b64decode(value, validate=True)
+        return True
+    except Exception:
+        return False
+
 online_users = {}
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
-    app, 
-    cors_allowed_origins="*", 
-    ping_timeout=5, 
-    ping_interval=2,
-    logger=True,      
-    engineio_logger=True 
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading" if DEV_MODE else "gevent",
+    ping_timeout=60,
+    ping_interval=25,
+    logger=DEV_MODE,
+    engineio_logger=DEV_MODE,
 )
 
 @app.after_request
@@ -138,19 +156,19 @@ def save_message(sender_id, receiver_id, encrypted_text, msg_id):
 
 # Получение id текущего пользователя
 def get_current_user_id():
-    auth_token = session.get('auth_token')
-    auth_token = hashlib.sha256(auth_token.encode()).hexdigest()
-    if not auth_token:
-        print("Токен отсутствует")
+    raw_token = session.get('auth_token')
+    if not raw_token:
         return None
-    
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
     conn = get_db_connection()
     try:
         user = conn.execute(
-            'SELECT user_id FROM sessions WHERE token_hash = ?', 
-            (auth_token,)
+            'SELECT user_id FROM sessions WHERE token_hash = ?',
+            (token_hash,),
         ).fetchone()
-        
+
         return user['user_id'] if user else None
     except Exception as e:
         print(f"Ошибка БД в get_current_user_id: {e}")
@@ -295,7 +313,10 @@ def get_user_by_username(username):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+            cursor.execute(
+                "SELECT * FROM users WHERE LOWER(username) = LOWER(?)",
+                (username,),
+            )
             return cursor.fetchone()
     except Exception as e:
         return "d103"
@@ -327,7 +348,7 @@ def handle_disconnect():
 # Главная страница
 @app.route("/")
 def index():
-    # return render_template("firstt.html")
+    # return render_template("first.html")
     raw_token = session.get('auth_token')
     if not raw_token:
         return render_template("first.html")
@@ -352,56 +373,77 @@ def index():
 # Вход в аккаунт
 @app.route("/login", methods=['POST'])
 @limiter.limit("10 per hour")
-@limiter.limit("5 per minute", key_func=lambda: request.form.get('username', 'unknown').lower())
+@limiter.limit("5 per minute", key_func=lambda: (request.form.get('username') or 'unknown').strip().lower())
 def login():
-    username = request.form.get('username', '').lower()
-    client_hash = request.form.get('password')
+    username = (request.form.get('username') or '').strip()
+    client_hash = request.form.get('password') or ''
 
     if not username or not client_hash:
-        return jsonify({"status": "error", "message": "d101"})
+        return jsonify({"status": "error", "message": "d101"}), 400
+
+    if not CLIENT_HASH_RE.fullmatch(client_hash):
+        return jsonify({"status": "error", "message": "d102"}), 401
 
     user = get_user_by_username(username)
-    
-    if user and user != "d103" and check_password_hash(user['password'], client_hash):
+    if user == "d103":
+        return jsonify({"status": "error", "message": "d103"}), 500
+
+    # Всегда проверяем хэш (даже если пользователя нет) — меньше утечки по таймингу
+    password_hash = user['password'] if user else DUMMY_PASSWORD_HASH
+    password_ok = check_password_hash(password_hash, client_hash)
+
+    if user and password_ok:
         session.clear()
         raw_token = secrets.token_urlsafe(64)
 
         if save_session(raw_token, user['id']):
             session['auth_token'] = raw_token
-            session.permanent = True 
+            session.permanent = True
 
             return jsonify({
                 "status": "success",
                 "priv_key": user['private_key'],
                 "user_data": {"id": user['id'], "username": user['username']}
             })
-        else:
-            return jsonify({"status": "error", "message": "d103"})
-    
-    return jsonify({"status": "error", "message": "d102"})
+        return jsonify({"status": "error", "message": "d103"}), 500
+
+    return jsonify({"status": "error", "message": "d102"}), 401
 
 # Регистрация
 @app.route('/signup', methods=['POST'])
-@limiter.limit("20 per hour")
+@limiter.limit("10 per hour")
+@limiter.limit("5 per minute")
 def signup():
-    name = request.form.get('name')
-    username = request.form.get('username')
-    client_hash = request.form.get('password') 
-    pub_key = request.form.get('public_key')
-    priv_key = request.form.get('encrypted_private_key')
+    name = (request.form.get('name') or '').strip()
+    username = (request.form.get('username') or '').strip()
+    client_hash = request.form.get('password') or ''
+    pub_key = request.form.get('public_key') or ''
+    priv_key = request.form.get('encrypted_private_key') or ''
     avatar_file = request.files.get('avatar')
 
     if not name or not username or not client_hash:
         return jsonify({"status": "error", "message": "d201"}), 400
-        
+
+    if not (1 <= len(name) <= 32):
+        return jsonify({"status": "error", "message": "d201"}), 400
+
     if not (4 <= len(username) <= 16):
         return jsonify({"status": "error", "message": "d208"}), 400
-        
-    if not re.fullmatch(r"^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$", username):
+
+    if not USERNAME_RE.fullmatch(username):
         return jsonify({"status": "error", "message": "d206"}), 400
-    
+
+    if not CLIENT_HASH_RE.fullmatch(client_hash):
+        return jsonify({"status": "error", "message": "d201"}), 400
+
+    # Без ключей аккаунт бесполезен и опасен — не принимаем пустые/битые
+    if not is_valid_base64(pub_key, min_len=80, max_len=512):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not is_valid_base64(priv_key, min_len=80, max_len=1024):
+        return jsonify({"status": "error", "message": "d201"}), 400
+
     if not check_username(username):
-        return jsonify({"status": "error", "message": "d203"}), 400
+        return jsonify({"status": "error", "message": "d203"}), 409
 
     avatar_name = "avatarkins.png"
     if avatar_file and avatar_file.filename != '':
@@ -410,31 +452,33 @@ def signup():
             avatar_name = processed_name
 
     secure_db_hash = generate_password_hash(client_hash)
-    
+
     success, message = save_user(name, username, secure_db_hash, pub_key, priv_key, avatar_name)
 
     if success:
         user_id = message
         raw_token = secrets.token_urlsafe(64)
-        
+
         if save_session(raw_token, user_id):
             session.clear()
             session['auth_token'] = raw_token
             session.permanent = True
-            
+
             return jsonify({
-                "status": "success", 
+                "status": "success",
                 "user_data": {"id": user_id, "username": username}
             })
-        else:
-            return jsonify({"status": "error", "message": "d204"}), 500
-    
+        return jsonify({"status": "error", "message": "d204"}), 500
+
     status_code = 409 if message == "d203" else 400
     return jsonify({"status": "error", "message": message}), status_code
 
 # Обработчик ошибки 429
 @app.errorhandler(429)
 def ratelimit_handler(e):
+    # API (login/signup) ждут JSON; иначе фронт падает в catch
+    if request.path in ('/login', '/signup') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({"status": "error", "message": "d207"}), 429
     return render_template('error.html', error="429"), 429
 
 # Обработчик ошибки 404
@@ -543,11 +587,6 @@ def get_my_chats():
 
     return jsonify(chats)
 
-# Защита CSRF
-@app.errorhandler(CSRFError)
-def handle_csrf_error(e):
-    return jsonify({"status": "error", "message": "d207"})
-
 # Сокеты отправка сообщения
 @socketio.on('send_direct_message')
 def handle_message(data):
@@ -627,6 +666,23 @@ def get_history(second_id):
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
         return jsonify([]), 500
+
+# Логирование: не шумим от служебных /ping (если кто-то всё же дернёт)
+class _QuietPingFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        return '/ping' not in msg
+
+logging.getLogger('werkzeug').addFilter(_QuietPingFilter())
+
+@app.route('/ping', methods=['GET', 'HEAD'])
+@limiter.exempt
+def ping():
+    """Лёгкий healthcheck. Клиент Dovery больше не поллит его — статус через Socket.IO."""
+    return '', 204
 
 # Анализ username
 @app.route('/<string:username>')
@@ -708,4 +764,13 @@ def delete_chat(data):
         print(f"Ошибка при удалении чата через сокет: {e}")
 
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0', port=8080, debug=True)
+    # В DEV_MODE: threading + reloader — Ctrl+S перезапускает процесс на том же порту,
+    # туннель обычно переживает это без ручного перезапуска.
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=8080,
+        debug=DEV_MODE,
+        use_reloader=DEV_MODE,
+        allow_unsafe_werkzeug=True,
+    )

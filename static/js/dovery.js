@@ -191,9 +191,9 @@ async function startChat(userId) {
         });
 
         if (response.ok) {
-            closeActiveScreen(1);
             await loadMyChats();
-            // await openDirectWindow(userId);
+            await openDirectWindow(userId);
+            closeActiveScreen(1);
         }
     } catch (err) {
         console.error("Ошибка при создании чата:", err);
@@ -798,6 +798,28 @@ function getPreciseISOString() {
     return isoString.replace('Z', microseconds + '+00:00');
 }
 
+function scrollMessagesToLatest() {
+    if (!messagesArea) return;
+    // flex-direction: column-reverse — актуальные сообщения у визуального низа при scrollTop = 0
+    requestAnimationFrame(() => {
+        messagesArea.scrollTop = 0;
+        scheduleStickyChatDateUpdate();
+    });
+}
+
+function isWideChatLayout() {
+    // Планшет/ноут: список чатов виден рядом с перепиской
+    return window.innerWidth >= 751 && !!document.getElementById('chats-list');
+}
+
+function resetMessageComposer() {
+    msgInput.value = '';
+    msgInput.setAttribute('rows', '1');
+    msgInput.style.height = 'auto';
+    if (bottomBar) bottomBar.style.top = 'calc(100% - 77px)';
+    if (ma) ma.style.paddingBottom = 'calc(77px)';
+}
+
 async function sendMessage() {
     const text = msgInput.value;
     if (!text.trim()) return;
@@ -856,9 +878,10 @@ async function sendMessage() {
         });
     }
 
-    msgInput.value = '';
-    msgInput.style.height = 'auto';
-    msgInput.focus();
+    resetMessageComposer();
+    scrollMessagesToLatest();
+    // keep keyboard / caret — без blur; preventScroll чтобы страница не дёргалась
+    msgInput.focus({ preventScroll: true });
 }
 
 socket.on('new_message', async (data) => {
@@ -929,6 +952,14 @@ socket.on('new_message', async (data) => {
 
             wrapper.querySelector('.message-content').textContent = decryptedText;
             insertNewMessageWithDateCheck(messagesArea, wrapper, data.time);
+
+            // Входящие: вниз только если уже были у низа ленты
+            if (!isMe) {
+                const nearBottom = messagesArea.scrollTop < 80;
+                if (nearBottom) scrollMessagesToLatest();
+            } else {
+                scrollMessagesToLatest();
+            }
         }
 
     } catch (err) {
@@ -936,17 +967,20 @@ socket.on('new_message', async (data) => {
     }
 });
 
+// Не отдаём фокус кнопке Send — иначе на мобиле закрывается клавиатура
+sendBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+});
+
 sendBtn.addEventListener('click', async () => {
     await sendMessage();
+    msgInput.focus({ preventScroll: true });
 });
 
 msgInput.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        const isMobile = window.matchMedia("(max-width: 1024px)").matches;
-        if (!isMobile) {
-            e.preventDefault();
-            await sendMessage();
-        }
+    if (e.key === 'Enter' && !e.shiftKey && isWideChatLayout()) {
+        e.preventDefault();
+        await sendMessage();
     }
 });
 
@@ -1032,7 +1066,8 @@ function renderChat(messagesArea, messages, userId) {
     });
 
     messagesArea.prepend(fragment);
-    messagesArea.scrollTop = messagesArea.scrollHeight;
+    // column-reverse: низ ленты (новые) при scrollTop = 0
+    messagesArea.scrollTop = 0;
     bindStickyChatDate();
 }
 
@@ -1064,8 +1099,13 @@ socket.on('chat_deleted', async (data) => {
         if (typeof chatHash !== 'undefined' && chatHash[deletedChatId]) {
             delete chatHash[deletedChatId];
         }
-
-        toggleChat(false);
+        const screenWidth = window.innerWidth;
+        if (screenWidth > 751) {
+            document.getElementById('no-chat-content').classList.remove('hidden');
+            document.getElementById('chat-content').classList.add('hidden');
+        } else {
+            closeActiveScreen(2);
+        }
         await loadMyChats();
     } catch (error) {
         console.error('Ошибка при обработке удаления чата на клиенте:', error);

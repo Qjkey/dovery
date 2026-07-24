@@ -860,6 +860,11 @@ input:focus {
     justify-content: flex-start; 
 }
 
+/* Сообщения в группе ближе друг к другу */
+.message-wrapper.msg-group-follow {
+    margin-top: 2px;
+}
+
 .message-bubble {
     position: relative;
     max-width: 70%;
@@ -879,6 +884,24 @@ input:focus {
     border-bottom-right-radius: 0px;
 }
 
+/* Последнее в группе (самое новое): верхний угол «хвоста» без радиуса — склейка с предыдущим */
+.message-wrapper.msg-group-last .message-bubble.sent {
+    border-top-right-radius: 0;
+}
+.message-wrapper.msg-group-last .message-bubble.received {
+    border-top-left-radius: 0;
+}
+
+/* Средние в группе: плоские углы со стороны склейки */
+.message-wrapper.msg-group-middle .message-bubble.sent {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.message-wrapper.msg-group-middle .message-bubble.received {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
 /* Адаптация для десктопа - все сообщения слева */
 @media (min-width: 768px) {
     .message-wrapper.sent { 
@@ -888,6 +911,18 @@ input:focus {
     .message-bubble.sent {
         border-bottom-right-radius: 14px;
         border-bottom-left-radius: 0px;
+    }
+
+    .message-wrapper.msg-group-last .message-bubble.sent {
+        border-top-right-radius: 14px;
+        border-top-left-radius: 0;
+    }
+
+    .message-wrapper.msg-group-middle .message-bubble.sent {
+        border-top-right-radius: 14px;
+        border-bottom-right-radius: 14px;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
     }
 }
 

@@ -14,6 +14,8 @@ import re
 import hashlib
 from PIL import Image, ImageOps
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict, deque
+import time
 import logging
 import json
 import base64
@@ -49,6 +51,10 @@ app.config.update(
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$")
 CLIENT_HASH_RE = re.compile(r"^[a-f0-9]{64}$")
+MAX_MESSAGE_CHARS = 1024
+MAX_ENCRYPTED_MESSAGE_LEN = 8192
+MAX_MESSAGES_PER_MINUTE = 20
+_message_rate_buckets = defaultdict(deque)
 # Заглушка для выравнивания времени ответа при неверном логине
 DUMMY_PASSWORD_HASH = generate_password_hash("dovery-dummy-password-not-used")
 
@@ -65,6 +71,19 @@ def is_valid_base64(value, min_len=32, max_len=4096):
         return True
     except Exception:
         return False
+
+def allow_message_send(user_id):
+    """Не больше MAX_MESSAGES_PER_MINUTE сообщений в минуту на пользователя."""
+    if not user_id:
+        return False
+    now = time.monotonic()
+    bucket = _message_rate_buckets[user_id]
+    while bucket and now - bucket[0] > 60:
+        bucket.popleft()
+    if len(bucket) >= MAX_MESSAGES_PER_MINUTE:
+        return False
+    bucket.append(now)
+    return True
 
 online_users = {}
 logging.basicConfig(level=logging.INFO)
@@ -590,30 +609,41 @@ def get_my_chats():
 # Сокеты отправка сообщения
 @socketio.on('send_direct_message')
 def handle_message(data):
-    # Данные от клиента
     receiver_id = data.get('receiver_id')
     encrypted_text = data.get('text')
     msg_id = data.get('msgId')
-    
-    # Определяем отправителя (через сессию Flask или кастомный метод)
     sender_id = get_current_user_id()
 
-    if not receiver_id or not encrypted_text:
+    if not sender_id:
+        emit('message_error', {'code': 'unauthorized', 'msg_id': msg_id})
         return
 
-    # 1. Сохраняем в БД зашифрованную строку
-    time = save_message(sender_id, receiver_id, encrypted_text, msg_id)
+    if not receiver_id or not encrypted_text or not msg_id:
+        emit('message_error', {'code': 'invalid', 'msg_id': msg_id})
+        return
+
+    if not isinstance(encrypted_text, str) or len(encrypted_text) > MAX_ENCRYPTED_MESSAGE_LEN:
+        emit('message_error', {'code': 'too_long', 'msg_id': msg_id})
+        return
+
+    if not allow_message_send(sender_id):
+        emit('message_error', {'code': 'rate_limit', 'msg_id': msg_id})
+        return
+
+    time_iso = save_message(sender_id, receiver_id, encrypted_text, msg_id)
+    if not time_iso:
+        emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
+        return
 
     data_mess = {
         'msg_id': msg_id,
         'text': encrypted_text,
         'sender_id': sender_id,
         'receiver_id': receiver_id,
-        'time': time
+        'time': time_iso
     }
 
     emit('new_message', data_mess, to=f"user_{receiver_id}")
-
     emit('new_message', data_mess, to=f"user_{sender_id}")
 
 # Удаление сообщения сокет

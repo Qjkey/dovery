@@ -579,6 +579,8 @@ socket.on('message_deleted', async (data) => {
                         if (dateHeaderElement) {
                             dateHeaderElement.remove();
                         }
+                        applyMessageGrouping(messagesArea);
+                        scheduleStickyChatDateUpdate();
                     }, 500);
 
                 } catch (err) {
@@ -591,6 +593,8 @@ socket.on('message_deleted', async (data) => {
                             break;
                         }
                     }
+                    applyMessageGrouping(messagesArea);
+                    scheduleStickyChatDateUpdate();
                 }
             }
         }
@@ -716,8 +720,66 @@ function insertNewMessageWithDateCheck(messagesArea, messageWrapper, msgTime) {
         messagesArea.prepend(createDateHeaderElement(dateLabel));
     }
 
+    if (msgTime && !messageWrapper.dataset.time) {
+        messageWrapper.dataset.time = msgTime;
+    }
+
     messagesArea.prepend(messageWrapper);
+    applyMessageGrouping(messagesArea);
     scheduleStickyChatDateUpdate();
+}
+
+const MESSAGE_GROUP_GAP_MS = 10 * 60 * 1000;
+
+function hasDateHeaderBetween(newerEl, olderEl) {
+    let node = newerEl.nextElementSibling;
+    while (node && node !== olderEl) {
+        if (node.classList.contains('chat-date-group')) return true;
+        node = node.nextElementSibling;
+    }
+    return false;
+}
+
+function canGroupMessages(a, b) {
+    if (!a || !b) return false;
+    if (a.dataset.sender !== b.dataset.sender) return false;
+    const aSent = a.classList.contains('sent');
+    const bSent = b.classList.contains('sent');
+    if (aSent !== bSent) return false;
+
+    const t1 = new Date(a.dataset.time).getTime();
+    const t2 = new Date(b.dataset.time).getTime();
+    if (!Number.isFinite(t1) || !Number.isFinite(t2)) return false;
+    return Math.abs(t1 - t2) < MESSAGE_GROUP_GAP_MS;
+}
+
+function applyMessageGrouping(area) {
+    if (!area) return;
+    const wrappers = Array.from(area.querySelectorAll('.message-wrapper'));
+
+    wrappers.forEach((w) => {
+        w.classList.remove('msg-group-first', 'msg-group-middle', 'msg-group-last', 'msg-group-follow');
+    });
+
+    // DOM при column-reverse: [0]=новее … дальше=старше
+    for (let i = 0; i < wrappers.length; i++) {
+        const curr = wrappers[i];
+        const older = wrappers[i + 1];
+        const newer = wrappers[i - 1];
+
+        const linksOlder = canGroupMessages(curr, older) && !hasDateHeaderBetween(curr, older);
+        const linksNewer = canGroupMessages(curr, newer) && !hasDateHeaderBetween(newer, curr);
+
+        if (linksNewer && linksOlder) {
+            curr.classList.add('msg-group-middle', 'msg-group-follow');
+        } else if (linksNewer && !linksOlder) {
+            // Самое старое в группе — радиус как у обычных
+            curr.classList.add('msg-group-first');
+        } else if (!linksNewer && linksOlder) {
+            // Самое новое в группе — 0 у стыковочного угла
+            curr.classList.add('msg-group-last', 'msg-group-follow');
+        }
+    }
 }
 
 request.onsuccess = (event) => {
@@ -820,9 +882,51 @@ function resetMessageComposer() {
     if (ma) ma.style.paddingBottom = 'calc(77px)';
 }
 
+const MAX_MESSAGE_LENGTH = 1024;
+const MAX_MESSAGES_PER_MINUTE = 20;
+const _recentMessageTimes = [];
+
+function canSendMessageClient() {
+    const now = Date.now();
+    while (_recentMessageTimes.length && now - _recentMessageTimes[0] > 60_000) {
+        _recentMessageTimes.shift();
+    }
+    return _recentMessageTimes.length < MAX_MESSAGES_PER_MINUTE;
+}
+
+function noteMessageSentClient() {
+    _recentMessageTimes.push(Date.now());
+}
+
+function removeOptimisticMessage(msgId) {
+    if (!msgId) return;
+    const el = messagesArea?.querySelector(`.message-wrapper[data-id="${msgId}"]`)
+        || messagesArea?.querySelector(`[data-id="${msgId}"]`)?.closest('.message-wrapper');
+    if (el) el.remove();
+
+    const activeChatUserId = document.getElementById('id_ept')?.innerText;
+    if (activeChatUserId && chatHash[activeChatUserId]) {
+        chatHash[activeChatUserId].messages = chatHash[activeChatUserId].messages.filter(
+            (m) => m.id !== msgId
+        );
+    }
+    applyMessageGrouping(messagesArea);
+    scheduleStickyChatDateUpdate();
+}
+
 async function sendMessage() {
     const text = msgInput.value;
     if (!text.trim()) return;
+
+    if (text.length > MAX_MESSAGE_LENGTH) {
+        d_pop("Слишком длинное сообщение", `Максимум ${MAX_MESSAGE_LENGTH} символов`, "Хорошо");
+        return;
+    }
+
+    if (!canSendMessageClient()) {
+        d_pop("Слишком часто", "Не больше 20 сообщений в минуту", "Хорошо");
+        return;
+    }
 
     let encryptedText;
     try {
@@ -844,8 +948,11 @@ async function sendMessage() {
     };
 
     const msgId = "msg_" + generateId(15);
+    const time = getPreciseISOString();
 
     const receiverId = document.getElementById('id_ept').innerText;
+
+    noteMessageSentClient();
 
     socket.emit('send_direct_message', {
         receiver_id: receiverId,
@@ -855,7 +962,9 @@ async function sendMessage() {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'message-wrapper sent new-msg';
-    const time = getPreciseISOString(); 
+    wrapper.dataset.id = msgId;
+    wrapper.dataset.time = time;
+    wrapper.dataset.sender = String(userId ?? window.userId ?? '');
     wrapper.innerHTML = `
         <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${msgId}">
             <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
@@ -883,6 +992,22 @@ async function sendMessage() {
     // keep keyboard / caret — без blur; preventScroll чтобы страница не дёргалась
     msgInput.focus({ preventScroll: true });
 }
+
+socket.on('message_error', (data) => {
+    const code = data?.code;
+    const msgId = data?.msg_id;
+    removeOptimisticMessage(msgId);
+
+    if (code === 'too_long') {
+        d_pop("Слишком длинное сообщение", `Максимум ${MAX_MESSAGE_LENGTH} символов`, "Хорошо");
+    } else if (code === 'rate_limit') {
+        d_pop("Слишком часто", "Не больше 20 сообщений в минуту", "Хорошо");
+    } else if (code === 'unauthorized') {
+        d_alert("Ошибка", "Сессия истекла, войдите снова", "ok");
+    } else {
+        d_alert("Ошибка", "Не удалось отправить сообщение", "ok");
+    }
+});
 
 socket.on('new_message', async (data) => {
     try {
@@ -929,6 +1054,9 @@ socket.on('new_message', async (data) => {
             if (isMe) {
                 // Отрисовка на ТВОИХ соседних вкладках (как исходящее)
                 wrapper.className = 'message-wrapper sent new-msg';
+                wrapper.dataset.id = data.msg_id;
+                wrapper.dataset.time = data.time;
+                wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
                     <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
@@ -940,6 +1068,9 @@ socket.on('new_message', async (data) => {
             } else {
                 // Отрисовка у ПОЛУЧАТЕЛЯ (как входящее)
                 wrapper.className = 'message-wrapper received new-msg';
+                wrapper.dataset.id = data.msg_id;
+                wrapper.dataset.time = data.time;
+                wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
                     <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
@@ -1046,6 +1177,8 @@ function renderChat(messagesArea, messages, userId) {
         wrapper.className = 'message-wrapper ' + typeClass;
         wrapper.id = 'cntxt_menu_btn_03';
         wrapper.dataset.id = msg.id;
+        wrapper.dataset.time = msg.time;
+        wrapper.dataset.sender = String(msg.sender_id);
         wrapper.innerHTML = `
             <div class="message-bubble ${typeClass}">
                 <div class="message-content body1"></div>
@@ -1066,6 +1199,7 @@ function renderChat(messagesArea, messages, userId) {
     });
 
     messagesArea.prepend(fragment);
+    applyMessageGrouping(messagesArea);
     // column-reverse: низ ленты (новые) при scrollTop = 0
     messagesArea.scrollTop = 0;
     bindStickyChatDate();

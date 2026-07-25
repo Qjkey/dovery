@@ -6,6 +6,41 @@ html, body {
     overflow: hidden;
     position: fixed;
 }
+
+@media (min-width: 751px) {
+  body {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  /* Список чатов не сжимается длинными сообщениями */
+  .chats,
+  #app.chats {
+    flex-shrink: 0;
+    width: var(--width-chat-list, 350px);
+    min-width: var(--width-chat-list, 350px);
+  }
+
+  #message-chats.messages.screen {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  #chat-content,
+  .messages-area {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .message-bubble {
+    /* В панели чата — не шире 60% экрана и не шире самой панели */
+    max-width: min(60vw, 100%);
+  }
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .hidden {
@@ -243,11 +278,21 @@ html, body {
   padding-left: 10px;
   padding-right: 10px;
   text-align: center;
-  background: var(--bg-one);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px); /* Поддержка Safari */
   border-radius: 10px;
+  pointer-events: none;
+  color: white;
+
+  background: linear-gradient(135deg, 
+      color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%, 
+      color-mix(in srgb, var(--bg-two) 54%, black 10%) 100%
+  );
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
   z-index: 10;
+}
+
+#welcome-panel.hidden {
+  display: none !important;
 }
 
 .as {

@@ -46,22 +46,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (!messageArea || !welcomePanel) return;
 
-  function checkMessageArea() {
-    if (messageArea.children.length === 0) {
-      welcomePanel.classList.remove("hidden");
-    } else {
-      welcomePanel.classList.add("hidden");
-    }
-  }
+  window.updateWelcomePanel = function updateWelcomePanel() {
+    const hasMessages = messageArea.querySelector(".message-wrapper") !== null;
+    welcomePanel.classList.toggle("hidden", hasMessages);
+  };
 
-  checkMessageArea();
+  window.updateWelcomePanel();
 
   const observer = new MutationObserver(() => {
-    checkMessageArea();
+    window.updateWelcomePanel();
   });
 
-  observer.observe(messageArea, { 
-    childList: true 
+  observer.observe(messageArea, {
+    childList: true,
+    subtree: true,
   });
 });
 
@@ -974,7 +972,7 @@ async function sendMessage() {
         </div>
     `;
 
-    wrapper.querySelector('.message-content').textContent = text;
+    setMessageContent(wrapper.querySelector('.message-content'), text);
 
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
@@ -1081,7 +1079,7 @@ socket.on('new_message', async (data) => {
                 `;
             }
 
-            wrapper.querySelector('.message-content').textContent = decryptedText;
+            setMessageContent(wrapper.querySelector('.message-content'), decryptedText);
             insertNewMessageWithDateCheck(messagesArea, wrapper, data.time);
 
             // Входящие: вниз только если уже были у низа ленты
@@ -1187,7 +1185,7 @@ function renderChat(messagesArea, messages, userId) {
                 </div>
             </div>
         `;
-        wrapper.querySelector('.message-content').textContent = msg.decryptedText;
+        setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
         fragment.appendChild(wrapper);
 
         const currentDateLabel = getShortDateLabel(msg.time);
@@ -1209,6 +1207,77 @@ function formatTime(timeStr) {
     const date = new Date(timeStr);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * Безопасно заполняет .message-content: ссылки → <a>, @username → подсветка.
+ */
+function setMessageContent(el, text) {
+    if (!el) return;
+    el.replaceChildren();
+    if (text == null || text === '') return;
+
+    const source = String(text);
+    // http(s), www, t.me/, domain.tld (/path), @username
+    const urlPart =
+        String.raw`https?:\/\/[^\s<]+` +
+        String.raw`|www\.[^\s<]+` +
+        String.raw`|t\.me\/[^\s<]+` +
+        String.raw`|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+` +
+        String.raw`(?:com|net|org|ru|io|me|dev|app|info|biz|xyz|online|site|pro|tv|cc|co|uk|de|fr|edu|gov|ai|tg|gg|to|ly|link|shop|store|blog|tech|cloud|page|space|fun|live|news|world|club|media|email|agency|design|studio|tools|click|top|vip|one|pw|su|by|ua|kz|uz)` +
+        String.raw`(?:\/[^\s<]*)?`;
+    const mentionPart = String.raw`@[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*`;
+    const pattern = new RegExp(`(${urlPart})|(${mentionPart})`, 'gi');
+
+    let lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(source)) !== null) {
+        // Не цепляем домен из email (user@domain.com)
+        if (match[1] && match.index > 0 && source[match.index - 1] === '@') {
+            el.appendChild(document.createTextNode(source.slice(lastIndex, pattern.lastIndex)));
+            lastIndex = pattern.lastIndex;
+            continue;
+        }
+
+        if (match.index > lastIndex) {
+            el.appendChild(document.createTextNode(source.slice(lastIndex, match.index)));
+        }
+
+        if (match[1]) {
+            let raw = match[1];
+            let trailing = '';
+            while (/[),.!?;:'"\]]$/.test(raw)) {
+                trailing = raw.slice(-1) + trailing;
+                raw = raw.slice(0, -1);
+            }
+
+            const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+            const a = document.createElement('a');
+            a.className = 'msg-link';
+            a.href = href;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = raw;
+            el.appendChild(a);
+
+            if (trailing) {
+                el.appendChild(document.createTextNode(trailing));
+            }
+        } else if (match[2]) {
+            const span = document.createElement('span');
+            span.className = 'msg-mention';
+            span.textContent = match[2];
+            el.appendChild(span);
+        }
+
+        lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < source.length) {
+        el.appendChild(document.createTextNode(source.slice(lastIndex)));
+    }
+}
+
 
 function delete_chat() {
     const targetElement = document.getElementById('id_ept');

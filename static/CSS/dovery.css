@@ -22,8 +22,19 @@ html, body {
     min-width: var(--width-chat-list, 350px);
   }
 
-  #message-chats.messages.screen {
+  #messages-host {
+    position: relative;
     flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  #message-chats.messages.screen {
+    flex: none;
+    width: 100%;
+    height: 100%;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
@@ -230,8 +241,46 @@ html, body {
 }
 
 .profile-blocks {
-    height: 100%;
+    height: auto;
+    min-height: calc(100% - 60px);
     background-color: var(--tg-theme-secondary-bg-color);
+    overflow-y: auto;
+}
+
+/* Профиль: на телефоне без отступов; на desktop — inset через --margin */
+[data-screen="3"].profile-block-dovery.screen {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  margin: 0;
+  border-radius: 0;
+  overflow: hidden;
+  overflow-y: auto;
+}
+
+[data-screen="3"] .profile-block .defult.headline6,
+[data-screen="3"] .profile-block .subname {
+    color: #fff;
+    z-index: 1;
+}
+
+/* Пока профиль открыт — чат не кликабелен; opacity задаёт JS */
+#message-chats.profile-covering > #chat-content,
+#message-chats.profile-covering > #no-chat-content:not(.hidden) {
+  pointer-events: none;
+}
+
+@media (min-width: 751px) {
+  [data-screen="3"].profile-block-dovery.screen {
+    position: absolute;
+    width: calc(100% - 2 * var(--margin));
+    height: calc(100% - 2 * var(--margin));
+    top: var(--margin);
+    left: var(--margin);
+    border-radius: var(--radius);
+  }
 }
 
 /* Отключение разделителя на мобильных устройствах */

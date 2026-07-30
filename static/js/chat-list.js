@@ -46,14 +46,14 @@ async function loadMyChats() {
                 avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
             }
 
-            chatsData[chat.id] = {
+            chatsData[String(chat.id)] = {
                 username: chat.username,
                 name: chat.name,
                 avatar: avatarHtml,
                 publicKey: chat.public_key,
                 status: currentStatus
             };
-            if (chat.id === window.userId) return;
+            if (String(chat.id) === String(window.userId)) return;
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);

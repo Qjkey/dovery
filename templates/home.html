@@ -163,6 +163,7 @@ Dovery
         </div>
     </div>
 </div> -->
+<div id="messages-host" class="messages-host">
 <div class="messages screen" id="message-chats" data-screen="2" data-swipe>
     <div id="no-chat-content" class="body1-medium empty-state">
         <p class="label-no-chats">Выберите чат, либо используйте поиск</p>
@@ -238,6 +239,62 @@ Dovery
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+    <div class="screen hidden profile-block-dovery" id="profile-screen" data-screen="3" data-swipe data-inset-margin data-reveal-behind="#chat-content, #no-chat-content">
+        <div class="header-wrapper stick">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="3" id="close-profile">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="position: relative;">
+            <div id="profileBlock1" class="profile-block s-img defult">
+                <div class="avatar" id="profile-avatar"></div>
+                <div class="defult headline6" id="profile-name"></div>
+                <div class="subname subtitle1" id="profile-status"></div>
+                <div class="hidden" id="profile-id"></div>
+            </div>
+        </div>
+        <section class="bottom top">
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline second-title">
+                        <div class="button1-medium">Информация</div>
+                    </div>
+                </div>
+            </div>
+            <div class="item clicked" id="cntxt_menu_btn_05">
+                <div class="right">
+                    <div class="text twoline">
+                        <div class="label body1" id="profile-username"></div>
+                        <div class="label subtitle subtitle1">Username</div>
+                    </div>
+                    <div class="element">
+                        <svg class="copy"><use href="#copy"></use></svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section>
+            <div class="item clicked" id="profile-open-chat">
+                <div class="right">
+                    <div class="text oneline">
+                        <div class="label body1">Открыть чат</div>
+                    </div>
+                    <div class="element">
+                        <svg class="link"><use href="#link"></use></svg>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 <div id="tagDropdown" class="tag-dropdown"></div>

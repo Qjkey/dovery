@@ -785,8 +785,58 @@ function isDoveryMessagesScreen(screen) {
   return !!(screen && (screen.id === 'message-chats' || screen.classList.contains('messages')));
 }
 
+function isDoveryProfileScreen(screen) {
+  return !!(screen && (screen.id === 'profile-screen' || screen.getAttribute('data-screen') === '3'));
+}
+
 function shouldPreserveChatsScroll(screen) {
-  return isDoveryChatListLayout() && isDoveryMessagesScreen(screen);
+  // Чат и профиль на desktop не должны блокировать скролл списка чатов
+  return isDoveryChatListLayout()
+    && (isDoveryMessagesScreen(screen) || isDoveryProfileScreen(screen));
+}
+
+function isInsetMarginScreen(screen) {
+  return !!(screen && screen.hasAttribute('data-inset-margin'));
+}
+
+function getRevealBehindTargets(screen) {
+  if (!screen || !screen.hasAttribute('data-reveal-behind')) return [];
+  const sel = screen.getAttribute('data-reveal-behind');
+  if (!sel) return [];
+  return Array.from(document.querySelectorAll(sel));
+}
+
+function setRevealBehindProgress(screen, progress, options = {}) {
+  const targets = getRevealBehindTargets(screen);
+  if (!targets.length) return;
+
+  const p = Math.max(0, Math.min(1, progress));
+  const animate = options.animate === true;
+  // Чат может быть «под» профилем даже если профиль вынесен из #message-chats
+  const host = document.getElementById('message-chats');
+  if (host) {
+    if (p >= 1) host.classList.remove('profile-covering');
+    else host.classList.add('profile-covering');
+  }
+
+  targets.forEach((el) => {
+    if (!el || el.classList.contains('hidden')) return;
+    el.style.transition = animate ? 'opacity 0.18s ease' : 'none';
+    el.style.opacity = String(p);
+    el.style.pointerEvents = p > 0.95 ? '' : 'none';
+  });
+}
+
+function clearRevealBehind(screen) {
+  const targets = getRevealBehindTargets(screen);
+  const host = document.getElementById('message-chats');
+  if (host) host.classList.remove('profile-covering');
+  targets.forEach((el) => {
+    if (!el) return;
+    el.style.opacity = '';
+    el.style.pointerEvents = '';
+    el.style.transition = '';
+  });
 }
 
 function isChatsScrollContainer(container) {
@@ -881,6 +931,8 @@ function initSwipeListeners(screenId) {
       e.stopPropagation(); 
       if (e.cancelable) e.preventDefault(); 
       topScreen.style.transform = `translateX(${dist}px)`;
+      const w = topScreen.offsetWidth || window.innerWidth;
+      setRevealBehindProgress(topScreen, dist / w);
     }
   }, { passive: false });
 
@@ -891,12 +943,14 @@ function initSwipeListeners(screenId) {
 
     if (isMoving && dist > swipeThreshold) {
       topScreen.style.transform = 'translateX(100%)';
+      setRevealBehindProgress(topScreen, 1);
       setTimeout(() => {
         closeActiveScreen(screenId, true);
         resetTouchCoordinates();
       }, 180);
     } else {
       topScreen.style.transform = 'translateX(0)';
+      setRevealBehindProgress(topScreen, 0);
       setTimeout(() => {
         topScreen.style.transition = '';
         topScreen.style.overflowY = 'auto'; 
@@ -909,6 +963,7 @@ function initSwipeListeners(screenId) {
     e.stopPropagation();
     topScreen.style.transition = 'transform 0.18s ease';
     topScreen.style.transform = 'translateX(0)';
+    setRevealBehindProgress(topScreen, 0);
     setTimeout(() => {
       topScreen.style.transition = '';
       topScreen.style.overflowY = 'auto';
@@ -941,6 +996,8 @@ function initSwipeListeners(screenId) {
       hasMovedFar = true;
     }
     topScreen.style.transform = `translateX(${dist}px)`;
+    const w = topScreen.offsetWidth || window.innerWidth;
+    setRevealBehindProgress(topScreen, dist / w);
   });
 
   const handleMouseUp = () => {
@@ -950,12 +1007,14 @@ function initSwipeListeners(screenId) {
 
     if (dist > swipeThreshold) {
       topScreen.style.transform = 'translateX(100%)';
+      setRevealBehindProgress(topScreen, 1);
       setTimeout(() => {
         closeActiveScreen(screenId, true);
         resetTouchCoordinates();
       }, 180);
     } else {
       topScreen.style.transform = 'translateX(0)';
+      setRevealBehindProgress(topScreen, 0);
       setTimeout(() => {
         topScreen.style.transition = '';
         resetTouchCoordinates();
@@ -996,7 +1055,10 @@ function openScreen(screenId) {
     }
   }
 
-  if (parentContainer && window.innerWidth > 600 && !keepChatsScroll) {
+  if (isInsetMarginScreen(screen)) {
+    // Отступы задаются CSS (top/left: var(--margin))
+    screen.style.top = '';
+  } else if (parentContainer && window.innerWidth > 600 && !keepChatsScroll) {
     const currentScroll = parentContainer.scrollTop;
     screen.style.top = `${currentScroll}px`;
   } else {
@@ -1009,17 +1071,33 @@ function openScreen(screenId) {
   screen.style.transition = 'none';
   screen.style.transform = 'translateX(100%)';
   screen.style.zIndex = 100 + openedScreens.length;
-  screen.style.overflowY = 'auto'; 
+  screen.style.overflowY = 'auto';
+
+  const revealBehind = screen.hasAttribute('data-reveal-behind');
+  // Сначала интерфейс виден, затем плавно гаснет вместе со слайдом профиля
+  if (revealBehind) {
+    setRevealBehindProgress(screen, 1);
+  }
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       screen.style.transition = 'transform 0.18s ease';
       screen.classList.add('active');
-      screen.style.transform = ''; 
+      screen.style.transform = '';
+      if (revealBehind) {
+        setRevealBehindProgress(screen, 0, { animate: true });
+      }
     });
   });
 
   initSwipeListeners(screenId);
+
+  // Профиль / чат на desktop: явно оставить скролл списка чатов
+  if (keepChatsScroll && isDoveryChatListLayout()) {
+    document.querySelectorAll('.chats').forEach((el) => {
+      el.style.overflowY = 'auto';
+    });
+  }
 }
 
 // Закрытие экрана
@@ -1035,6 +1113,7 @@ function closeActiveScreen(screenId, isSwiped = false) {
     }
 
     const finalizeClose = () => {
+      clearRevealBehind(screen);
       screen.classList.add('hidden');
       screen.classList.remove('active');
       screen.style.transform = ''; 
@@ -1046,6 +1125,8 @@ function closeActiveScreen(screenId, isSwiped = false) {
     };
 
     if (!isSwiped) {
+      // При закрытии кнопкой плавно проявляем интерфейс за профилем
+      setRevealBehindProgress(screen, 1, { animate: true });
       screen.style.transition = 'transform 0.18s ease';
       screen.style.transform = 'translateX(100%)';
       setTimeout(finalizeClose, 180); 
@@ -1063,6 +1144,13 @@ function closeActiveScreen(screenId, isSwiped = false) {
       toggleInnerScroll(currentTopScreen, false);
     }
   }
+
+  // После профиля на desktop список чатов снова должен скроллиться
+  if (isDoveryChatListLayout()) {
+    document.querySelectorAll('.chats').forEach((el) => {
+      el.style.overflowY = 'auto';
+    });
+  }
 }
 
 // --- ЗАЩИТА ОТ СДВИГА ЭКРАНОВ ПРИ РЕСАЙЗЕ ---
@@ -1071,7 +1159,9 @@ window.addEventListener('resize', () => {
     const screen = document.querySelector(`[data-screen="${screenId}"]`);
     if (!screen) return;
 
-    if (window.innerWidth <= 600) {
+    if (isInsetMarginScreen(screen)) {
+      screen.style.top = '';
+    } else if (window.innerWidth <= 600) {
       screen.style.top = '0px';
     } else if (!shouldPreserveChatsScroll(screen)) {
       const parentContainer = screen.closest('.page, .messages, .chats');
@@ -1090,7 +1180,7 @@ window.addEventListener('resize', () => {
     document.querySelectorAll('.chats').forEach((el) => {
       const blockingOverlay = openedScreens.some((id) => {
         const s = document.querySelector(`[data-screen="${id}"]`);
-        return s && !isDoveryMessagesScreen(s);
+        return s && !isDoveryMessagesScreen(s) && !isDoveryProfileScreen(s);
       });
       if (!blockingOverlay) {
         el.style.overflowY = 'auto';

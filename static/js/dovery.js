@@ -110,58 +110,62 @@ async function calc_key_chat(myPrivateKey, opponentPublicKey) {
 
 let debounceTimer;
 
-function openProfile(userId, is_my_profile, url_open) {
-    const chat = document.querySelector('.chat-active-content');
-    const open = window.getComputedStyle(chat).display;
-    const user = chatsData[userId];
+function openProfile(userId, is_my_profile = false, url_open = false) {
+    if (!userId) {
+        userId = window.userId;
+        is_my_profile = true;
+    }
+    userId = userId != null ? String(userId) : '';
 
-    document.getElementById('chat-active-content').style.display = 'none';
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('profile-name').textContent = user.name;
+    const user = chatsData[userId];
+    if (!userId || !user) {
+        d_alert("Ошибка", "Профиль не найден", "ok");
+        return;
+    }
+
+    document.getElementById('profile-name').textContent = user.name || '';
     document.getElementById('profile-id').textContent = userId;
-    document.getElementById('profile-status').textContent = user.status;
-    document.getElementById('profile-username').textContent = '@' + user.username;
+    document.getElementById('profile-status').textContent = user.status || 'был(а) недавно';
+    document.getElementById('profile-username').textContent = '@' + (user.username || '');
 
     const avatar = document.getElementById('profile-avatar');
-    if (avatar && chatsData[userId]?.avatar) {
-        avatar.querySelector('.ava')?.remove();
-
-        // Парсим строку HTML из chatsData в реальный элемент
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(chatsData[userId].avatar, 'text/html');
-        const avatarElement = doc.body.firstChild;
-
-        // Если у элемента есть класс letter-ava, меняем его на letter-ava1
-        if (avatarElement && avatarElement.classList.contains('letter-ava')) {
-            avatarElement.classList.replace('letter-ava', 'letter-ava1');
-            avatarElement.classList.replace('letter-ava', 'letter-ava1');
+    if (avatar) {
+        avatar.innerHTML = '';
+        if (user.avatar) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(user.avatar, 'text/html');
+            const avatarElement = doc.body.firstChild;
+            if (avatarElement && avatarElement.classList && avatarElement.classList.contains('letter-ava')) {
+                avatarElement.classList.replace('letter-ava', 'letter-ava1');
+            }
+            if (avatarElement) avatar.appendChild(avatarElement);
         }
-
-        // Вставляем измененный элемент внутрь контейнера
-        avatar.prepend(avatarElement);
     }
 
-    if (is_my_profile) {
-        document.getElementById('profile-open-chat').classList.add('hidden');
-    }
-    document.getElementById('close-profile').onclick = function() {
-        closeProfile();
-    }
-
-    document.getElementById('profile-open-chat').onclick = function() {
-        closeProfile();
-        if (url_open) {
-            startChat(userId);
+    const openChatBtn = document.getElementById('profile-open-chat');
+    if (openChatBtn) {
+        // Из шапки чата / свой профиль — кнопка не нужна
+        if (is_my_profile || !url_open) {
+            openChatBtn.classList.add('hidden');
+        } else {
+            openChatBtn.classList.remove('hidden');
+            openChatBtn.onclick = function () {
+                closeProfile();
+                if (url_open) startChat(userId);
+                openDirectWindow(userId);
+            };
         }
-        openDirectWindow(userId);
-    };
-    document.getElementById('profile-block').classList.remove('hidden');
+    }
+
+    openScreen('3');
 }
 
 function closeProfile() {
-    document.getElementById('chat-active-content').style.display = 'flex';
-    document.getElementById('profile-block').classList.add('hidden');
+    closeActiveScreen('3');
 }
+
+window.openProfile = openProfile;
+window.closeProfile = closeProfile;
 
 document.getElementById('search-field').addEventListener('input', function(e) {
     const query = e.target.value.trim();
@@ -214,10 +218,16 @@ socket.on("user_status_update", (data) => {
             currentStatus.textContent = data.status;
         }
 
-        // const profile = document.getElementById("profile-id").textContent;
-        // if (profile === userId) {
-        //     document.getElementById("profile-status").textContent = data.status;
-        // }
+        const profileScreen = document.getElementById('profile-screen');
+        const profileId = document.getElementById('profile-id');
+        if (
+            profileScreen
+            && !profileScreen.classList.contains('hidden')
+            && profileId
+            && profileId.textContent === userId
+        ) {
+            document.getElementById('profile-status').textContent = data.status;
+        }
 
         const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
         if (currentChatElem) {
@@ -298,9 +308,9 @@ async function openDirectWindow(userId) {
         const container = document.getElementById('id_ept');
         container.textContent = userId; 
 
-        // if (headerPanel) {
-        //     headerPanel.onclick = () => {openProfile(userId, false, false);};
-        // }   
+        if (headerPanel) {
+            headerPanel.onclick = () => openProfile(userId, false, false);
+        }
         try {
             const private_key = await get_private_key(); 
             const public_key = await get_public_key(user.publicKey);
@@ -790,7 +800,7 @@ request.onsuccess = (event) => {
   getRequest.onsuccess = () => {
     const data = getRequest.result;
     if (data) {
-      userId = data.id;
+      window.userId = String(data.id);
     }
   };
 };
@@ -1217,7 +1227,6 @@ function setMessageContent(el, text) {
     if (text == null || text === '') return;
 
     const source = String(text);
-    // http(s), www, t.me/, domain.tld (/path), @username
     const urlPart =
         String.raw`https?:\/\/[^\s<]+` +
         String.raw`|www\.[^\s<]+` +

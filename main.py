@@ -740,7 +740,34 @@ def get_user_data_api(user_id):
         return jsonify({"error": "User not found"}), 404
 
     user_id_int = int(user['id'])
-    
+
+    if user_id_int in online_users:
+        status = 'в сети'
+    else:
+        status = 'был(а) недавно'
+    return jsonify({
+        "id": user['id'],
+        "username": user['username'],
+        "name": user['name'],
+        "avatar": user['avatar'] if user['avatar'] else "",
+        "public_key": user['public_key'],
+        "status": status
+    })
+
+@app.route('/get_user_by_username/<username>')
+def get_user_by_username_api(username):
+    """API для получения данных пользователя по username (без авторизации)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user_id_int = int(user['id'])
+
     if user_id_int in online_users:
         status = 'в сети'
     else:

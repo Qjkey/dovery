@@ -184,6 +184,99 @@ document.getElementById('search-field').addEventListener('input', function(e) {
 
 const chatsData = {};
 
+// Кэш пользователей по username для быстрого доступа при клике на @username в сообщениях
+const usernameCache = {};
+
+/**
+ * Получает данные пользователя по username.
+ * Сначала проверяет кэш, если нет — делает запрос на сервер.
+ * @param {string} username - username без символа @
+ * @returns {Promise<Object|null>} - данные пользователя или null
+ */
+async function getUserByUsername(username) {
+    if (!username) return null;
+
+    // Проверяем кэш
+    if (usernameCache[username]) {
+        return usernameCache[username];
+    }
+
+    try {
+        const response = await fetch(`/get_user_by_username/${encodeURIComponent(username)}`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                return null;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const user = await response.json();
+
+        // Кэшируем результат
+        usernameCache[username] = user;
+
+        return user;
+    } catch (err) {
+        console.error("Ошибка при получении пользователя по username:", err);
+        return null;
+    }
+}
+
+/**
+ * Открывает профиль пользователя по username.
+ * Если пользователь есть в кэше chatsData — открывает сразу.
+ * Иначе запрашивает данные с сервера и кэширует.
+ * @param {string} username - username без символа @
+ */
+async function openProfileByUsername(username) {
+    if (!username) return;
+
+    // Сначала проверяем, есть ли пользователь в chatsData (по username)
+    for (const userId in chatsData) {
+        if (chatsData[userId].username === username) {
+            openProfile(userId, false, false);
+            return;
+        }
+    }
+
+    // Проверяем кэш по username
+    const user = await getUserByUsername(username);
+    if (!user) {
+        d_alert("Ошибка", "Пользователь не найден", "ok");
+        return;
+    }
+
+    const userId = String(user.id);
+
+    // Если уже есть в chatsData, просто открываем профиль
+    if (chatsData[userId]) {
+        openProfile(userId, false, false);
+        return;
+    }
+
+    // Формируем аватар
+    let avatarHtml = '';
+    if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
+        avatarHtml = `<img src="static/files/avatars/${user.avatar}" class="ava">`;
+    } else {
+        const firstLetter = user.name ? user.name.charAt(0).toUpperCase() : '?';
+        avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+    }
+
+    // Добавляем в кэш
+    chatsData[userId] = {
+        username: user.username,
+        name: user.name,
+        avatar: avatarHtml,
+        publicKey: user.public_key,
+        status: user.status
+    };
+
+    openProfile(userId, false, false);
+}
+
+window.getUserByUsername = getUserByUsername;
+window.openProfileByUsername = openProfileByUsername;
+
 async function startChat(userId) {
     try {
         const response = await fetch('/add', {
@@ -1273,9 +1366,18 @@ function setMessageContent(el, text) {
                 el.appendChild(document.createTextNode(trailing));
             }
         } else if (match[2]) {
+            const currentMention = match[2]; 
+
             const span = document.createElement('span');
             span.className = 'msg-mention';
-            span.textContent = match[2];
+            span.textContent = currentMention;
+            span.style.cursor = 'pointer';
+            span.title = 'Открыть профиль';
+            span.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const username = currentMention.slice(1);
+                openProfileByUsername(username);
+            });
             el.appendChild(span);
         }
 

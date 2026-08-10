@@ -18,10 +18,10 @@ async function loadMyChats() {
         }
         const chats = await response.json();
         const listContainer = document.getElementById('chats-list');
-        let inx = 1;
+        let inx = 0;
         listContainer.innerHTML = ''; 
 
-        if (!chats || chats.length <= 1) {
+        if (!chats || chats.length === 0) {
             const big_header = document.createElement('div');
             big_header.className = 'big-header';
             big_header.onclick = () => openScreen(1);
@@ -33,7 +33,8 @@ async function loadMyChats() {
             listContainer.appendChild(big_header);
         }
 
-        chats.forEach(chat => {
+        window.chatIdToUserId = window.chatIdToUserId || {};
+        chats.forEach((chat, index) => {
             const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
 
             let avatarHtml = '';
@@ -47,19 +48,22 @@ async function loadMyChats() {
             }
 
             chatsData[String(chat.id)] = {
+                chatId: chat.chat_id,
+                userId: chat.id,
                 username: chat.username,
                 name: chat.name,
                 avatar: avatarHtml,
                 publicKey: chat.public_key,
                 status: currentStatus
             };
+            window.chatIdToUserId[chat.chat_id] = String(chat.id);
             if (String(chat.id) === String(window.userId)) return;
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
             const str_status = currentStatus === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
             let sepa = "";
-            if (inx !== chats.length - 1) {
+            if (index < chats.length - 1) {
                 sepa = "separator";
             }
             const safeName = escapeHtml(chat.name);
@@ -74,9 +78,8 @@ async function loadMyChats() {
                     </div>
                 </div>
             `;
-            // <div class="element"><div class="badge caption2">5</div></div>
             item.onclick = async () => {
-                await openDirectWindow(chat.id);
+                await openDirectWindow(chat.chat_id);
             };
             listContainer.appendChild(item);
             inx++;

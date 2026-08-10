@@ -124,6 +124,60 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row 
     return conn
 
+# Миграция схемы БД: добавляем chat_id в messages и id в chats
+def migrate_schema():
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("PRAGMA table_info(chats)")
+            chats_columns = [row[1] for row in cursor.fetchall()]
+            
+            cursor.execute("PRAGMA table_info(message)")
+            message_columns = [row[1] for row in cursor.fetchall()]
+            
+            if 'id' not in chats_columns:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS chats_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_one_id INTEGER NOT NULL,
+                        user_two_id INTEGER NOT NULL,
+                        UNIQUE(user_one_id, user_two_id)
+                    )
+                ''')
+                cursor.execute('INSERT INTO chats_new (user_one_id, user_two_id) SELECT user_one_id, user_two_id FROM chats')
+                cursor.execute('DROP TABLE chats')
+                cursor.execute('ALTER TABLE chats_new RENAME TO chats')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_chats_users ON chats(user_one_id, user_two_id)')
+            
+            if 'chat_id' not in message_columns:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS message_new (
+                        id TEXT PRIMARY KEY,
+                        chat_id INTEGER NOT NULL,
+                        sender_id INTEGER NOT NULL,
+                        message_text TEXT NOT NULL,
+                        time TEXT NOT NULL,
+                        FOREIGN KEY (chat_id) REFERENCES chats(id)
+                    )
+                ''')
+                cursor.execute('''
+                    INSERT INTO message_new (id, chat_id, sender_id, message_text, time)
+                    SELECT m.id, c.id, m.sender_id, m.message_text, m.time
+                    FROM message m
+                    JOIN chats c ON (CAST(m.sender_id AS INTEGER) = c.user_one_id AND CAST(m.receiver_id AS INTEGER) = c.user_two_id)
+                       OR (CAST(m.sender_id AS INTEGER) = c.user_two_id AND CAST(m.receiver_id AS INTEGER) = c.user_one_id)
+                ''')
+                cursor.execute('DROP TABLE message')
+                cursor.execute('ALTER TABLE message_new RENAME TO message')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_chat_id ON message(chat_id)')
+            
+            conn.commit()
+    except Exception as e:
+        print(f"Ошибка миграции схемы БД: {e}")
+
+migrate_schema()
+
 # Генерация id
 def generate_id(length=10):
     first_digit = secrets.choice(string.digits[1:]) 
@@ -157,7 +211,7 @@ def save_session(raw_token, user_id):
         return False
 
 # Сохранение сообщения
-def save_message(sender_id, receiver_id, encrypted_text, msg_id):
+def save_message(chat_id, sender_id, encrypted_text, msg_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -165,9 +219,9 @@ def save_message(sender_id, receiver_id, encrypted_text, msg_id):
             time_iso = utc_now.isoformat()
 
             cursor.execute('''
-                INSERT INTO message (id, sender_id, receiver_id, message_text, time)
+                INSERT INTO message (id, chat_id, sender_id, message_text, time)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (msg_id, sender_id, receiver_id, encrypted_text, time_iso))
+            ''', (msg_id, chat_id, sender_id, encrypted_text, time_iso))
             conn.commit()
             return time_iso
     except Exception as e:
@@ -237,19 +291,19 @@ def get_user_s_chats(user_id):
 
     query = """
         SELECT 
+            c.id AS chat_id,
             CASE 
-                WHEN user_one_id = ? THEN user_two_id 
-                ELSE user_one_id 
+                WHEN c.user_one_id = ? THEN c.user_two_id 
+                ELSE c.user_one_id 
             END AS contact_id
-        FROM chats 
-        WHERE user_one_id = ? OR user_two_id = ?
+        FROM chats c
+        WHERE c.user_one_id = ? OR c.user_two_id = ?
     """
     
     try:
         cursor.execute(query, (user_id, user_id, user_id))
         rows = cursor.fetchall()
-        contact_ids = [str(row['contact_id']) for row in rows]
-        return contact_ids
+        return [{'chat_id': row['chat_id'], 'contact_id': str(row['contact_id'])} for row in rows]
     except sqlite3.OperationalError as e:
         print(f"[SQLite Error] Ошибка при чтении контактов: {e}")
         return []
@@ -260,11 +314,11 @@ def get_user_s_chats(user_id):
 # Отправка статуса пользователя в сети / был(а) недавно
 def send_user_status(user_id, status):
     chats = get_user_s_chats(user_id)
-    for i in chats:
+    for chat in chats:
         socketio.emit(
             'user_status_update', 
             {'user_id': user_id, 'status': status}, 
-            to=f"user_{i}"
+            to=f"user_{chat['contact_id']}"
         )
 
 def check_username(username):
@@ -312,17 +366,25 @@ def delete_message(msg_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT receiver_id, sender_id FROM message WHERE id = ?", (msg_id,)) 
+            cursor.execute("SELECT chat_id, sender_id FROM message WHERE id = ?", (msg_id,)) 
             row = cursor.fetchone()
         
             if not row: 
                 return False
             
-            receiver_id, sender_id = row[0], row[1]
+            chat_id, sender_id = row[0], row[1]
+            
+            cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
+            chat_row = cursor.fetchone()
+            if not chat_row:
+                return False
+            
+            user_one_id, user_two_id = chat_row[0], chat_row[1]
+            other_user_id = user_two_id if sender_id == user_one_id else user_one_id
             
             cursor.execute("DELETE FROM message WHERE id = ?", (msg_id,))
             conn.commit()
-            return receiver_id, sender_id
+            return chat_id, sender_id, other_user_id
     except Exception as e:
         print(e)
         return False
@@ -550,11 +612,17 @@ def add_to_chats():
     conn = get_db_connection()
     try:
         u1, u2 = sorted([int(current_user_id), int(target_id)])
-        conn.execute('''INSERT or IGNORE INTO chats (user_one_id, user_two_id) VALUES (?, ?)''', (u1, u2,))
+        cursor = conn.cursor()
+        cursor.execute('''INSERT OR IGNORE INTO chats (user_one_id, user_two_id) VALUES (?, ?)''', (u1, u2,))
         conn.commit()
+        
+        cursor.execute('SELECT id FROM chats WHERE user_one_id = ? AND user_two_id = ?', (u1, u2))
+        chat_row = cursor.fetchone()
+        chat_id = chat_row['id'] if chat_row else None
+        
         socketio.emit('chat_created', to=f"user_{target_id}")
         
-        return jsonify({"status": "ok"})
+        return jsonify({"status": "ok", "chat_id": chat_id})
     except Exception as e:
         print(f"Ошибка сохранения чата: {e}")
         return jsonify({"status": "error"}), 500
@@ -571,6 +639,7 @@ def get_my_chats():
     
     query_chats = '''
         SELECT 
+            c.id AS chat_id,
             u.id, 
             u.username, 
             u.name, 
@@ -583,19 +652,7 @@ def get_my_chats():
     chats_rows = conn.execute(query_chats, (current_user_id, current_user_id, current_user_id)).fetchall()
     chats = [dict(chat) for chat in chats_rows]
 
-    # 2. Получаем данные самого пользователя
-    query_self = '''
-        SELECT id, username, name, avatar, public_key
-        FROM users 
-        WHERE id = ?
-    '''
-    self_row = conn.execute(query_self, (current_user_id,)).fetchone()
-    
     conn.close()
-
-    # 3. Добавляем себя в список, если пользователь найден в БД
-    if self_row:
-        chats.append(dict(self_row))
 
     for chat in chats:
         user_id_str = int(chat['id'])
@@ -609,7 +666,7 @@ def get_my_chats():
 # Сокеты отправка сообщения
 @socketio.on('send_direct_message')
 def handle_message(data):
-    receiver_id = data.get('receiver_id')
+    chat_id = data.get('chat_id')
     encrypted_text = data.get('text')
     msg_id = data.get('msgId')
     sender_id = get_current_user_id()
@@ -618,7 +675,7 @@ def handle_message(data):
         emit('message_error', {'code': 'unauthorized', 'msg_id': msg_id})
         return
 
-    if not receiver_id or not encrypted_text or not msg_id:
+    if not chat_id or not encrypted_text or not msg_id:
         emit('message_error', {'code': 'invalid', 'msg_id': msg_id})
         return
 
@@ -630,7 +687,24 @@ def handle_message(data):
         emit('message_error', {'code': 'rate_limit', 'msg_id': msg_id})
         return
 
-    time_iso = save_message(sender_id, receiver_id, encrypted_text, msg_id)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
+        chat_row = cursor.fetchone()
+        if not chat_row:
+            emit('message_error', {'code': 'invalid_chat', 'msg_id': msg_id})
+            return
+        
+        user_one_id, user_two_id = chat_row[0], chat_row[1]
+        receiver_id = user_two_id if sender_id == user_one_id else user_one_id
+    except Exception as e:
+        emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
+        return
+    finally:
+        conn.close()
+
+    time_iso = save_message(chat_id, sender_id, encrypted_text, msg_id)
     if not time_iso:
         emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
         return
@@ -639,7 +713,7 @@ def handle_message(data):
         'msg_id': msg_id,
         'text': encrypted_text,
         'sender_id': sender_id,
-        'receiver_id': receiver_id,
+        'chat_id': chat_id,
         'time': time_iso
     }
 
@@ -651,46 +725,57 @@ def handle_message(data):
 def handle_delete(data):
     msg_id = data.get('msg_id')
 
-    id, sender_id = delete_message(msg_id)
-    if id:
-        emit('message_deleted', {'msg_id': msg_id}, to=f"user_{id}")
-        emit('message_deleted', {'msg_id': msg_id}, to=f"user_{sender_id}")
+    result = delete_message(msg_id)
+    if result:
+        chat_id, sender_id, other_user_id = result
+        emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{other_user_id}")
+        emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{sender_id}")
 
 # Получить историю чата
-@app.route('/get_history_messages/<int:second_id>')
-def get_history(second_id):
+@app.route('/get_history_messages/<int:chat_id>')
+def get_history(chat_id):
     user_id = get_current_user_id()
-    
-    # Получаем ID самого старого сообщения на фронтенде (если оно есть)
-    last_id = request.args.get('last_id', default=None, type=int)
+    if not user_id:
+        return jsonify([]), 401
     
     try:
         conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
+        chat_row = cursor.fetchone()
+        if not chat_row:
+            conn.close()
+            return jsonify([]), 403
+        
+        user_one_id, user_two_id = chat_row[0], chat_row[1]
+        if int(user_id) not in (int(user_one_id), int(user_two_id)):
+            conn.close()
+            return jsonify([]), 403
+        
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        last_id = request.args.get('last_id', default=None, type=int)
+        
         if last_id is not None:
-            # Подгрузка истории: выбираем сообщения МЕНЬШЕ, чем last_id
             cursor.execute('''
                 SELECT id, sender_id, message_text, time 
                 FROM message 
-                WHERE ((sender_id = ? AND receiver_id = ?) 
-                OR (sender_id = ? AND receiver_id  = ?))
+                WHERE chat_id = ?
                 AND id < ?
                 ORDER BY id DESC 
-            ''', (user_id, second_id, second_id, user_id, last_id))
+            ''', (chat_id, last_id))
         else:
-            # Первая загрузка чата: берем просто последние 15 сообщений
             cursor.execute('''
                 SELECT id, sender_id, message_text, time 
                 FROM message 
-                WHERE (sender_id = ? AND receiver_id = ?) 
-                OR (sender_id = ? AND receiver_id  = ?)
+                WHERE chat_id = ?
                 ORDER BY id DESC 
-            ''', (user_id, second_id, second_id, user_id))
+            ''', (chat_id,))
         
         rows = cursor.fetchall()
         messages = [dict(row) for row in reversed(rows)]
+        conn.close()
         
         return jsonify(messages)
     except Exception as e:
@@ -785,8 +870,8 @@ def get_user_by_username_api(username):
 @socketio.on('delete_chat')
 def delete_chat(data):
     try:
-        user_id = data.get('id')
-        if not user_id:
+        chat_id = data.get('id')
+        if not chat_id:
             return
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -795,28 +880,23 @@ def delete_chat(data):
 
         userid = get_current_user_id()
 
-        cursor.execute(
-            """
-            DELETE FROM message 
-            WHERE (sender_id = ? AND receiver_id = ?) 
-            OR (sender_id = ? AND receiver_id = ?);
-            """, 
-            (user_id, userid, userid, user_id)
-        )
-        cursor.execute(
-            """
-            DELETE FROM chats 
-            WHERE (user_one_id = ? AND user_two_id = ?) 
-            OR (user_one_id = ? AND user_two_id = ?);
-            """, 
-            (user_id, userid, userid, user_id)
-        )
+        cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
+        chat_row = cursor.fetchone()
+        if not chat_row:
+            conn.close()
+            return
+        
+        user_one_id, user_two_id = chat_row[0], chat_row[1]
+        other_user_id = user_two_id if userid == user_one_id else user_one_id
+
+        cursor.execute("DELETE FROM message WHERE chat_id = ?", (chat_id,))
+        cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
         
         conn.commit()
         conn.close() 
         
-        emit('chat_deleted', {'chat_s': user_id}, to=f"user_{userid}")
-        emit('chat_deleted', {'chat_s': userid}, to=f"user_{user_id}")
+        emit('chat_deleted', {'chat_id': chat_id}, to=f"user_{userid}")
+        emit('chat_deleted', {'chat_id': chat_id}, to=f"user_{other_user_id}")
     except Exception as e:
         print(f"Ошибка при удалении чата через сокет: {e}")
 

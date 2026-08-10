@@ -144,15 +144,20 @@ function openProfile(userId, is_my_profile = false, url_open = false) {
 
     const openChatBtn = document.getElementById('profile-open-chat');
     if (openChatBtn) {
-        // Из шапки чата / свой профиль — кнопка не нужна
         if (is_my_profile || !url_open) {
             openChatBtn.classList.add('hidden');
         } else {
             openChatBtn.classList.remove('hidden');
             openChatBtn.onclick = function () {
                 closeProfile();
-                if (url_open) startChat(userId);
-                openDirectWindow(userId);
+                if (url_open) {
+                    startChat(userId);
+                } else {
+                    const chatId = getChatIdByUserId(userId);
+                    if (chatId) {
+                        openDirectWindow(chatId);
+                    }
+                }
             };
         }
     }
@@ -286,8 +291,11 @@ async function startChat(userId) {
         });
 
         if (response.ok) {
+            const data = await response.json();
             await loadMyChats();
-            await openDirectWindow(userId);
+            if (data.chat_id) {
+                await openDirectWindow(data.chat_id);
+            }
             closeActiveScreen(1);
         }
     } catch (err) {
@@ -299,12 +307,14 @@ socket.on("user_status_update", (data) => {
     try {
         const userId = String(data.user_id);
         const idEpt = document.getElementById('id_ept');
+        const activeChatId = idEpt ? idEpt.innerText : null;
+        const activePartnerId = activeChatId ? window.chatIdToUserId[activeChatId] : null;
         
         if (chatsData[userId]) {
             chatsData[userId].status = data.status;
         }
 
-        if (idEpt && userId === idEpt.textContent) {
+        if (idEpt && userId === activePartnerId) {
             const currentStatus = document.getElementById('user-status');
             const str_status = data.status === 'в сети' ? 'active' : 'subtitle';
             currentStatus.className = `subtitle2 ${str_status}`;
@@ -339,6 +349,15 @@ socket.on("user_status_update", (data) => {
 
 window.keychat = null;
 
+function getChatIdByUserId(userId) {
+    for (const chatId in window.chatIdToUserId) {
+        if (window.chatIdToUserId[chatId] === String(userId)) {
+            return chatId;
+        }
+    }
+    return null;
+}
+
 const tx = document.getElementById('messages-textarea');
 const ma = document.getElementById('messages-area');
 const bottomBar = document.querySelector('.bottom-bar');
@@ -366,16 +385,20 @@ tx.addEventListener('input', function() {
     ma.style.paddingBottom = `calc(${totalBarHeight}px)`
 });
 
-async function openDirectWindow(userId) {
+async function openDirectWindow(chatId) {
     try {
-        const user = chatsData[userId];
+        const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+        if (!partnerId) { 
+            return;
+        }
+        const user = chatsData[partnerId];
         if (!user) { 
             return;
         }
         document.querySelectorAll('.open_chat').forEach(elem => {
             elem.classList.remove('open_chat');
         });
-        const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
+        const currentChatElem = document.querySelector(`[data-user-id="${partnerId}"]`);
         const screenWidth = window.innerWidth;
 
         if (screenWidth > 751) {
@@ -399,21 +422,21 @@ async function openDirectWindow(userId) {
         if (headerAvatar) headerAvatar.innerHTML = user.avatar;
 
         const container = document.getElementById('id_ept');
-        container.textContent = userId; 
+        container.textContent = chatId; 
 
         if (headerPanel) {
-            headerPanel.onclick = () => openProfile(userId, false, false);
+            headerPanel.onclick = () => openProfile(partnerId, false, false);
         }
         try {
             const private_key = await get_private_key(); 
             const public_key = await get_public_key(user.publicKey);
             window.keychat = await calc_key_chat(private_key, public_key);
-            chatsData[userId].keychat = window.keychat;
+            chatsData[partnerId].keychat = window.keychat;
         } catch (err) {
             console.error("Ошибка установки защищенного соединения:", err);
         }
         msgInput.value = '';
-        loadChat(userId);
+        loadChat(chatId);
         document.getElementById('no-chat-content').classList.add('hidden');
         document.getElementById('chat-content').classList.remove('hidden');
         // На планшете/ноуте панель сообщений уже видна — openScreen только блокировал скролл списка
@@ -565,43 +588,34 @@ window.snapDelete = async function(id) {
 
 socket.on('message_deleted', async (data) => {
     try {
-        // Получаем ID текущего открытого чата
-        const activeChatUserId = document.getElementById('id_ept') ? document.getElementById('id_ept').innerText : null;
+        const chatId = data.chat_id;
         let shouldRemoveDateHeader = false;
         let dateLabelToRemove = null;
 
-        Object.keys(chatHash).forEach(chatId => {
-            // Находим удаляемое сообщение в хэше, чтобы узнать его время
+        if (typeof chatHash !== 'undefined' && chatHash[chatId]) {
             const msgToDelete = chatHash[chatId].messages.find(msg => msg.id === data.msg_id);
             
             if (msgToDelete) {
                 dateLabelToRemove = getShortDateLabel(msgToDelete.time);
                 
-                // Фильтруем сообщения, удаляя нужное
                 chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
                 
-                // Если это текущий активный чат, проверяем, остались ли сообщения с такой же датой
-                if (chatId === activeChatUserId) {
-                    const hasMoreMessagesThisDay = chatHash[chatId].messages.some(
-                        msg => getShortDateLabel(msg.time) === dateLabelToRemove
-                    );
-                    // Если сообщений этого дня больше не осталось — помечаем плашку на удаление
-                    if (!hasMoreMessagesThisDay) {
-                        shouldRemoveDateHeader = true;
-                    }
+                const hasMoreMessagesThisDay = chatHash[chatId].messages.some(
+                    msg => getShortDateLabel(msg.time) === dateLabelToRemove
+                );
+                if (!hasMoreMessagesThisDay) {
+                    shouldRemoveDateHeader = true;
                 }
             }
-        });
+        }
 
         const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
         if (messageElement) {
             const wrapper = messageElement.closest('.message-wrapper');
             if (wrapper) {
                 try {
-                    // ЕСЛИ НУЖНО УДАЛИТЬ ДАТУ: Ищем соответствующую плашку в DOM
                     let dateHeaderElement = null;
                     if (shouldRemoveDateHeader && dateLabelToRemove) {
-                        // Ищем плашку, текст внутри которой совпадает с нашей датой
                         const headers = messagesArea.querySelectorAll('.chat-date-group');
                         for (let header of headers) {
                             if (header.textContent.trim() === dateLabelToRemove) {
@@ -611,26 +625,22 @@ socket.on('message_deleted', async (data) => {
                         }
                     }
 
-                    // Использование самого быстрого метода захвата
                     const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
                     
                     const width = wrapper.offsetWidth;
                     const height = wrapper.offsetHeight;
                     const rect = wrapper.getBoundingClientRect();
 
-                    // Мгновенно скрываем оригинал сообщения
                     wrapper.style.visibility = 'hidden';
                     
-                    // Если нашли плашку даты, тоже плавно её скрываем (растворяем через opacity)
                     if (dateHeaderElement) {
                         dateHeaderElement.style.transition = 'opacity 0.2s ease-out, transform 0.5s ease-out';
                         dateHeaderElement.style.opacity = '0';
                     }
 
-                    const layersCount = 20; // Минимум для Android
+                    const layersCount = 20;
                     const layers = [];
                     
-                    // Создаем слои БЕЗ заполнения пикселей сначала (для скорости)
                     for (let i = 0; i < layersCount; i++) {
                         const c = document.createElement('canvas');
                         c.width = width;
@@ -650,13 +660,11 @@ socket.on('message_deleted', async (data) => {
                         layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
                     }
 
-                    // Быстрое распределение
                     for (let i = 0; i < pixels.length; i += 12) { 
                         const x = (i / 4) % width;
                         const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
                         const d = layers[lIdx].imgData.data;
 
-                        // Копируем основной пиксель
                         d[i] = pixels[i]; 
                         d[i+1] = pixels[i+1]; 
                         d[i+2] = pixels[i+2]; 
@@ -674,7 +682,6 @@ socket.on('message_deleted', async (data) => {
                         setTimeout(() => l.c.remove(), 1000);
                     });
 
-                    // Удаляем элементы из DOM по окончании анимации
                     setTimeout(() => {
                         wrapper.remove();
                         if (dateHeaderElement) {
@@ -686,12 +693,13 @@ socket.on('message_deleted', async (data) => {
 
                 } catch (err) {
                     wrapper.remove();
-                    // Если в блоке анимации упала ошибка, аварийно удаляем и плашку тоже
-                    const headers = messagesArea.querySelectorAll('.chat-date-group');
-                    for (let header of headers) {
-                        if (header.textContent.trim() === dateLabelToRemove) {
-                            header.remove();
-                            break;
+                    if (dateHeaderElement) {
+                        const headers = messagesArea.querySelectorAll('.chat-date-group');
+                        for (let header of headers) {
+                            if (header.textContent.trim() === dateLabelToRemove) {
+                                header.remove();
+                                break;
+                            }
                         }
                     }
                     applyMessageGrouping(messagesArea);
@@ -1005,9 +1013,9 @@ function removeOptimisticMessage(msgId) {
         || messagesArea?.querySelector(`[data-id="${msgId}"]`)?.closest('.message-wrapper');
     if (el) el.remove();
 
-    const activeChatUserId = document.getElementById('id_ept')?.innerText;
-    if (activeChatUserId && chatHash[activeChatUserId]) {
-        chatHash[activeChatUserId].messages = chatHash[activeChatUserId].messages.filter(
+    const activeChatId = document.getElementById('id_ept')?.innerText;
+    if (activeChatId && chatHash[activeChatId]) {
+        chatHash[activeChatId].messages = chatHash[activeChatId].messages.filter(
             (m) => m.id !== msgId
         );
     }
@@ -1051,12 +1059,12 @@ async function sendMessage() {
     const msgId = "msg_" + generateId(15);
     const time = getPreciseISOString();
 
-    const receiverId = document.getElementById('id_ept').innerText;
+    const chatId = document.getElementById('id_ept').innerText;
 
     noteMessageSentClient();
 
     socket.emit('send_direct_message', {
-        receiver_id: receiverId,
+        chat_id: chatId,
         text: encryptedText,
         msgId: msgId
     });
@@ -1079,8 +1087,8 @@ async function sendMessage() {
 
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
-    if (chatHash[receiverId]) {
-        chatHash[receiverId].messages.push({
+    if (chatHash[chatId]) {
+        chatHash[chatId].messages.push({
             id: msgId,
             message_text: encryptedText,
             sender_id: userId,
@@ -1112,18 +1120,17 @@ socket.on('message_error', (data) => {
 
 socket.on('new_message', async (data) => {
     try {
-        // Текущий открытый чат на этой вкладке
-        const activeChatUserId = document.getElementById('id_ept') ? document.getElementById('id_ept').innerText : null;
+        const activeChatId = document.getElementById('id_ept') ? document.getElementById('id_ept').innerText : null;
         
         const isMe = (data.sender_id == window.userId);
-        
-        const chatPartnerId = isMe ? data.receiver_id : data.sender_id;
+        const chatId = data.chat_id;
+        const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
 
-        if (chatHash[chatPartnerId]) {
-            const isAlreadyExists = chatHash[chatPartnerId].messages.some(m => m.id === data.msg_id);
+        if (chatHash[chatId]) {
+            const isAlreadyExists = chatHash[chatId].messages.some(m => m.id === data.msg_id);
             
             if (!isAlreadyExists) {
-                chatHash[chatPartnerId].messages.push({
+                chatHash[chatId].messages.push({
                     id: data.msg_id,
                     message_text: data.text,
                     sender_id: data.sender_id,
@@ -1136,8 +1143,8 @@ socket.on('new_message', async (data) => {
         }
 
         // 2. Рендерим в DOM только если этот чат сейчас открыт перед глазами
-        if (activeChatUserId == chatPartnerId) {
-            const keyOwnerId = isMe ? data.receiver_id : data.sender_id;
+        if (activeChatId == chatId) {
+            const keyOwnerId = partnerId;
             console.log(keyOwnerId);
             console.log(chatsData[keyOwnerId]);
             if (!chatsData[keyOwnerId] || !chatsData[keyOwnerId].keychat) {
@@ -1218,23 +1225,23 @@ msgInput.addEventListener('keydown', async (e) => {
 
 const chatHash = {};
 
-async function loadChat(userId) {
+async function loadChat(chatId) {
     const messagesArea = document.getElementById('messages-area');
     messagesArea.innerHTML = '';
     hideStickyChatDate();
 
-    if (chatHash[userId]) {
-        const messages = await decryptAll(chatHash[userId].messages);
-        renderChat(messagesArea, messages, userId);
+    if (chatHash[chatId]) {
+        const messages = await decryptAll(chatHash[chatId].messages);
+        renderChat(messagesArea, messages, window.userId);
         return;
     } else {
         try {
-            const server = await fetch(`/get_history_messages/${userId}`);
+            const server = await fetch(`/get_history_messages/${chatId}`);
             const messages = await server.json();
             const safe = Array.isArray(messages) ? messages : [];
 
-            chatHash[userId] = {
-                id: userId,
+            chatHash[chatId] = {
+                id: chatId,
                 messages: safe.map(msg => ({
                     id: msg.id,
                     message_text: msg.message_text,
@@ -1243,8 +1250,8 @@ async function loadChat(userId) {
                 }))
             };
 
-            const decrypted = await decryptAll(chatHash[userId].messages);
-            renderChat(messagesArea, decrypted, userId);
+            const decrypted = await decryptAll(chatHash[chatId].messages);
+            renderChat(messagesArea, decrypted, window.userId);
         } catch (err) {
             console.error("Ошибка загрузки истории:", err);
         }
@@ -1262,7 +1269,7 @@ async function decryptAll(messages) {
     }));
 }
 
-function renderChat(messagesArea, messages, userId) {
+function renderChat(messagesArea, messages, currentUserId) {
     const fragment = document.createDocumentFragment();
     const sortedMessages = [...messages].sort((a, b) => {
         const dateA = new Date(a.time);
@@ -1271,8 +1278,8 @@ function renderChat(messagesArea, messages, userId) {
     });
 
     sortedMessages.forEach((msg, index) => {
-        const mne = msg.sender_id != userId;
-        const typeClass = mne ? 'sent' : 'received';
+        const mne = msg.sender_id != currentUserId;
+        const typeClass = mne ? 'received' : 'sent';
 
         const wrapper = document.createElement('div');
         wrapper.className = 'message-wrapper ' + typeClass;
@@ -1408,7 +1415,7 @@ window.delete_chat = delete_chat;
 
 socket.on('chat_deleted', async (data) => {
     try {
-        const deletedChatId = data.chat_s;
+        const deletedChatId = data.chat_id;
 
         if (typeof chatHash !== 'undefined' && chatHash[deletedChatId]) {
             delete chatHash[deletedChatId];

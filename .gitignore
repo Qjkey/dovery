@@ -1,6 +1,8 @@
 funcs.md
-venv/
+dovery/
 db/
 info.env
 dovery.db
 static/files
+.kilo/
+__pycache__/

@@ -110,14 +110,40 @@ async function calc_key_chat(myPrivateKey, opponentPublicKey) {
 
 let debounceTimer;
 
-function openProfile(userId, is_my_profile = false, url_open = false) {
+async function openProfile(userId, is_my_profile = false, url_open = false) {
     if (!userId) {
         userId = window.userId;
         is_my_profile = true;
     }
     userId = userId != null ? String(userId) : '';
 
-    const user = chatsData[userId];
+    let user = chatsData[userId];
+    if (!user) {
+        try {
+            const response = await fetch(`/get_use_profile/${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                let avatarHtml = '';
+                if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
+                    avatarHtml = `<img src="static/files/avatars/${data.avatar}" class="ava">`;
+                } else {
+                    const firstLetter = data.name ? data.name.charAt(0).toUpperCase() : '?';
+                    avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+                }
+                chatsData[userId] = {
+                    username: data.username,
+                    name: data.name,
+                    avatar: avatarHtml,
+                    publicKey: data.public_key,
+                    status: data.status
+                };
+                user = chatsData[userId];
+            }
+        } catch (e) {
+            console.error("Ошибка загрузки профиля:", e);
+        }
+    }
+
     if (!userId || !user) {
         d_alert("Ошибка", "Профиль не найден", "ok");
         return;
@@ -144,19 +170,17 @@ function openProfile(userId, is_my_profile = false, url_open = false) {
 
     const openChatBtn = document.getElementById('profile-open-chat');
     if (openChatBtn) {
-        if (is_my_profile || !url_open) {
+        if (is_my_profile) {
             openChatBtn.classList.add('hidden');
         } else {
             openChatBtn.classList.remove('hidden');
             openChatBtn.onclick = function () {
                 closeProfile();
-                if (url_open) {
-                    startChat(userId);
+                const chatId = getChatIdByUserId(userId);
+                if (chatId) {
+                    openDirectWindow(chatId);
                 } else {
-                    const chatId = getChatIdByUserId(userId);
-                    if (chatId) {
-                        openDirectWindow(chatId);
-                    }
+                    startChat(userId);
                 }
             };
         }
@@ -235,18 +259,18 @@ async function getUserByUsername(username) {
 async function openProfileByUsername(username) {
     if (!username) return;
 
-    // Сначала проверяем, есть ли пользователь в chatsData (по username)
+    const lowerUsername = username.toLowerCase();
+
     for (const userId in chatsData) {
-        if (chatsData[userId].username === username) {
+        if (chatsData[userId].username.toLowerCase() === lowerUsername) {
             openProfile(userId, false, false);
             return;
         }
     }
 
-    // Проверяем кэш по username
     const user = await getUserByUsername(username);
     if (!user) {
-        d_alert("Ошибка", "Пользователь не найден", "ok");
+        d_pop("Ошибка", "Пользователь не найден", "Оки");
         return;
     }
 
@@ -747,6 +771,96 @@ function hideStickyChatDate() {
     if (label) label.textContent = '';
 }
 
+function ensureSkeletonStyles() {
+    if (document.getElementById('skeleton-loading-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'skeleton-loading-styles';
+    style.textContent = `
+        .message-wrapper.loading-skeleton {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .message-wrapper.loading-skeleton .message-bubble {
+            background: linear-gradient(90deg, #e3e3e3 25%, #f3f3f3 50%, #e3e3e3 75%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.4s infinite linear;
+        }
+        .message-wrapper.loading-skeleton.sent .message-bubble {
+            background: linear-gradient(90deg, #d0d0d0 25%, #e8e8e8 50%, #d0d0d0 75%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.4s infinite linear;
+        }
+        .message-wrapper.loading-skeleton.received .message-bubble {
+            background: linear-gradient(90deg, #e3e3e3 25%, #f3f3f3 50%, #e3e3e3 75%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.4s infinite linear;
+        }
+        .message-wrapper.loading-skeleton .message-content {
+            color: transparent;
+            min-height: 10px;
+            width: 60%;
+            border-radius: 4px;
+        }
+        .message-wrapper.loading-skeleton .message-content::after {
+            content: '';
+            display: inline-block;
+            width: 100%;
+            height: 100%;
+        }
+        .message-wrapper.loading-skeleton .message-info {
+            opacity: 0.5;
+        }
+        .message-wrapper.loading-skeleton .message-info span {
+            color: transparent;
+        }
+        @keyframes skeletonShimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function createSkeletonMessage(type, textLines = 1) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper loading-skeleton ${type}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = `message-bubble ${type}`;
+    
+    const content = document.createElement('div');
+    content.className = 'message-content body1';
+    
+    const info = document.createElement('div');
+    info.className = 'message-info caption2';
+    info.innerHTML = '<span>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</span>';
+    
+    bubble.appendChild(content);
+    bubble.appendChild(info);
+    wrapper.appendChild(bubble);
+    return wrapper;
+}
+
+function showLoadingSkeletons(container) {
+    container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    
+    const patterns = [
+        { type: 'sent', lines: 2 },
+        { type: 'received', lines: 1 },
+        { type: 'sent', lines: 3 },
+        { type: 'received', lines: 2 },
+        { type: 'sent', lines: 1 },
+        { type: 'received', lines: 2 }
+    ];
+    
+    patterns.forEach(pattern => {
+        fragment.appendChild(createSkeletonMessage(pattern.type, pattern.lines));
+    });
+    
+    container.appendChild(fragment);
+}
+
 function updateStickyChatDate() {
     const { area, sticky } = getStickyDateElements();
     if (!area || !sticky) return;
@@ -1236,6 +1350,9 @@ async function loadChat(chatId) {
         return;
     } else {
         try {
+            ensureSkeletonStyles();
+            showLoadingSkeletons(messagesArea);
+            
             const server = await fetch(`/get_history_messages/${chatId}`);
             const messages = await server.json();
             const safe = Array.isArray(messages) ? messages : [];
@@ -1250,6 +1367,7 @@ async function loadChat(chatId) {
                 }))
             };
 
+            messagesArea.innerHTML = '';
             const decrypted = await decryptAll(chatHash[chatId].messages);
             renderChat(messagesArea, decrypted, window.userId);
         } catch (err) {

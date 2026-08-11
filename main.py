@@ -802,6 +802,7 @@ def ping():
 # Анализ username
 @app.route('/<string:username>')
 def get_user_profile(username):
+    username = username.lower()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM users WHERE username = ?", (username,))

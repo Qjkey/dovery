@@ -86,6 +86,7 @@ def allow_message_send(user_id):
     return True
 
 online_users = {}
+typing_in_chat = {}  # user_id -> chat_id
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
     app,
@@ -414,6 +415,48 @@ def handle_connect():
 
         online_users[user_id].add(request.sid)
 
+def get_chat_peer(chat_id, user_id):
+    if not chat_id or user_id is None:
+        return None
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT user_one_id, user_two_id FROM chats WHERE id = ?",
+            (chat_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        user_one_id, user_two_id = row[0], row[1]
+        if str(user_id) == str(user_one_id):
+            return user_two_id
+        if str(user_id) == str(user_two_id):
+            return user_one_id
+        return None
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+def emit_partner_typing(chat_id, sender_id, is_typing):
+    peer_id = get_chat_peer(chat_id, sender_id)
+    if peer_id is None:
+        return
+    socketio.emit(
+        'partner_typing',
+        {'chat_id': str(chat_id), 'typing': bool(is_typing)},
+        to=f"user_{peer_id}",
+    )
+
+
+def clear_user_typing(user_id):
+    chat_id = typing_in_chat.pop(user_id, None)
+    if chat_id is not None:
+        emit_partner_typing(chat_id, user_id, False)
+
+
 @socketio.on('disconnect')
 def handle_disconnect():
     user_id = get_current_user_id()
@@ -425,6 +468,7 @@ def handle_disconnect():
         if not online_users[user_id]:
             del online_users[user_id]
             send_user_status(user_id, 'был(а) недавно')
+            clear_user_typing(user_id)
 
 # Главная страница
 @app.route("/")
@@ -719,6 +763,39 @@ def handle_message(data):
 
     emit('new_message', data_mess, to=f"user_{receiver_id}")
     emit('new_message', data_mess, to=f"user_{sender_id}")
+
+
+@socketio.on('typing')
+def handle_typing(data):
+    sender_id = get_current_user_id()
+    if not sender_id or not isinstance(data, dict):
+        return
+
+    chat_id = data.get('chat_id')
+    is_typing = bool(data.get('typing'))
+    if not chat_id:
+        return
+
+    peer_id = get_chat_peer(chat_id, sender_id)
+    if peer_id is None:
+        return
+
+    if is_typing:
+        prev_chat = typing_in_chat.get(sender_id)
+        if prev_chat is not None and str(prev_chat) != str(chat_id):
+            emit_partner_typing(prev_chat, sender_id, False)
+        typing_in_chat[sender_id] = chat_id
+    else:
+        current_chat = typing_in_chat.get(sender_id)
+        if current_chat is None or str(current_chat) != str(chat_id):
+            return
+        typing_in_chat.pop(sender_id, None)
+
+    emit(
+        'partner_typing',
+        {'chat_id': str(chat_id), 'typing': is_typing},
+        to=f"user_{peer_id}",
+    )
 
 # Удаление сообщения сокет
 @socketio.on('delete_message')

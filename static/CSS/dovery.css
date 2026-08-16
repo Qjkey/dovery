@@ -19,7 +19,8 @@ html, body {
   #app.chats {
     flex-shrink: 0;
     width: var(--width-chat-list, 350px);
-    min-width: var(--width-chat-list, 350px);
+    min-width: 250px;
+    max-width: min(560px, calc(100vw - 380px));
   }
 
   #messages-host {
@@ -29,6 +30,10 @@ html, body {
     max-width: 100%;
     height: 100dvh;
     overflow: hidden;
+  }
+
+  .resizer {
+    display: block;
   }
 
   #message-chats.messages.screen {
@@ -201,18 +206,41 @@ html, body {
 
 /* Стили для разделителя */
 .resizer {
-  width: 1px;
+  display: none;
+  width: 10px;
+  margin-left: -5px;
+  margin-right: -5px;
+  padding: 0;
   cursor: col-resize;
   background-color: transparent;
   border: 0;
-  transition: background-color 0.1s;
-  z-index: 20;
+  outline: none;
+  z-index: 30;
   flex-shrink: 0;
-  right: -5;
+  align-self: stretch;
+  position: relative;
+  touch-action: none;
 }
 
-.resizer:hover, .resizer.dragging {
+.resizer::before {
+  content: '';
+  position: absolute;
+  top: var(--margin, 15px);
+  bottom: var(--margin, 15px);
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
   background-color: var(--tg-theme-section-separator-color);
+  opacity: 0.45;
+  transition: width 0.12s ease, opacity 0.12s ease, background-color 0.12s ease;
+  pointer-events: none;
+}
+
+.resizer:hover::before,
+.resizer.dragging::before {
+  width: 2px;
+  opacity: 1;
+  background-color: var(--tg-theme-button-color);
 }
 
 /* Изменения в медиа-запросах для ПК */
@@ -226,10 +254,6 @@ html, body {
     flex-shrink: 0;
     height: 100%;
     overflow-y: auto;
-  }
-  .resizer {
-    display: block;
-    border-right: 1px solid var(--tg-theme-section-separator-color);
   }
   .chat-window {
     flex-grow: 1;
@@ -284,10 +308,58 @@ html, body {
 }
 
 /* Отключение разделителя на мобильных устройствах */
-@media (max-width: 700px) {
+@media (max-width: 750px) {
   .resizer {
     display: none;
   }
+}
+
+#user-typing {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.typing-dots {
+  display: inline-flex;
+  min-width: 1.85em;
+  letter-spacing: 0.02em;
+}
+
+.typing-dots span {
+  opacity: 0;
+  animation-duration: 1.6s;
+  animation-iteration-count: infinite;
+  animation-timing-function: step-end;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-name: typing-dot-1;
+}
+.typing-dots span:nth-child(2) {
+  animation-name: typing-dot-2;
+}
+.typing-dots span:nth-child(3) {
+  animation-name: typing-dot-3;
+}
+
+@keyframes typing-dot-1 {
+  0% { opacity: 0; }
+  14% { opacity: 1; }
+  85% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes typing-dot-2 {
+  0% { opacity: 0; }
+  28% { opacity: 1; }
+  71% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes typing-dot-3 {
+  0% { opacity: 0; }
+  42% { opacity: 1; }
+  57% { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 .empty-state {

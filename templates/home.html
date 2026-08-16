@@ -69,7 +69,7 @@ Dovery
         <section><div id="search-results"></div></section>
     </div>
 </div>
-<button class="resizer" id="dragbar"></button>
+<button type="button" class="resizer" id="dragbar" tabindex="-1" aria-label="Изменить ширину списка чатов"></button>
 <!-- <div class="messages screen" data-screen="1" data-swipe>
     <div id="profile-block" class="profile-blocks hidden">
         <section>
@@ -187,6 +187,9 @@ Dovery
                             <div class="text twoline"> 
                                 <div class="label body1" id="user-name"></div> 
                                 <div class="subtitle subtitle2" id="user-status">был(а) недавно</div> 
+                                <div class="subtitle2 active hidden" id="user-typing" aria-live="polite">
+                                    <span class="typing-dots" style="width: 17px;" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span> Печатает
+                                </div>
                             </div>
                         </div>
                     </div>

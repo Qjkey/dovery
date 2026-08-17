@@ -1987,3 +1987,7 @@ textarea::placeholder {
     z-index: 10;
     flex-shrink: 0;
 }
+
+#scroll-to-bottom {
+    pointer-events: auto;
+}

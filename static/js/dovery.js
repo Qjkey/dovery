@@ -450,6 +450,39 @@ function getChatIdByUserId(userId) {
 const tx = document.getElementById('messages-textarea');
 const ma = document.getElementById('messages-area');
 const bottomBar = document.querySelector('.bottom-bar');
+const COMPOSER_BASE_HEIGHT = 77;
+const SCROLL_DOWN_ROW_HEIGHT = 62;
+
+function isScrollToBottomVisible() {
+    const row = document.getElementById('scroll-to-bottom');
+    return !!(row && !row.classList.contains('hidden'));
+}
+
+function getComposerBarHeight() {
+    if (!tx || !bottomBar) return COMPOSER_BASE_HEIGHT;
+    const currentRows = parseInt(tx.getAttribute('rows') || '1', 10);
+    let totalBarHeight;
+
+    if (currentRows <= 1) {
+        totalBarHeight = COMPOSER_BASE_HEIGHT;
+    } else {
+        const textareaHeight = tx.offsetHeight;
+        const barPaddingTop = parseFloat(window.getComputedStyle(bottomBar).paddingTop) || 0;
+        const barPaddingBottom = parseFloat(window.getComputedStyle(bottomBar).paddingBottom) || 0;
+        totalBarHeight = textareaHeight + barPaddingTop + barPaddingBottom;
+    }
+
+    if (isScrollToBottomVisible()) {
+        totalBarHeight += SCROLL_DOWN_ROW_HEIGHT;
+    }
+    return totalBarHeight;
+}
+
+function syncComposerBarLayout() {
+    const totalBarHeight = getComposerBarHeight();
+    if (bottomBar) bottomBar.style.top = `calc(100% - ${totalBarHeight}px)`;
+    if (ma) ma.style.paddingBottom = `${totalBarHeight}px`;
+}
 
 tx.addEventListener('input', function() {
     this.setAttribute('rows', '1');
@@ -457,21 +490,7 @@ tx.addEventListener('input', function() {
     const computedLineHeight = parseFloat(computedStyle.lineHeight);
     const currentRows = Math.round(this.scrollHeight / computedLineHeight);
     this.setAttribute('rows', currentRows);
-    
-    let totalBarHeight;
-
-    if (currentRows <= 1) {
-        totalBarHeight = 77;
-    } else {
-        const textareaHeight = this.offsetHeight; 
-        const barPaddingTop = parseFloat(window.getComputedStyle(bottomBar).paddingTop) || 0;
-        const barPaddingBottom = parseFloat(window.getComputedStyle(bottomBar).paddingBottom) || 0;
-        const totalPadding = barPaddingTop + barPaddingBottom;
-        
-        totalBarHeight = textareaHeight + totalPadding;
-    }
-    bottomBar.style.top = `calc(100% - ${totalBarHeight}px)`;
-    ma.style.paddingBottom = `calc(${totalBarHeight}px)`
+    syncComposerBarLayout();
 });
 
 async function openDirectWindow(chatId) {
@@ -1177,6 +1196,7 @@ function scheduleStickyChatDateUpdate() {
     stickyDateRaf = requestAnimationFrame(() => {
         stickyDateRaf = null;
         updateStickyChatDate();
+        updateScrollToBottomButton();
     });
 }
 
@@ -1346,8 +1366,46 @@ function scrollMessagesToLatest() {
     requestAnimationFrame(() => {
         messagesArea.scrollTop = 0;
         scheduleStickyChatDateUpdate();
+        updateScrollToBottomButton();
     });
 }
+
+function isChatScrolledFarUp() {
+    const area = document.getElementById('messages-area');
+    if (!area) return false;
+    const distance = Math.abs(area.scrollTop);
+    const threshold = Math.max(280, area.clientHeight * 0.85);
+    return distance > threshold;
+}
+
+function updateScrollToBottomButton() {
+    const row = document.getElementById('scroll-to-bottom');
+    if (!row) return;
+    const shouldShow = isChatScrolledFarUp();
+    const isShown = !row.classList.contains('hidden');
+    if (shouldShow === isShown) return;
+    row.classList.toggle('hidden', !shouldShow);
+    if (bottomBar) bottomBar.classList.toggle('has-scroll-down', shouldShow);
+    syncComposerBarLayout();
+}
+
+function initScrollToBottomButton() {
+    const btn = document.getElementById('scroll-to-bottom-btn');
+    if (!btn || btn.dataset.bound === '1') {
+        updateScrollToBottomButton();
+        return;
+    }
+    btn.dataset.bound = '1';
+    btn.addEventListener('pointerdown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollMessagesToLatest();
+    });
+    updateScrollToBottomButton();
+}
+
+document.addEventListener('DOMContentLoaded', initScrollToBottomButton);
+if (document.readyState !== 'loading') initScrollToBottomButton();
 
 function isWideChatLayout() {
     // Планшет/ноут: список чатов виден рядом с перепиской
@@ -1358,8 +1416,7 @@ function resetMessageComposer() {
     msgInput.value = '';
     msgInput.setAttribute('rows', '1');
     msgInput.style.height = 'auto';
-    if (bottomBar) bottomBar.style.top = 'calc(100% - 77px)';
-    if (ma) ma.style.paddingBottom = 'calc(77px)';
+    syncComposerBarLayout();
 }
 
 const MAX_MESSAGE_LENGTH = 1024;

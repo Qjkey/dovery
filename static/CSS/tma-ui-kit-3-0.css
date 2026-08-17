@@ -31,9 +31,9 @@
     );
     --main-gradient: linear-gradient(135deg, var(--bg-one) 0%, var(--bg-two) 50%, var(--bg-three) 100%);
     --blend-mode: normal, soft-light;
+    color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-    :root {
+:root[data-theme="dark"] {
         --tg-theme-bg-color: #1e1e1e;
         --tg-theme-section-bg-color: #191918;
         --tg-theme-secondary-bg-color: #000000;
@@ -69,8 +69,8 @@
             color-mix(in srgb, var(--rainbow-two) 30%, transparent) 50%, 
             color-mix(in srgb, var(--rainbow-three) 30%, transparent) 100%
         );
-        --blend-mode: exclusion, normal; 
-    }
+        --blend-mode: exclusion, normal;
+        color-scheme: dark;
 }
 .label {
     color: var(--tg-theme-text-color);

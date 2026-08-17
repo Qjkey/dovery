@@ -36,6 +36,9 @@ async function loadMyChats() {
         window.chatIdToUserId = window.chatIdToUserId || {};
         chats.forEach((chat, index) => {
             const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
+            const shownStatus = typeof window.displayedPresenceText === 'function'
+                ? window.displayedPresenceText(currentStatus, true)
+                : currentStatus;
 
             let avatarHtml = '';
             if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
@@ -61,7 +64,9 @@ async function loadMyChats() {
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
-            const str_status = currentStatus === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
+            const str_status = typeof window.presenceClass === 'function'
+                ? window.presenceClass(currentStatus, true)
+                : (currentStatus === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1');
             let sepa = "";
             if (index < chats.length - 1) {
                 sepa = "separator";
@@ -74,7 +79,7 @@ async function loadMyChats() {
                 <div class="right ${sepa}">
                     <div class="text twoline"> 
                         <div class="label body1">${safeName}</div> 
-                        <div class="label status_of_user_in_list_chats ${str_status}">${currentStatus}</div> 
+                        <div class="label status_of_user_in_list_chats ${str_status}">${escapeHtml(shownStatus)}</div> 
                     </div>
                 </div>
             `;

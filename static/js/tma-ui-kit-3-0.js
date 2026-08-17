@@ -165,14 +165,61 @@ function getTargetTextDiv(buttonElement) {
     return buttonElement.querySelector('.element > div');
 }
 
+function dropdownIconHtml(icon) {
+    if (!icon) return '';
+    const raw = String(icon).trim();
+    if (raw.startsWith('<')) {
+        return `<span class="icon-wrapper">${raw}</span>`;
+    }
+    return `<span class="icon-wrapper"><svg class="${raw}"><use href="#${raw}"></use></svg></span>`;
+}
+
+function positionTagDropdown(buttonElement, widthSize, anchor) {
+    const pad = 8;
+    const menuW = widthSize || 200;
+    tagDropdown.style.position = 'fixed';
+    tagDropdown.style.right = 'auto';
+    tagDropdown.style.maxHeight = '264px';
+    tagDropdown.style.display = 'block';
+
+    const menuH = tagDropdown.offsetHeight || 120;
+    let left;
+    let top;
+
+    if (anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)) {
+        left = anchor.x;
+        top = anchor.y;
+        if (top + menuH > window.innerHeight - pad) {
+            top = Math.max(pad, anchor.y - menuH);
+        }
+    } else {
+        const rect = buttonElement.getBoundingClientRect();
+        left = rect.right - menuW;
+        top = rect.top;
+        if (top + menuH > window.innerHeight - pad) {
+            top = Math.max(pad, rect.bottom - menuH);
+        }
+    }
+
+    if (left + menuW > window.innerWidth - pad) left = window.innerWidth - menuW - pad;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+
+    tagDropdown.style.left = `${left}px`;
+    tagDropdown.style.top = `${top}px`;
+}
+
 /**
  * Функция для отображения и заполнения выпадающего меню.
  * @param {HTMLElement} buttonElement - Кнопка, вызвавшая меню.
  * @param {Array<Object>} items - Список элементов для меню.
  * @param {'mark'|'icon'} type - Тип элементов ('mark' для radio-кнопок, 'icon' для ссылок с иконками).
+ * @param {{x:number, y:number}|null} [anchor] - Точка показа (ПКМ / долгое нажатие).
  */
-function showDropdown(buttonElement, items, type) {
+function showDropdown(buttonElement, items, type, anchor) {
+    if (!tagDropdown || !buttonElement) return;
 
+    tagDropdown.classList.remove('closing');
     tagDropdown.innerHTML = ''; // Очищаем предыдущие элементы
 
     // Получаем текущий текст из div внутри кнопки, чтобы отметить выбранный пункт в меню
@@ -221,6 +268,7 @@ function showDropdown(buttonElement, items, type) {
             `;
         } else if (type === 'icon') {
             const dangerClass = item.danger ? 'is-danger' : '';
+            const iconHtml = dropdownIconHtml(item.icon);
             if (item.link) {
                 if (!item.icon) {
                     width_size = 250;
@@ -233,9 +281,7 @@ function showDropdown(buttonElement, items, type) {
                     width_size = 200;
                     itemHtml = `
                         <a href="${item.link}" class="dropdown-item clicked">
-                            <span class="icon-wrapper">
-                                <svg class="${item.icon}"><use href="#${item.icon}"></use></svg>
-                            </span>
+                            ${iconHtml}
                             <span class="item-text ${dangerClass}">${item.label}</span>
                         </a>
                     `;
@@ -251,10 +297,8 @@ function showDropdown(buttonElement, items, type) {
                 } else {
                     width_size = 200;
                     itemHtml = `
-                            <a onclick="${item.onclick}" class="dropdown-item clicked">
-                                <span class="icon-wrapper">
-                                    <svg class="${item.icon}"><use href="#${item.icon}"></use></svg>
-                                </span>
+                            <a href="#" onclick="${item.onclick}; return false;" class="dropdown-item clicked">
+                                ${iconHtml}
                                 <span class="item-text ${dangerClass}">${item.label}</span>
                             </a>
                         `;
@@ -281,16 +325,8 @@ function showDropdown(buttonElement, items, type) {
         });
     }
 
-
-    // Позиционируем выпадающее меню согласно вашим требованиям
-    const buttonRect = buttonElement.getBoundingClientRect();
-    tagDropdown.style.top = `${buttonRect.top + window.scrollY}px`;
-    tagDropdown.style.left = `${buttonRect.right - width_size}px`;
-    tagDropdown.style.right = `auto`;
-    tagDropdown.style.maxHeight = '264px'; // 6 элементов
-
-    tagDropdown.style.display = 'block'; // Показываем меню
-    currentOpenButton = buttonElement; // Запоминаем кнопку, которая его открыла
+    currentOpenButton = buttonElement;
+    positionTagDropdown(buttonElement, width_size, anchor);
 
     // Если нет текущего текста в кнопке и не установлен выбор,
     // устанавливаем его на первый элемент ("Никакой")
@@ -312,19 +348,24 @@ function showDropdown(buttonElement, items, type) {
  * Функция для скрытия выпадающего меню.
  */
 function hideDropdown() {
-    // 1. Добавляем класс, который запускает анимацию bounceHide из CSS
-    tagDropdown.classList.add('closing');
-
-    // 2. Ждем окончания анимации (событие 'animationend')
-    tagDropdown.addEventListener('animationend', () => {
-        // 3. Только теперь скрываем элемент полностью
-        tagDropdown.style.display = 'none';
-        
-        // 4. Убираем класс закрытия, чтобы при следующем открытии он не мешал
-        tagDropdown.classList.remove('closing');
-        
+    if (!tagDropdown) return;
+    if (tagDropdown.style.display !== 'block') {
         currentOpenButton = null;
-    }, { once: true }); // { once: true } автоматически удалит обработчик после выполнения
+        return;
+    }
+    if (tagDropdown.classList.contains('closing')) return;
+
+    tagDropdown.classList.add('closing');
+    let finished = false;
+    const finish = () => {
+        if (finished) return;
+        finished = true;
+        tagDropdown.style.display = 'none';
+        tagDropdown.classList.remove('closing');
+        currentOpenButton = null;
+    };
+    tagDropdown.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, 280);
 }
 
 
@@ -342,6 +383,7 @@ document.querySelectorAll('[id^="cntxt_menu_btn_"]').forEach(button => {
 
     button.addEventListener('click', function(event) {
         event.stopPropagation(); // Предотвращаем закрытие меню сразу же по клику на документ
+        if (!tagDropdown) return;
 
         const buttonIdSuffix = this.id.split('_').pop(); // Извлекаем суффикс ID (например, '01')
 
@@ -382,16 +424,18 @@ document.querySelectorAll('[id^="cntxt_menu_btn_"]').forEach(button => {
 
 // Закрываем меню, если клик произошел вне его или вне кнопки, которая его открыла
 document.addEventListener('click', function(event) {
-    if (tagDropdown.style.display === 'block' &&
-        !tagDropdown.contains(event.target) && // Клик не внутри меню
-        currentOpenButton && !currentOpenButton.contains(event.target)) { // Клик не по открывшей кнопке
+    if (!tagDropdown || tagDropdown.style.display !== 'block') return;
+    if (
+        !tagDropdown.contains(event.target) &&
+        currentOpenButton && !currentOpenButton.contains(event.target)
+    ) {
         hideDropdown();
     }
 });
 
 // Дополнительно: закрываем меню по нажатию клавиши Escape
 document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape' && tagDropdown.style.display === 'block') {
+    if (event.key === 'Escape' && tagDropdown && tagDropdown.style.display === 'block') {
         hideDropdown();
     }
 });

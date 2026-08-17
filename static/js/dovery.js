@@ -341,11 +341,9 @@ socket.on("user_status_update", (data) => {
         if (idEpt && userId === activePartnerId) {
             const currentStatus = document.getElementById('user-status');
             if (currentStatus) {
-                const str_status = data.status === 'в сети' ? 'active' : 'subtitle';
-                const keepHidden = currentStatus.classList.contains('hidden');
-                currentStatus.className = `subtitle2 ${str_status}`;
+                const keepHidden = currentStatus.classList.contains('hidden') && !getConnectionStatusLabel();
+                setOpenChatPresence(data.status);
                 if (keepHidden) currentStatus.classList.add('hidden');
-                currentStatus.textContent = data.status;
             }
         }
 
@@ -364,9 +362,8 @@ socket.on("user_status_update", (data) => {
         if (currentChatElem) {
             const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
             if (statusInList) {
-                const str_status = data.status === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
-                statusInList.className = `label status_of_user_in_list_chats ${str_status}`;
-                statusInList.textContent = data.status;
+                statusInList.className = `label status_of_user_in_list_chats ${presenceClass(data.status, true)}`;
+                statusInList.textContent = displayedPresenceText(data.status, true);
             }
         }
     } catch (err) {
@@ -374,6 +371,70 @@ socket.on("user_status_update", (data) => {
         d_alert("Ошибка", "Ошибка при изменении статуса пользователя", "ok");
     }
 });
+
+function getConnectionStatusLabel() {
+    return typeof window.getDoveryConnectionLabel === 'function'
+        ? window.getDoveryConnectionLabel()
+        : null;
+}
+
+function displayedPresenceText(realStatus, inList) {
+    if (!inList) {
+        const override = getConnectionStatusLabel();
+        if (override) return override;
+    }
+    return realStatus || 'был(а) недавно';
+}
+
+function presenceClass(realStatus, inList) {
+    if (!inList && getConnectionStatusLabel()) {
+        return 'subtitle';
+    }
+    if (inList) {
+        return realStatus === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1';
+    }
+    return realStatus === 'в сети' ? 'active' : 'subtitle';
+}
+
+function setOpenChatPresence(realStatus) {
+    const headerStatus = document.getElementById('user-status');
+    if (!headerStatus) return;
+
+    const override = getConnectionStatusLabel();
+    headerStatus.className = `subtitle2 ${presenceClass(realStatus, false)}`;
+    headerStatus.textContent = displayedPresenceText(realStatus);
+
+    if (override) {
+        headerStatus.classList.remove('hidden');
+        const typingEl = document.getElementById('user-typing');
+        if (typingEl) typingEl.classList.add('hidden');
+    }
+}
+
+function refreshAllPresenceDisplays() {
+    const idEpt = document.getElementById('id_ept');
+    const chatId = idEpt ? idEpt.innerText.trim() : '';
+    const partnerId = chatId && window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+    const real = (partnerId && chatsData[partnerId] && chatsData[partnerId].status) || 'был(а) недавно';
+    setOpenChatPresence(real);
+
+    if (!getConnectionStatusLabel() && typeof refreshPartnerTypingHeader === 'function') {
+        refreshPartnerTypingHeader();
+    }
+
+    document.querySelectorAll('[data-user-id]').forEach((item) => {
+        const el = item.querySelector('.status_of_user_in_list_chats');
+        if (!el) return;
+        const uid = item.getAttribute('data-user-id');
+        const st = (chatsData[uid] && chatsData[uid].status) || 'был(а) недавно';
+        el.className = `label status_of_user_in_list_chats ${presenceClass(st, true)}`;
+        el.textContent = displayedPresenceText(st, true);
+    });
+}
+
+window.displayedPresenceText = displayedPresenceText;
+window.presenceClass = presenceClass;
+window.refreshAllPresenceDisplays = refreshAllPresenceDisplays;
 
 window.keychat = null;
 
@@ -443,9 +504,7 @@ async function openDirectWindow(chatId) {
 
         if (headerName) headerName.innerText = user.name;
         if (headerStatus) {
-            const str_status = user.status === 'в сети' ? 'active' : 'subtitle';
-            headerStatus.className = `subtitle2 ${str_status}`;
-            headerStatus.innerText = user.status;
+            setOpenChatPresence(user.status);
         }
         const typingEl = document.getElementById('user-typing');
         if (typingEl) typingEl.classList.add('hidden');
@@ -596,6 +655,10 @@ function setHeaderTypingVisible(show) {
 }
 
 function refreshPartnerTypingHeader() {
+    if (getConnectionStatusLabel()) {
+        setHeaderTypingVisible(false);
+        return;
+    }
     const openId = getOpenChatId();
     setHeaderTypingVisible(!!(openId && typingPartners.has(String(openId))));
 }
@@ -966,17 +1029,26 @@ function ensureSkeletonStyles() {
             pointer-events: none;
         }
         .message-wrapper.loading-skeleton .message-bubble {
-            background: linear-gradient(90deg, #e3e3e3 25%, #f3f3f3 50%, #e3e3e3 75%);
+            background: linear-gradient(90deg,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-received)) 25%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-message-bg-color-received)) 50%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-received)) 75%);
             background-size: 200% 100%;
             animation: skeletonShimmer 1.4s infinite linear;
         }
         .message-wrapper.loading-skeleton.sent .message-bubble {
-            background: linear-gradient(90deg, #d0d0d0 25%, #e8e8e8 50%, #d0d0d0 75%);
+            background: linear-gradient(90deg,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-sent)) 25%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-message-bg-color-sent)) 50%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-sent)) 75%);
             background-size: 200% 100%;
             animation: skeletonShimmer 1.4s infinite linear;
         }
         .message-wrapper.loading-skeleton.received .message-bubble {
-            background: linear-gradient(90deg, #e3e3e3 25%, #f3f3f3 50%, #e3e3e3 75%);
+            background: linear-gradient(90deg,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-received)) 25%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-message-bg-color-received)) 50%,
+                color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-received)) 75%);
             background-size: 200% 100%;
             animation: skeletonShimmer 1.4s infinite linear;
         }
@@ -1736,59 +1808,169 @@ socket.on('chat_deleted', async (data) => {
     }
 });
 
+const THEME_STORAGE_KEY = 'dovery-theme';
+
+function getDoveryTheme() {
+    const attr = document.documentElement.getAttribute('data-theme');
+    if (attr === 'dark' || attr === 'light') return attr;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function getThemeMenuItem() {
+    const dark = getDoveryTheme() === 'dark';
+    return {
+        id: 'theme',
+        label: dark ? 'Светлая тема' : 'Тёмная тема',
+        onclick: 'toggleDoveryTheme();',
+        icon: dark ? 'sun' : 'moon'
+    };
+}
+
+function syncThemeMenuItem() {
+    if (!Array.isArray(window.list_items_icon_01)) return;
+    const item = getThemeMenuItem();
+    const idx = window.list_items_icon_01.findIndex((entry) => entry.id === 'theme');
+    if (idx >= 0) window.list_items_icon_01[idx] = item;
+    else window.list_items_icon_01.push(item);
+
+    const menu = document.getElementById('tagDropdown');
+    if (!menu || menu.style.display !== 'block') return;
+    menu.querySelectorAll('.dropdown-item').forEach((row) => {
+        const text = row.querySelector('.item-text');
+        if (!text) return;
+        if (text.textContent !== 'Тёмная тема' && text.textContent !== 'Светлая тема') return;
+        text.textContent = item.label;
+        const wrap = row.querySelector('.icon-wrapper');
+        if (wrap) {
+            wrap.innerHTML = `<svg class="${item.icon}"><use href="#${item.icon}"></use></svg>`;
+        }
+        row.setAttribute('onclick', `${item.onclick}; return false;`);
+    });
+}
+
+function applyDoveryTheme(theme) {
+    const next = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch (e) {}
+    syncThemeMenuItem();
+}
+
+function toggleDoveryTheme() {
+    applyDoveryTheme(getDoveryTheme() === 'dark' ? 'light' : 'dark');
+}
+
+window.getDoveryTheme = getDoveryTheme;
+window.toggleDoveryTheme = toggleDoveryTheme;
+window.syncThemeMenuItem = syncThemeMenuItem;
+window.applyDoveryTheme = applyDoveryTheme;
+
 const inputField = document.querySelector('#messages-textarea');
 
-function copy_text() {
-    const start = inputField.selectionStart;
-    const end = inputField.selectionEnd;
-    const selectedText = inputField.value.substring(start, end);
+function getComposerSelection() {
+    if (!inputField) return '';
+    const start = inputField.selectionStart || 0;
+    const end = inputField.selectionEnd || 0;
+    return start !== end ? inputField.value.substring(start, end) : '';
+}
 
-    if (selectedText) {
-        navigator.clipboard.writeText(selectedText)
-            .then(() => hideDropdown())
-            .catch(err => console.error('Ошибка копирования:', err));
-            inputField.focus();
+function copy_text() {
+    const selectedText = getComposerSelection();
+    if (!selectedText || !inputField) return;
+
+    const done = () => {
+        hideDropdown();
+        inputField.focus({ preventScroll: true });
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(selectedText).then(done).catch(() => {
+            try {
+                inputField.focus();
+                document.execCommand('copy');
+            } catch (err) {
+                console.error('Ошибка копирования:', err);
+            }
+            done();
+        });
+        return;
     }
+
+    try {
+        inputField.focus();
+        document.execCommand('copy');
+    } catch (err) {
+        console.error('Ошибка копирования:', err);
+    }
+    done();
 }
 
 async function paste_text() {
+    if (!inputField) return;
+    const start = inputField.selectionStart || 0;
+    const end = inputField.selectionEnd || 0;
+    let text = '';
+
     try {
-        const text = await navigator.clipboard.readText();
-        const start = inputField.selectionStart;
-        const end = inputField.selectionEnd;
-        
-        inputField.setRangeText(text, start, end, 'end');
-        
-        hideDropdown();
-        inputField.focus();
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+        }
     } catch (err) {
-        console.warn('Доступ к буферу отклонен пользователем' + err);
+        text = '';
     }
+
+    if (text) {
+        inputField.setRangeText(text, start, end, 'end');
+        inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+        inputField.focus({ preventScroll: true });
+        try {
+            document.execCommand('paste');
+        } catch (err) {
+            console.warn('Доступ к буферу отклонен пользователем', err);
+        }
+    }
+
+    hideDropdown();
+    inputField.focus({ preventScroll: true });
 }
 
-inputField.addEventListener('contextmenu', async function(e) {
-    e.preventDefault();
+let composerMenuAt = 0;
+let composerPressTimer = null;
 
-    const selectedText = window.getSelection().toString();
-    let hasClipboard = false;
+function openComposerContextMenu(x, y) {
+    if (!inputField || typeof showDropdown !== 'function') return;
+    if (Date.now() - composerMenuAt < 350) return;
+    composerMenuAt = Date.now();
 
-    try {
-        const clipboardText = await navigator.clipboard.readText();
-        hasClipboard = clipboardText.length > 0;
-    } catch (err) {
-        hasClipboard = false;
-    }
+    const selectedText = getComposerSelection();
+    const items = selectedText
+        ? (window.list_items_icon_03 || [])
+        : (window.list_items_icon_04 || []);
+    if (!items.length) return;
 
-    let items = [];
-    if (selectedText) {
-        items = list_items_icon_03;
-        if (items.length > 0) {
-            showDropdown(this, items, 'icon', { x: e.pageX }, paste=false);
-        }
-    } else if (hasClipboard) {
-        items = list_items_icon_04;
-        if (items.length > 0) {
-            showDropdown(this, items, 'icon', { x: e.pageX }, paste=true);
-        }
-    }
-});
+    showDropdown(inputField, items, 'icon', { x, y });
+}
+
+if (inputField) {
+    inputField.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openComposerContextMenu(e.clientX, e.clientY);
+    });
+
+    inputField.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        clearTimeout(composerPressTimer);
+        composerPressTimer = setTimeout(() => {
+            openComposerContextMenu(touch.clientX, touch.clientY);
+        }, 520);
+    }, { passive: true });
+
+    const cancelComposerPress = () => clearTimeout(composerPressTimer);
+    inputField.addEventListener('touchend', cancelComposerPress);
+    inputField.addEventListener('touchcancel', cancelComposerPress);
+    inputField.addEventListener('touchmove', cancelComposerPress);
+}

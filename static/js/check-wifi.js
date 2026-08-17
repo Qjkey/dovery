@@ -4,28 +4,47 @@
  * и только засоряет логи.
  */
 (function () {
-    const titleEl = () => document.getElementById('title-status');
+    const titleTextEl = () => document.getElementById('title-status-text');
+    const titleDotsEl = () => document.querySelector('#title-status .conn-status-dots');
 
-    function setStatus(text) {
-        const el = titleEl();
-        if (el) el.textContent = text;
+    function getDoveryConnectionLabel() {
+        if (!navigator.onLine) return 'Ожидание сети...';
+        if (typeof socket === 'undefined' || !socket || !socket.connected) {
+            return 'Соединение...';
+        }
+        return null;
+    }
+
+    window.getDoveryConnectionLabel = getDoveryConnectionLabel;
+
+    function setTitleStatus(kind) {
+        const textEl = titleTextEl();
+        const dotsEl = titleDotsEl();
+        if (!textEl) return;
+
+        if (kind === 'offline') {
+            textEl.textContent = 'Ожидание сети';
+            if (dotsEl) dotsEl.classList.remove('hidden');
+        } else if (kind === 'connecting') {
+            textEl.textContent = 'Соединение';
+            if (dotsEl) dotsEl.classList.remove('hidden');
+        } else {
+            textEl.textContent = 'Dovery';
+            if (dotsEl) dotsEl.classList.add('hidden');
+        }
     }
 
     function syncStatus() {
+        let kind = 'connecting';
         if (!navigator.onLine) {
-            setStatus('Ожидание сети...');
-            return;
+            kind = 'offline';
+        } else if (typeof socket !== 'undefined' && socket && socket.connected) {
+            kind = 'online';
         }
 
-        if (typeof socket === 'undefined' || !socket) {
-            setStatus('Соединение...');
-            return;
-        }
-
-        if (socket.connected) {
-            setStatus('Dovery');
-        } else {
-            setStatus('Соединение...');
+        setTitleStatus(kind);
+        if (typeof window.refreshAllPresenceDisplays === 'function') {
+            window.refreshAllPresenceDisplays();
         }
     }
 
@@ -35,7 +54,7 @@
     function bindSocket(s) {
         s.on('connect', syncStatus);
         s.on('disconnect', syncStatus);
-        s.on('reconnect_attempt', () => setStatus('Соединение...'));
+        s.on('reconnect_attempt', syncStatus);
         s.on('reconnect', syncStatus);
         s.on('connect_error', syncStatus);
         syncStatus();
@@ -44,7 +63,6 @@
     if (typeof socket !== 'undefined' && socket) {
         bindSocket(socket);
     } else {
-        // На случай, если скрипт подключат раньше dovery.js
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof socket !== 'undefined' && socket) bindSocket(socket);
             else syncStatus();

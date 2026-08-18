@@ -552,3 +552,58 @@ html, body {
 .badge:empty {
   display: none;
 }
+
+#chats-list .item .right {
+  align-items: center;
+}
+
+#chats-list .item .text {
+  min-width: 0;
+  flex: 1;
+  width: auto;
+}
+
+#chats-list .item .element {
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.message-info {
+  opacity: 1;
+}
+
+.message-info .message-time {
+  opacity: 0.6;
+}
+
+.message-status {
+  display: inline-flex;
+  align-items: center;
+  color: var(--tg-theme-icon-message-color);
+  opacity: 1;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.message-status svg,
+.message-status .msg-ticks {
+  width: 13px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  display: block;
+}
+
+.message-status svg path {
+  fill: none;
+  stroke: currentColor;
+}
+
+.message-status.is-read svg,
+.message-status.is-read .msg-ticks {
+  width: 18px;
+}
+
+:root[data-theme="dark"] .message-status {
+  color: var(--tg-theme-icon-message-color);
+}

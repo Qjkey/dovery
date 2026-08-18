@@ -557,6 +557,12 @@ async function openDirectWindow(chatId) {
         if (typeof window.syncComposerTyping === 'function') {
             window.syncComposerTyping();
         }
+        if (typeof window.setChatUnreadBadge === 'function') {
+            window.setChatUnreadBadge(chatId, 0);
+        }
+        if (typeof window.syncChatViewing === 'function') {
+            window.syncChatViewing();
+        }
     } catch (err) {
         d_alert("Ошибка", "Ошибка в открытии чата", "ok");
         console.log(err);
@@ -643,10 +649,13 @@ document.addEventListener('DOMContentLoaded', initChatListResizer);
 
 const TYPING_HEARTBEAT_MS = 2500;
 const TYPING_EXPIRE_MS = 4500;
+const VIEWING_HEARTBEAT_MS = 2500;
 const typingPartners = new Set();
 let emittedTypingChatId = null;
 let typingHeartbeatTimer = null;
 let typingExpireTimers = {};
+let emittedViewingChatId = null;
+let viewingHeartbeatTimer = null;
 
 function getOpenChatId() {
     const chatContent = document.getElementById('chat-content');
@@ -752,10 +761,16 @@ socket.on('disconnect', () => {
         clearInterval(typingHeartbeatTimer);
         typingHeartbeatTimer = null;
     }
+    emittedViewingChatId = null;
+    if (viewingHeartbeatTimer) {
+        clearInterval(viewingHeartbeatTimer);
+        viewingHeartbeatTimer = null;
+    }
 });
 
 socket.on('connect', () => {
     syncComposerTyping();
+    syncChatViewing();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -772,13 +787,72 @@ document.addEventListener('DOMContentLoaded', () => {
     const classObs = new MutationObserver(() => {
         syncComposerTyping();
         refreshPartnerTypingHeader();
+        syncChatViewing();
     });
     if (chatScreen) classObs.observe(chatScreen, { attributes: true, attributeFilter: ['class'] });
     if (chatContent) classObs.observe(chatContent, { attributes: true, attributeFilter: ['class'] });
 });
 
-document.addEventListener('visibilitychange', syncComposerTyping);
-window.addEventListener('pagehide', () => emitComposerTyping(false));
+document.addEventListener('visibilitychange', () => {
+    syncComposerTyping();
+    syncChatViewing();
+});
+window.addEventListener('pagehide', () => {
+    emitComposerTyping(false);
+    emitChatViewing(false);
+});
+
+function isChatViewingNow() {
+    return !!getOpenChatId() && document.visibilityState === 'visible';
+}
+
+function emitChatViewing(isViewing, force) {
+    const chatId = isViewing ? getOpenChatId() : (getOpenChatId() || emittedViewingChatId);
+    if (!chatId) return;
+    if (isViewing) {
+        const switched = emittedViewingChatId && emittedViewingChatId !== chatId;
+        if (switched) {
+            socket.emit('viewing_chat', { chat_id: emittedViewingChatId, viewing: false });
+        }
+        if (switched || emittedViewingChatId !== chatId || force) {
+            socket.emit('viewing_chat', { chat_id: chatId, viewing: true });
+        }
+        if (emittedViewingChatId !== chatId) {
+            socket.emit('mark_chat_read', { chat_id: chatId });
+            if (typeof window.setChatUnreadBadge === 'function') {
+                window.setChatUnreadBadge(chatId, 0);
+            }
+        }
+        emittedViewingChatId = chatId;
+    } else if (emittedViewingChatId) {
+        socket.emit('viewing_chat', { chat_id: emittedViewingChatId, viewing: false });
+        emittedViewingChatId = null;
+    }
+}
+
+function syncChatViewing() {
+    const shouldView = isChatViewingNow();
+    if (shouldView) {
+        emitChatViewing(true);
+        if (!viewingHeartbeatTimer) {
+            viewingHeartbeatTimer = setInterval(() => {
+                if (isChatViewingNow()) {
+                    emitChatViewing(true, true);
+                } else {
+                    syncChatViewing();
+                }
+            }, VIEWING_HEARTBEAT_MS);
+        }
+    } else {
+        if (viewingHeartbeatTimer) {
+            clearInterval(viewingHeartbeatTimer);
+            viewingHeartbeatTimer = null;
+        }
+        emitChatViewing(false);
+    }
+}
+
+window.syncChatViewing = syncChatViewing;
 
 function copy_message(id) {
     // Ищем элемент, у которого data-id совпадает с переданным
@@ -1451,6 +1525,59 @@ function removeOptimisticMessage(msgId) {
     scheduleStickyChatDateUpdate();
 }
 
+function isMessageRead(value) {
+    return value === true || value === 1 || value === '1';
+}
+const TICK_DOUBLE_SVG = '<svg class="msg-ticks" width="18" height="9" viewBox="0 0 18 9" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M0.75 5.23153L3.70486 7.9894L11.4614 0.75M16.6324 0.922367L8.87586 8.16177L7.95246 7.29993" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg>'
+// const TICK_SINGLE_SVG = '<svg class="msg-ticks" viewBox="0 0 12 11" width="16" height="11" aria-hidden="true"><path d="M1.2 5.8 L4.4 9 L10.8 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// const TICK_DOUBLE_SVG = '<svg class="msg-ticks" viewBox="0 0 16 11" width="18" height="11" aria-hidden="true"><path d="M0.9 5.8 L4.1 9 L10.5 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.2 5.8 L8.4 9 L14.8 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const TICK_SINGLE_SVG = '<svg class="msg-ticks" width="14" height="9" viewBox="0 0 14 9" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M0.75 5.29813L3.94355 8.16177L12.3971 0.75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg>'
+
+
+function messageStatusHtml(isRead) {
+    return `<span class="message-status${isRead ? ' is-read' : ''}">${isRead ? TICK_DOUBLE_SVG : TICK_SINGLE_SVG}</span>`;
+}
+
+function sentMessageInfoHtml(timeStr, isRead) {
+    return `<div class="message-info">
+                <span class="message-time caption2">${formatTime(timeStr) || ''}</span>
+                ${messageStatusHtml(!!isRead)}
+            </div>`;
+}
+
+function receivedMessageInfoHtml(timeStr) {
+    return `<div class="message-info">
+                <span class="message-time caption2">${formatTime(timeStr) || ''}</span>
+            </div>`;
+}
+
+function applyMessageReadStatus(root, isRead) {
+    const status = root && root.querySelector('.message-status');
+    if (!status) return;
+    status.classList.toggle('is-read', !!isRead);
+    status.innerHTML = isRead ? TICK_DOUBLE_SVG : TICK_SINGLE_SVG;
+}
+
+function setCachedMessageRead(chatId, msgId, isRead) {
+    if (!chatId || !chatHash[chatId] || !msgId) return;
+    const msg = chatHash[chatId].messages.find((m) => m.id === msgId);
+    if (msg) msg.is_read = isRead ? 1 : 0;
+}
+
+function markSentMessagesReadInChat(chatId) {
+    if (!chatId) return;
+    if (chatHash[chatId]) {
+        const me = String(window.userId);
+        chatHash[chatId].messages.forEach((m) => {
+            if (String(m.sender_id) === me) m.is_read = 1;
+        });
+    }
+    if (String(getOpenChatId()) !== String(chatId)) return;
+    document.querySelectorAll('#messages-area .message-wrapper.sent').forEach((w) => {
+        applyMessageReadStatus(w, true);
+    });
+}
+
 async function sendMessage() {
     const text = msgInput.value;
     if (!text.trim()) return;
@@ -1505,9 +1632,7 @@ async function sendMessage() {
     wrapper.innerHTML = `
         <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${msgId}">
             <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-            <div class="message-info">
-                <span class="message-time caption2">${formatTime(time) || ''}</span>
-            </div>
+            ${sentMessageInfoHtml(time, false)}
         </div>
     `;
 
@@ -1515,14 +1640,15 @@ async function sendMessage() {
 
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
-    if (chatHash[chatId]) {
-        chatHash[chatId].messages.push({
-            id: msgId,
-            message_text: encryptedText,
-            sender_id: userId,
-            time: time
-        });
-    }
+        if (chatHash[chatId]) {
+            chatHash[chatId].messages.push({
+                id: msgId,
+                message_text: encryptedText,
+                sender_id: userId,
+                time: time,
+                is_read: 0
+            });
+        }
 
     resetMessageComposer();
     scrollMessagesToLatest();
@@ -1554,6 +1680,8 @@ socket.on('new_message', async (data) => {
         const chatId = data.chat_id;
         const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
 
+        const readFlag = isMessageRead(data.is_read);
+
         if (chatHash[chatId]) {
             const isAlreadyExists = chatHash[chatId].messages.some(m => m.id === data.msg_id);
             
@@ -1562,10 +1690,13 @@ socket.on('new_message', async (data) => {
                     id: data.msg_id,
                     message_text: data.text,
                     sender_id: data.sender_id,
-                    time: data.time
+                    time: data.time,
+                    is_read: readFlag ? 1 : 0
                 });
             } else if (isMe) {
-
+                setCachedMessageRead(chatId, data.msg_id, readFlag);
+                const existing = messagesArea?.querySelector(`.message-wrapper[data-id="${data.msg_id}"]`);
+                if (existing) applyMessageReadStatus(existing, readFlag);
                 return;
             }
         }
@@ -1596,9 +1727,7 @@ socket.on('new_message', async (data) => {
                 wrapper.innerHTML = `
                     <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-                        <div class="message-info">
-                            <span class="message-time caption2">${formatTime(data.time) || ''}</span>
-                        </div>
+                        ${sentMessageInfoHtml(data.time, readFlag)}
                     </div>
                 `;
             } else {
@@ -1610,9 +1739,7 @@ socket.on('new_message', async (data) => {
                 wrapper.innerHTML = `
                     <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-                        <div class="message-info">
-                            <span class="message-time caption2">${formatTime(data.time) || ''}</span>
-                        </div>
+                        ${receivedMessageInfoHtml(data.time)}
                     </div>
                 `;
             }
@@ -1632,6 +1759,12 @@ socket.on('new_message', async (data) => {
     } catch (err) {
         console.error("Критическая ошибка обработки сокета new_message:", err);
     }
+});
+
+socket.on('messages_read', (data) => {
+    const chatId = data && data.chat_id;
+    if (!chatId) return;
+    markSentMessagesReadInChat(chatId);
 });
 
 // Не отдаём фокус кнопке Send — иначе на мобиле закрывается клавиатура
@@ -1677,7 +1810,8 @@ async function loadChat(chatId) {
                     id: msg.id,
                     message_text: msg.message_text,
                     sender_id: msg.sender_id,
-                    time: msg.time
+                    time: msg.time,
+                    is_read: isMessageRead(msg.is_read) ? 1 : 0
                 }))
             };
 
@@ -1722,9 +1856,7 @@ function renderChat(messagesArea, messages, currentUserId) {
         wrapper.innerHTML = `
             <div class="message-bubble ${typeClass}">
                 <div class="message-content body1"></div>
-                <div class="message-info caption2">
-                    <span>${formatTime(msg.time)}</span>
-                </div>
+                ${mne ? receivedMessageInfoHtml(msg.time) : sentMessageInfoHtml(msg.time, isMessageRead(msg.is_read))}
             </div>
         `;
         setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);

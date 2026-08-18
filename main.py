@@ -87,6 +87,8 @@ def allow_message_send(user_id):
 
 online_users = {}
 typing_in_chat = {}  # user_id -> chat_id
+viewing_by_sid = {}  # sid -> {"chat_id", "ts"}
+VIEWING_EXPIRE_SEC = 6.0
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
     app,
@@ -172,6 +174,15 @@ def migrate_schema():
                 cursor.execute('DROP TABLE message')
                 cursor.execute('ALTER TABLE message_new RENAME TO message')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_chat_id ON message(chat_id)')
+
+            cursor.execute("PRAGMA table_info(message)")
+            message_columns = [row[1] for row in cursor.fetchall()]
+            if 'is_read' not in message_columns:
+                # Старые сообщения считаем прочитанными, чтобы не вспыхнули бейджи
+                cursor.execute('ALTER TABLE message ADD COLUMN is_read INTEGER NOT NULL DEFAULT 1')
+                cursor.execute(
+                    'CREATE INDEX IF NOT EXISTS idx_message_chat_unread ON message(chat_id, is_read, sender_id)'
+                )
             
             conn.commit()
     except Exception as e:
@@ -212,21 +223,68 @@ def save_session(raw_token, user_id):
         return False
 
 # Сохранение сообщения
-def save_message(chat_id, sender_id, encrypted_text, msg_id):
+def save_message(chat_id, sender_id, encrypted_text, msg_id, is_read=0):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             utc_now = datetime.now(timezone.utc)
             time_iso = utc_now.isoformat()
+            read_flag = 1 if is_read else 0
 
             cursor.execute('''
-                INSERT INTO message (id, chat_id, sender_id, message_text, time)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (msg_id, chat_id, sender_id, encrypted_text, time_iso))
+                INSERT INTO message (id, chat_id, sender_id, message_text, time, is_read)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (msg_id, chat_id, sender_id, encrypted_text, time_iso, read_flag))
             conn.commit()
             return time_iso
     except Exception as e:
         return False
+
+
+def get_unread_count(chat_id, user_id, conn=None):
+    own = conn is None
+    if own:
+        conn = get_db_connection()
+    try:
+        row = conn.execute(
+            '''SELECT COUNT(*) AS n FROM message
+               WHERE chat_id = ? AND sender_id != ? AND COALESCE(is_read, 1) = 0''',
+            (chat_id, user_id),
+        ).fetchone()
+        return int(row['n'] if row else 0)
+    except Exception:
+        return 0
+    finally:
+        if own:
+            conn.close()
+
+
+def emit_unread_update(user_id, chat_id, conn=None):
+    if user_id is None or chat_id is None:
+        return
+    count = get_unread_count(chat_id, user_id, conn=conn)
+    socketio.emit(
+        'unread_update',
+        {'chat_id': str(chat_id), 'unread': count},
+        to=f"user_{user_id}",
+    )
+
+
+def is_viewing_chat(user_id, chat_id):
+    if user_id is None or chat_id is None:
+        return False
+    sids = online_users.get(user_id) or set()
+    now = time.monotonic()
+    for sid in list(sids):
+        info = viewing_by_sid.get(sid)
+        if not info:
+            continue
+        if now - info['ts'] > VIEWING_EXPIRE_SEC:
+            viewing_by_sid.pop(sid, None)
+            continue
+        if str(info['chat_id']) == str(chat_id):
+            return True
+    return False
 
 # Получение id текущего пользователя
 def get_current_user_id():
@@ -463,6 +521,8 @@ def handle_disconnect():
     if not user_id:
         return
 
+    viewing_by_sid.pop(request.sid, None)
+
     if user_id in online_users:
         online_users[user_id].discard(request.sid)
         if not online_users[user_id]:
@@ -688,12 +748,21 @@ def get_my_chats():
             u.username, 
             u.name, 
             u.avatar,
-            u.public_key
+            u.public_key,
+            (
+                SELECT COUNT(*) FROM message m
+                WHERE m.chat_id = c.id
+                  AND m.sender_id != ?
+                  AND COALESCE(m.is_read, 1) = 0
+            ) AS unread_count
         FROM chats c
         JOIN users u ON u.id = (CASE WHEN c.user_one_id = ? THEN c.user_two_id ELSE c.user_one_id END)
         WHERE c.user_one_id = ? OR c.user_two_id = ?
     '''
-    chats_rows = conn.execute(query_chats, (current_user_id, current_user_id, current_user_id)).fetchall()
+    chats_rows = conn.execute(
+        query_chats,
+        (current_user_id, current_user_id, current_user_id, current_user_id),
+    ).fetchall()
     chats = [dict(chat) for chat in chats_rows]
 
     conn.close()
@@ -748,7 +817,8 @@ def handle_message(data):
     finally:
         conn.close()
 
-    time_iso = save_message(chat_id, sender_id, encrypted_text, msg_id)
+    is_read = 1 if is_viewing_chat(receiver_id, chat_id) else 0
+    time_iso = save_message(chat_id, sender_id, encrypted_text, msg_id, is_read)
     if not time_iso:
         emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
         return
@@ -758,11 +828,13 @@ def handle_message(data):
         'text': encrypted_text,
         'sender_id': sender_id,
         'chat_id': chat_id,
-        'time': time_iso
+        'time': time_iso,
+        'is_read': is_read,
     }
 
     emit('new_message', data_mess, to=f"user_{receiver_id}")
     emit('new_message', data_mess, to=f"user_{sender_id}")
+    emit_unread_update(receiver_id, chat_id)
 
 
 @socketio.on('typing')
@@ -797,6 +869,78 @@ def handle_typing(data):
         to=f"user_{peer_id}",
     )
 
+
+@socketio.on('viewing_chat')
+def handle_viewing_chat(data):
+    user_id = get_current_user_id()
+    if not user_id or not isinstance(data, dict):
+        return
+
+    chat_id = data.get('chat_id')
+    viewing = bool(data.get('viewing'))
+    if viewing:
+        if not chat_id:
+            return
+        if get_chat_peer(chat_id, user_id) is None:
+            return
+        viewing_by_sid[request.sid] = {
+            'chat_id': str(chat_id),
+            'ts': time.monotonic(),
+        }
+        return
+
+    info = viewing_by_sid.get(request.sid)
+    if not info:
+        return
+    if chat_id and str(info['chat_id']) != str(chat_id):
+        return
+    viewing_by_sid.pop(request.sid, None)
+
+
+@socketio.on('mark_chat_read')
+def handle_mark_chat_read(data):
+    user_id = get_current_user_id()
+    if not user_id or not isinstance(data, dict):
+        return
+
+    chat_id = data.get('chat_id')
+    if not chat_id:
+        return
+
+    try:
+        chat_id_int = int(chat_id)
+    except (TypeError, ValueError):
+        return
+
+    peer_id = get_chat_peer(chat_id_int, user_id)
+    if peer_id is None:
+        return
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            '''UPDATE message SET is_read = 1
+               WHERE chat_id = ? AND sender_id != ? AND COALESCE(is_read, 1) = 0''',
+            (chat_id_int, user_id),
+        )
+        changed = cursor.rowcount
+        conn.commit()
+        unread = get_unread_count(chat_id_int, user_id, conn=conn)
+    except Exception:
+        return
+    finally:
+        conn.close()
+
+    emit('unread_update', {'chat_id': str(chat_id_int), 'unread': unread}, to=f"user_{user_id}")
+    if changed:
+        emit(
+            'messages_read',
+            {'chat_id': str(chat_id_int)},
+            to=f"user_{peer_id}",
+        )
+
+
 # Удаление сообщения сокет
 @socketio.on('delete_message')
 def handle_delete(data):
@@ -807,6 +951,7 @@ def handle_delete(data):
         chat_id, sender_id, other_user_id = result
         emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{other_user_id}")
         emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{sender_id}")
+        emit_unread_update(other_user_id, chat_id)
 
 # Получить историю чата
 @app.route('/get_history_messages/<int:chat_id>')
@@ -836,7 +981,7 @@ def get_history(chat_id):
         
         if last_id is not None:
             cursor.execute('''
-                SELECT id, sender_id, message_text, time 
+                SELECT id, sender_id, message_text, time, is_read
                 FROM message 
                 WHERE chat_id = ?
                 AND id < ?
@@ -844,7 +989,7 @@ def get_history(chat_id):
             ''', (chat_id, last_id))
         else:
             cursor.execute('''
-                SELECT id, sender_id, message_text, time 
+                SELECT id, sender_id, message_text, time, is_read
                 FROM message 
                 WHERE chat_id = ?
                 ORDER BY id DESC 

@@ -72,6 +72,14 @@ async function loadMyChats() {
                 sepa = "separator";
             }
             const safeName = escapeHtml(chat.name);
+            window.unreadCounts = window.unreadCounts || {};
+            const chatKey = String(chat.chat_id);
+            const liveUnread = window.unreadCounts[chatKey];
+            const unread = liveUnread != null ? liveUnread : (Number(chat.unread_count) || 0);
+            window.unreadCounts[chatKey] = unread;
+            const unreadHtml = unread > 0
+                ? `<div class="element"><div class="badge caption2">${unread}</div></div>`
+                : '';
             item.innerHTML = `
                 <div class="left"> 
                     ${avatarHtml}
@@ -81,6 +89,7 @@ async function loadMyChats() {
                         <div class="label body1">${safeName}</div> 
                         <div class="label status_of_user_in_list_chats ${str_status}">${escapeHtml(shownStatus)}</div> 
                     </div>
+                    ${unreadHtml}
                 </div>
             `;
             item.onclick = async () => {
@@ -88,6 +97,9 @@ async function loadMyChats() {
             };
             listContainer.appendChild(item);
             inx++;
+        });
+        Object.keys(window.unreadCounts || {}).forEach((id) => {
+            setChatUnreadBadge(id, window.unreadCounts[id]);
         });
     } catch {
         d_alert("Ошибка", `Ошибка загрузки списка чатов`, "ok");
@@ -101,4 +113,45 @@ window.onload = () => {
 
 socket.on("chat_created", (data) => {
     loadMyChats(); 
+});
+
+function setChatUnreadBadge(chatId, count) {
+    const n = Math.max(0, Number(count) || 0);
+    window.unreadCounts = window.unreadCounts || {};
+    if (chatId != null && chatId !== '') {
+        window.unreadCounts[String(chatId)] = n;
+    }
+
+    const map = window.chatIdToUserId || {};
+    const userId = map[chatId] || map[String(chatId)];
+    if (!userId) return;
+    const item = document.querySelector(`#chats-list .item[data-user-id="${userId}"]`);
+    if (!item) return;
+    const right = item.querySelector('.right');
+    if (!right) return;
+
+    let element = right.querySelector(':scope > .element');
+    if (n <= 0) {
+        if (element) element.remove();
+        return;
+    }
+    if (!element) {
+        element = document.createElement('div');
+        element.className = 'element';
+        right.appendChild(element);
+    }
+    let badge = element.querySelector('.badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'badge caption2';
+        element.appendChild(badge);
+    }
+    badge.textContent = String(n);
+}
+
+window.setChatUnreadBadge = setChatUnreadBadge;
+
+socket.on('unread_update', (data) => {
+    if (!data) return;
+    setChatUnreadBadge(data.chat_id, data.unread);
 });

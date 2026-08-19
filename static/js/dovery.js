@@ -856,7 +856,8 @@ window.syncChatViewing = syncChatViewing;
 
 function copy_message(id) {
     // Ищем элемент, у которого data-id совпадает с переданным
-    const msgElement = document.querySelector(`[data-id="${id}"]`);
+    const msgElement = document.querySelector(`.message-wrapper[data-id="${id}"]`)
+        || document.querySelector(`[data-id="${id}"]`);
     
     if (msgElement) {
         // Находим внутри него блок с текстом
@@ -877,6 +878,8 @@ function copy_message(id) {
         console.error(`Сообщение ${id} не найдено в DOM`);
     }
 }
+
+window.copy_message = copy_message;
 
 function copy_who(who) {
     const username = document.getElementById('profile-username').innerText;
@@ -1167,6 +1170,18 @@ function ensureSkeletonStyles() {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
         }
+        .history-loading-skeletons {
+            display: flex;
+            flex-direction: column-reverse;
+            width: 100%;
+            pointer-events: none;
+        }
+        #history-load-sentinel {
+            height: 1px;
+            width: 100%;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -1191,31 +1206,48 @@ function createSkeletonMessage(type, textLines = 1) {
     return wrapper;
 }
 
+const HISTORY_SKELETON_PATTERNS = [
+    { type: 'sent', lines: 2 },
+    { type: 'received', lines: 1 },
+    { type: 'sent', lines: 3 },
+    { type: 'received', lines: 2 },
+    { type: 'sent', lines: 1 },
+    { type: 'received', lines: 2 }
+];
+
 function showLoadingSkeletons(container) {
     container.innerHTML = '';
     const fragment = document.createDocumentFragment();
-    
-    const patterns = [
-        { type: 'sent', lines: 2 },
-        { type: 'received', lines: 1 },
-        { type: 'sent', lines: 3 },
-        { type: 'received', lines: 2 },
-        { type: 'sent', lines: 1 },
-        { type: 'received', lines: 2 }
-    ];
-    
-    patterns.forEach(pattern => {
+    HISTORY_SKELETON_PATTERNS.forEach((pattern) => {
         fragment.appendChild(createSkeletonMessage(pattern.type, pattern.lines));
     });
-    
     container.appendChild(fragment);
+}
+
+function appendHistorySkeletons(container) {
+    if (!container) return;
+    removeHistorySkeletons(container);
+    ensureSkeletonStyles();
+    const wrap = document.createElement('div');
+    wrap.className = 'history-loading-skeletons';
+    wrap.setAttribute('aria-hidden', 'true');
+    HISTORY_SKELETON_PATTERNS.forEach((pattern) => {
+        wrap.appendChild(createSkeletonMessage(pattern.type, pattern.lines));
+    });
+    const sentinel = container.querySelector('#history-load-sentinel');
+    if (sentinel) container.insertBefore(wrap, sentinel);
+    else container.appendChild(wrap);
+}
+
+function removeHistorySkeletons(container) {
+    container?.querySelectorAll('.history-loading-skeletons').forEach((el) => el.remove());
 }
 
 function updateStickyChatDate() {
     const { area, sticky } = getStickyDateElements();
     if (!area || !sticky) return;
 
-    const messages = area.querySelectorAll('.message-wrapper');
+    const messages = area.querySelectorAll('.message-wrapper:not(.loading-skeleton)');
     const headers = Array.from(area.querySelectorAll('.chat-date-group'));
     const canScroll = area.scrollHeight > area.clientHeight + 8;
 
@@ -1329,7 +1361,7 @@ function canGroupMessages(a, b) {
 
 function applyMessageGrouping(area) {
     if (!area) return;
-    const wrappers = Array.from(area.querySelectorAll('.message-wrapper'));
+    const wrappers = Array.from(area.querySelectorAll('.message-wrapper:not(.loading-skeleton)'));
 
     wrappers.forEach((w) => {
         w.classList.remove('msg-group-first', 'msg-group-middle', 'msg-group-last', 'msg-group-follow');
@@ -1630,7 +1662,7 @@ async function sendMessage() {
     wrapper.dataset.time = time;
     wrapper.dataset.sender = String(userId ?? window.userId ?? '');
     wrapper.innerHTML = `
-        <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${msgId}">
+        <div class="message-bubble sent" data-id="${msgId}">
             <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
             ${sentMessageInfoHtml(time, false)}
         </div>
@@ -1725,7 +1757,7 @@ socket.on('new_message', async (data) => {
                 wrapper.dataset.time = data.time;
                 wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
-                    <div class="message-bubble sent" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
+                    <div class="message-bubble sent" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
                         ${sentMessageInfoHtml(data.time, readFlag)}
                     </div>
@@ -1737,7 +1769,7 @@ socket.on('new_message', async (data) => {
                 wrapper.dataset.time = data.time;
                 wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
-                    <div class="message-bubble received" id="cntxt_menu_btn_03" data-id="${data.msg_id}">
+                    <div class="message-bubble received" data-id="${data.msg_id}">
                         <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
                         ${receivedMessageInfoHtml(data.time)}
                     </div>
@@ -1785,15 +1817,208 @@ msgInput.addEventListener('keydown', async (e) => {
 });
 
 const chatHash = {};
+const HISTORY_PAGE_SIZE = 20;
+let historyObserver = null;
+let historyLoadChatId = null;
+
+function getActiveChatId() {
+    return document.getElementById('id_ept')?.textContent?.trim() || null;
+}
+
+function parseHistoryResponse(data) {
+    if (Array.isArray(data)) {
+        return { messages: data, hasMore: data.length >= HISTORY_PAGE_SIZE };
+    }
+    const messages = Array.isArray(data?.messages) ? data.messages : [];
+    return { messages, hasMore: Boolean(data?.has_more) };
+}
+
+function mapHistoryMessages(list) {
+    return (list || []).map((msg) => ({
+        id: msg.id,
+        message_text: msg.message_text,
+        sender_id: msg.sender_id,
+        time: msg.time,
+        is_read: isMessageRead(msg.is_read) ? 1 : 0
+    }));
+}
+
+function getOldestCachedMessage(chatId) {
+    const list = chatHash[chatId]?.messages;
+    if (!list || !list.length) return null;
+    return list.reduce((oldest, msg) => {
+        const t = new Date(msg.time).getTime();
+        const ot = new Date(oldest.time).getTime();
+        if (t < ot) return msg;
+        if (t === ot && String(msg.id) < String(oldest.id)) return msg;
+        return oldest;
+    });
+}
+
+function getLastRealMessage(area) {
+    const all = area?.querySelectorAll('.message-wrapper:not(.loading-skeleton)');
+    return all && all.length ? all[all.length - 1] : null;
+}
+
+function preserveScrollAround(area, anchor, fn) {
+    const prevTop = anchor ? anchor.getBoundingClientRect().top : null;
+    fn();
+    if (!anchor || prevTop == null) return;
+    const newTop = anchor.getBoundingClientRect().top;
+    area.scrollTop += newTop - prevTop;
+}
+
+function teardownHistoryLoader() {
+    if (historyObserver) {
+        historyObserver.disconnect();
+        historyObserver = null;
+    }
+    historyLoadChatId = null;
+}
+
+function ensureHistorySentinel(area) {
+    if (!area) return null;
+    let sentinel = area.querySelector('#history-load-sentinel');
+    if (!sentinel) {
+        sentinel = document.createElement('div');
+        sentinel.id = 'history-load-sentinel';
+        sentinel.setAttribute('aria-hidden', 'true');
+    }
+    area.appendChild(sentinel);
+    return sentinel;
+}
+
+function setupHistoryLoader(chatId) {
+    teardownHistoryLoader();
+    const area = document.getElementById('messages-area');
+    if (!area || !chatHash[chatId] || chatHash[chatId].hasMore === false) return;
+
+    historyLoadChatId = String(chatId);
+    const sentinel = ensureHistorySentinel(area);
+    historyObserver = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        loadOlderMessages(chatId);
+    }, { root: area, rootMargin: '280px 0px', threshold: 0 });
+    historyObserver.observe(sentinel);
+}
+
+function rebuildDateHeaders(area) {
+    if (!area) return;
+    area.querySelectorAll('.chat-date-group').forEach((el) => el.remove());
+    const wrappers = Array.from(area.querySelectorAll('.message-wrapper:not(.loading-skeleton)'));
+    wrappers.forEach((wrapper, index) => {
+        const currentDateLabel = getShortDateLabel(wrapper.dataset.time);
+        const older = wrappers[index + 1];
+        const olderDateLabel = older ? getShortDateLabel(older.dataset.time) : null;
+        if (!older || currentDateLabel !== olderDateLabel) {
+            wrapper.after(createDateHeaderElement(currentDateLabel));
+        }
+    });
+}
+
+function buildMessageWrapper(msg, currentUserId) {
+    const mne = msg.sender_id != currentUserId;
+    const typeClass = mne ? 'received' : 'sent';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper ' + typeClass;
+    wrapper.dataset.id = msg.id;
+    wrapper.dataset.time = msg.time;
+    wrapper.dataset.sender = String(msg.sender_id);
+    wrapper.innerHTML = `
+        <div class="message-bubble ${typeClass}">
+            <div class="message-content body1"></div>
+            ${mne ? receivedMessageInfoHtml(msg.time) : sentMessageInfoHtml(msg.time, isMessageRead(msg.is_read))}
+        </div>
+    `;
+    setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
+    return wrapper;
+}
+
+async function loadOlderMessages(chatId) {
+    const cache = chatHash[chatId];
+    if (!cache || cache.loadingMore || cache.hasMore === false) return;
+    if (String(getActiveChatId()) !== String(chatId)) return;
+
+    const oldest = getOldestCachedMessage(chatId);
+    if (!oldest) return;
+
+    const area = document.getElementById('messages-area');
+    if (!area) return;
+
+    cache.loadingMore = true;
+    const anchor = getLastRealMessage(area);
+
+    preserveScrollAround(area, anchor, () => {
+        appendHistorySkeletons(area);
+        ensureHistorySentinel(area);
+    });
+    scheduleStickyChatDateUpdate();
+
+    try {
+        const params = new URLSearchParams({
+            before_time: oldest.time,
+            before_id: oldest.id
+        });
+        const server = await fetch(`/get_history_messages/${chatId}?${params.toString()}`);
+        const parsed = parseHistoryResponse(await server.json());
+
+        if (String(getActiveChatId()) !== String(chatId)) return;
+
+        const existingIds = new Set((cache.messages || []).map((m) => m.id));
+        const fresh = mapHistoryMessages(parsed.messages).filter((m) => m.id && !existingIds.has(m.id));
+        cache.hasMore = parsed.hasMore;
+        if (fresh.length) {
+            cache.messages = fresh.concat(cache.messages);
+        } else {
+            cache.hasMore = false;
+        }
+
+        const decrypted = await decryptAll(fresh);
+        if (String(getActiveChatId()) !== String(chatId)) return;
+
+        const sorted = [...decrypted].sort((a, b) => new Date(b.time) - new Date(a.time));
+        preserveScrollAround(area, anchor, () => {
+            removeHistorySkeletons(area);
+            if (sorted.length) {
+                const fragment = document.createDocumentFragment();
+                sorted.forEach((msg) => fragment.appendChild(buildMessageWrapper(msg, window.userId)));
+                const lastReal = getLastRealMessage(area);
+                if (lastReal) lastReal.after(fragment);
+                else area.prepend(fragment);
+            }
+            rebuildDateHeaders(area);
+            applyMessageGrouping(area);
+            if (cache.hasMore) ensureHistorySentinel(area);
+            else area.querySelector('#history-load-sentinel')?.remove();
+        });
+        scheduleStickyChatDateUpdate();
+    } catch (err) {
+        console.error('Ошибка подгрузки истории:', err);
+        if (String(getActiveChatId()) === String(chatId)) {
+            preserveScrollAround(area, anchor, () => removeHistorySkeletons(area));
+        }
+    } finally {
+        if (cache) cache.loadingMore = false;
+        if (String(getActiveChatId()) === String(chatId) && cache?.hasMore) {
+            setupHistoryLoader(chatId);
+        } else if (String(getActiveChatId()) === String(chatId)) {
+            teardownHistoryLoader();
+            document.getElementById('history-load-sentinel')?.remove();
+        }
+    }
+}
 
 async function loadChat(chatId) {
     const messagesArea = document.getElementById('messages-area');
     messagesArea.innerHTML = '';
     hideStickyChatDate();
+    teardownHistoryLoader();
 
     if (chatHash[chatId]) {
         const messages = await decryptAll(chatHash[chatId].messages);
+        if (String(getActiveChatId()) !== String(chatId)) return;
         renderChat(messagesArea, messages, window.userId);
+        setupHistoryLoader(chatId);
         return;
     } else {
         try {
@@ -1801,23 +2026,21 @@ async function loadChat(chatId) {
             showLoadingSkeletons(messagesArea);
             
             const server = await fetch(`/get_history_messages/${chatId}`);
-            const messages = await server.json();
-            const safe = Array.isArray(messages) ? messages : [];
+            const parsed = parseHistoryResponse(await server.json());
+
+            if (String(getActiveChatId()) !== String(chatId)) return;
 
             chatHash[chatId] = {
                 id: chatId,
-                messages: safe.map(msg => ({
-                    id: msg.id,
-                    message_text: msg.message_text,
-                    sender_id: msg.sender_id,
-                    time: msg.time,
-                    is_read: isMessageRead(msg.is_read) ? 1 : 0
-                }))
+                messages: mapHistoryMessages(parsed.messages),
+                hasMore: parsed.hasMore
             };
 
             messagesArea.innerHTML = '';
             const decrypted = await decryptAll(chatHash[chatId].messages);
+            if (String(getActiveChatId()) !== String(chatId)) return;
             renderChat(messagesArea, decrypted, window.userId);
+            setupHistoryLoader(chatId);
         } catch (err) {
             console.error("Ошибка загрузки истории:", err);
         }
@@ -1844,23 +2067,7 @@ function renderChat(messagesArea, messages, currentUserId) {
     });
 
     sortedMessages.forEach((msg, index) => {
-        const mne = msg.sender_id != currentUserId;
-        const typeClass = mne ? 'received' : 'sent';
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'message-wrapper ' + typeClass;
-        wrapper.id = 'cntxt_menu_btn_03';
-        wrapper.dataset.id = msg.id;
-        wrapper.dataset.time = msg.time;
-        wrapper.dataset.sender = String(msg.sender_id);
-        wrapper.innerHTML = `
-            <div class="message-bubble ${typeClass}">
-                <div class="message-content body1"></div>
-                ${mne ? receivedMessageInfoHtml(msg.time) : sentMessageInfoHtml(msg.time, isMessageRead(msg.is_read))}
-            </div>
-        `;
-        setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
-        fragment.appendChild(wrapper);
+        fragment.appendChild(buildMessageWrapper(msg, currentUserId));
 
         const currentDateLabel = getShortDateLabel(msg.time);
         const nextMsg = sortedMessages[index + 1];
@@ -1984,6 +2191,7 @@ socket.on('chat_deleted', async (data) => {
         if (typeof chatHash !== 'undefined' && chatHash[deletedChatId]) {
             delete chatHash[deletedChatId];
         }
+        if (typeof teardownHistoryLoader === 'function') teardownHistoryLoader();
         const screenWidth = window.innerWidth;
         if (screenWidth > 751) {
             document.getElementById('no-chat-content').classList.remove('hidden');
@@ -2162,4 +2370,71 @@ if (inputField) {
     inputField.addEventListener('touchend', cancelComposerPress);
     inputField.addEventListener('touchcancel', cancelComposerPress);
     inputField.addEventListener('touchmove', cancelComposerPress);
+}
+
+function escapeMenuArg(value) {
+    return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function getMessageMenuItems(msgId) {
+    const safeId = escapeMenuArg(msgId);
+    return [
+        { label: 'Копировать', onclick: `copy_message('${safeId}')`, icon: 'copy' },
+        { label: 'Удалить', danger: true, onclick: `snapDelete('${safeId}')`, icon: 'delete' }
+    ];
+}
+
+function findMessageMenuWrapper(target) {
+    if (!target || typeof target.closest !== 'function') return null;
+    if (target.closest('#tagDropdown')) return null;
+    if (target.closest('a, .msg-mention')) return null;
+    if (target.closest('.loading-skeleton')) return null;
+    if (!target.closest('.message-bubble')) return null;
+    const wrapper = target.closest('.message-wrapper');
+    if (!wrapper || !wrapper.dataset.id) return null;
+    return wrapper;
+}
+
+let messageMenuAt = 0;
+let messagePressTimer = null;
+
+function openMessageContextMenu(wrapper, x, y) {
+    if (!wrapper || typeof showDropdown !== 'function') return;
+    if (Date.now() - messageMenuAt < 350) return;
+    messageMenuAt = Date.now();
+    showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y });
+}
+
+if (messagesArea) {
+    messagesArea.addEventListener('click', (e) => {
+        const wrapper = findMessageMenuWrapper(e.target);
+        if (!wrapper) return;
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && wrapper.contains(sel.anchorNode)) return;
+        openMessageContextMenu(wrapper, e.clientX, e.clientY);
+    });
+
+    messagesArea.addEventListener('contextmenu', (e) => {
+        const wrapper = findMessageMenuWrapper(e.target);
+        if (!wrapper) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openMessageContextMenu(wrapper, e.clientX, e.clientY);
+    }, true);
+
+    messagesArea.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const wrapper = findMessageMenuWrapper(e.target);
+        if (!wrapper) return;
+        const touch = e.touches[0];
+        clearTimeout(messagePressTimer);
+        messagePressTimer = setTimeout(() => {
+            openMessageContextMenu(wrapper, touch.clientX, touch.clientY);
+        }, 520);
+    }, { passive: true });
+
+    const cancelMessagePress = () => clearTimeout(messagePressTimer);
+    messagesArea.addEventListener('touchend', cancelMessagePress);
+    messagesArea.addEventListener('touchcancel', cancelMessagePress);
+    messagesArea.addEventListener('touchmove', cancelMessagePress);
 }

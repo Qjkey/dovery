@@ -817,6 +817,10 @@ function d_pop(label = 'Label', description = 'Description', actionLabel = 'Labe
 
 const openedScreens = [];
 
+function normalizeScreenId(screenId) {
+  return screenId == null || screenId === '' ? '' : String(screenId);
+}
+
 const DOVERY_DESKTOP_BREAKPOINT = 751;
 
 function isDoveryChatListLayout() {
@@ -1072,8 +1076,9 @@ function initSwipeListeners(screenId) {
 
 // Открытие экрана
 function openScreen(screenId) {
+  screenId = normalizeScreenId(screenId);
   const screen = document.querySelector(`[data-screen="${screenId}"]`);
-  if (!screen) return;
+  if (!screen || !screenId) return;
 
   // Не дублируем уже открытый экран в стеке
   if (openedScreens[openedScreens.length - 1] === screenId) {
@@ -1146,7 +1151,8 @@ function openScreen(screenId) {
 
 // Закрытие экрана
 function closeActiveScreen(screenId, isSwiped = false) {
-  if (openedScreens.length === 0) return;
+  screenId = normalizeScreenId(screenId);
+  if (!screenId || openedScreens.length === 0) return;
 
   const screen = document.querySelector(`[data-screen="${screenId}"]`);
   

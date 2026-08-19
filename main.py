@@ -54,6 +54,7 @@ CLIENT_HASH_RE = re.compile(r"^[a-f0-9]{64}$")
 MAX_MESSAGE_CHARS = 1024
 MAX_ENCRYPTED_MESSAGE_LEN = 8192
 MAX_MESSAGES_PER_MINUTE = 20
+HISTORY_PAGE_SIZE = 20
 _message_rate_buckets = defaultdict(deque)
 # Заглушка для выравнивания времени ответа при неверном логине
 DUMMY_PASSWORD_HASH = generate_password_hash("dovery-dummy-password-not-used")
@@ -183,6 +184,10 @@ def migrate_schema():
                 cursor.execute(
                     'CREATE INDEX IF NOT EXISTS idx_message_chat_unread ON message(chat_id, is_read, sender_id)'
                 )
+
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_message_chat_time ON message(chat_id, time, id)'
+            )
             
             conn.commit()
     except Exception as e:
@@ -976,30 +981,42 @@ def get_history(chat_id):
         
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        last_id = request.args.get('last_id', default=None, type=int)
-        
-        if last_id is not None:
-            cursor.execute('''
+
+        before_time = (request.args.get('before_time') or '').strip() or None
+        before_id = (request.args.get('before_id') or '').strip() or None
+        page_limit = HISTORY_PAGE_SIZE + 1
+
+        if before_time:
+            cursor.execute(
+                '''
                 SELECT id, sender_id, message_text, time, is_read
-                FROM message 
+                FROM message
                 WHERE chat_id = ?
-                AND id < ?
-                ORDER BY id DESC 
-            ''', (chat_id, last_id))
+                  AND (time < ? OR (time = ? AND id < ?))
+                ORDER BY time DESC, id DESC
+                LIMIT ?
+                ''',
+                (chat_id, before_time, before_time, before_id or '', page_limit),
+            )
         else:
-            cursor.execute('''
+            cursor.execute(
+                '''
                 SELECT id, sender_id, message_text, time, is_read
-                FROM message 
+                FROM message
                 WHERE chat_id = ?
-                ORDER BY id DESC 
-            ''', (chat_id,))
-        
+                ORDER BY time DESC, id DESC
+                LIMIT ?
+                ''',
+                (chat_id, page_limit),
+            )
+
         rows = cursor.fetchall()
+        has_more = len(rows) > HISTORY_PAGE_SIZE
+        rows = rows[:HISTORY_PAGE_SIZE]
         messages = [dict(row) for row in reversed(rows)]
         conn.close()
-        
-        return jsonify(messages)
+
+        return jsonify({'messages': messages, 'has_more': has_more})
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
         return jsonify([]), 500

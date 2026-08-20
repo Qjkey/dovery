@@ -1041,17 +1041,31 @@ def ping():
 # Анализ username
 @app.route('/<string:username>')
 def get_user_profile(username):
-    username = username.lower()
+    username = (username or '').strip()
+    if not username:
+        return render_template('error.html', error="404"), 404
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    cursor.execute(
+        "SELECT id, name, username, avatar FROM users WHERE LOWER(username) = LOWER(?)",
+        (username,),
+    )
     user = cursor.fetchone()
     conn.close()
 
     if not user:
         return render_template('error.html', error="404"), 404
 
-    return redirect(url_for('index', profile='true', user_id=user['id']))
+    if get_current_user_id():
+        return redirect(url_for('index', profile='true', user_id=user['id']))
+
+    return render_template(
+        'profile.html',
+        profile_name=user['name'] or '',
+        profile_username=user['username'] or '',
+        profile_avatar=user['avatar'] or '',
+    )
 
 @app.route('/get_use_profile/<int:user_id>')
 def get_user_data_api(user_id):

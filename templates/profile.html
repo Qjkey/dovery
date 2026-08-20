@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('dovery-theme');
+                if (theme !== 'dark' && theme !== 'light') {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+    <title>{{ profile_name or profile_username or 'Dovery' }}</title>
+    <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
+    <link href="/static/CSS/tma-ui-kit-3-0.css" rel="stylesheet" type="text/css">
+    <link href="/static/CSS/svg.css" rel="stylesheet" type="text/css">
+</head>
+<style>
+.page-two {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100dvh;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.page-two > .header-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    width: calc(100% - 2 * var(--margin));
+    margin: var(--margin) var(--margin) 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.page-two > .header-wrapper .header {
+    padding: 0;
+}
+
+.page-two-content {
+    display: flex;
+    flex-direction: column;
+    width: calc(100% - 2 * var(--margin));
+    max-width: 450px;
+    flex: 1 1 0;
+    min-height: 0;
+    margin: var(--margin);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.page-two-content > .page {
+    width: 100%;
+    height: 60%;
+    max-height: 100%;
+    border-radius: var(--radius);
+    box-sizing: border-box;
+    overflow: hidden;
+    overflow-y: auto;
+}
+
+.page-two-content .profile-block .headline6 {
+    z-index: 1;
+    color: #fff;
+}
+
+.page-two-content .profile-block .subname {
+    z-index: 1;
+}
+
+.page-two-content .profile-block .avatar .letter-ava {
+    width: 100%;
+    height: 100%;
+    font-size: 34px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    user-select: none;
+    text-transform: uppercase;
+}
+
+@media (min-width: 751px) {
+    .page-two > .header-wrapper {
+        margin-top: var(--margin);
+    }
+
+    .page-two-content {
+        margin-top: var(--margin);
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: var(--margin);
+        height: auto;
+    }
+}
+
+.title-title {
+    margin-top: 7px;
+}
+</style>
+<body class="one-page">
+    <div class="page-two">
+        <div class="header-wrapper">
+            <div class="header">
+
+                <div class="header-center-two clicked header-capsule">
+                    <div class="item">
+                        <div class="left">
+                            <img src="images/test ava.png" class="ava"> 
+                        </div>
+                        <div class="right">
+                            <div class="label title-title headline6">Dovery</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-two-content">
+            <div class="page secondary_bg">
+                <div class="profile-block s-img defult">
+                    <div class="avatar">
+                        {% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %}
+                        <img src="{{ url_for('static', filename='files/avatars/' + profile_avatar) }}" alt="">
+                        {% else %}
+                        <div class="letter-ava">{{ (profile_name or profile_username or '?')[:1] }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="headline6">{{ profile_name }}</div>
+                    <div class="subname subtitle1">@{{ profile_username }}</div>
+                </div>
+                <section class="top">
+                    <a href="/" class="item clicked">
+                        <div class="right">
+                            <div class="text oneline">
+                                <div class="label body1">Открыть чат</div>
+                            </div>
+                            <div class="element">
+                                <svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L1 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </div>
+                        </div>
+                    </a>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="/static/js/tma-ui-kit-3-0.js"></script>
+</html>

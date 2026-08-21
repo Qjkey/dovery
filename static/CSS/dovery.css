@@ -67,6 +67,30 @@ html, body {
   background-color: color-mix(in srgb, var(--tg-theme-hint-color) 10%, transparent);
 }
 
+@keyframes skeletonShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+img.avatar-pending,
+.avatar.avatar-pending {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 25%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-secondary-bg-color)) 50%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite linear;
+}
+
+img.avatar-pending {
+    object-fit: none;
+    object-position: -9999px 0;
+}
+
+.avatar.avatar-pending img {
+    opacity: 0;
+}
+
 .letter-ava {
     display: flex;
     color: white;

@@ -44,7 +44,9 @@ async function loadMyChats() {
             if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
                 const avatarSrc = `static/files/avatars/${chat.avatar}`;
                 cacheImage(avatarSrc); 
-                avatarHtml = `<img src="${avatarSrc}" class="ava">`;
+                avatarHtml = typeof window.photoAvatarHtml === 'function'
+                    ? window.photoAvatarHtml(avatarSrc)
+                    : `<img src="${avatarSrc}" class="ava avatar-pending" alt="">`;
             } else {
                 const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
                 avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
@@ -96,6 +98,9 @@ async function loadMyChats() {
                 await openDirectWindow(chat.chat_id);
             };
             listContainer.appendChild(item);
+            if (typeof window.bindAvatarLoad === 'function') {
+                window.bindAvatarLoad(item);
+            }
             inx++;
         });
         Object.keys(window.unreadCounts || {}).forEach((id) => {

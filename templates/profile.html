@@ -88,6 +88,24 @@
     text-transform: uppercase;
 }
 
+@keyframes skeletonShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.avatar.avatar-pending {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 25%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-secondary-bg-color)) 50%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite linear;
+}
+
+.avatar.avatar-pending img {
+    opacity: 0;
+}
+
 @media (min-width: 751px) {
     .page-two > .header-wrapper {
         margin-top: var(--margin);
@@ -126,7 +144,7 @@
         <div class="page-two-content">
             <div class="page secondary_bg">
                 <div class="profile-block s-img defult">
-                    <div class="avatar">
+                    <div class="avatar{% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %} avatar-pending{% endif %}">
                         {% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %}
                         <img src="{{ url_for('static', filename='files/avatars/' + profile_avatar) }}" alt="">
                         {% else %}
@@ -153,4 +171,22 @@
     </div>
 </body>
 <script src="/static/js/tma-ui-kit-3-0.js"></script>
+<script>
+(function () {
+    var avatar = document.querySelector('.page-two-content .profile-block .avatar');
+    if (!avatar) return;
+    var img = avatar.querySelector('img');
+    if (!img) {
+        avatar.classList.remove('avatar-pending');
+        return;
+    }
+    var done = function () { avatar.classList.remove('avatar-pending'); };
+    if (img.complete && img.naturalWidth > 0) {
+        done();
+        return;
+    }
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+})();
+</script>
 </html>

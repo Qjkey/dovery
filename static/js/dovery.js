@@ -110,6 +110,39 @@ async function calc_key_chat(myPrivateKey, opponentPublicKey) {
 
 let debounceTimer;
 
+function photoAvatarHtml(src) {
+    return `<img src="${src}" class="ava avatar-pending" alt="">`;
+}
+
+function bindAvatarLoad(root) {
+    if (!root) return;
+    const imgs = [];
+    if (root.matches && root.matches('img')) imgs.push(root);
+    if (root.querySelectorAll) {
+        root.querySelectorAll('img').forEach((img) => {
+            if (!imgs.includes(img)) imgs.push(img);
+        });
+    }
+    imgs.forEach((img) => {
+        const profileBox = img.closest('.avatar');
+        const finish = () => {
+            img.classList.remove('avatar-pending');
+            if (profileBox) profileBox.classList.remove('avatar-pending');
+        };
+        if (img.complete && img.naturalWidth > 0) {
+            finish();
+            return;
+        }
+        img.classList.add('avatar-pending');
+        if (profileBox) profileBox.classList.add('avatar-pending');
+        img.addEventListener('load', finish, { once: true });
+        img.addEventListener('error', finish, { once: true });
+    });
+}
+
+window.photoAvatarHtml = photoAvatarHtml;
+window.bindAvatarLoad = bindAvatarLoad;
+
 async function openProfile(userId, is_my_profile = false, url_open = false) {
     if (!userId) {
         userId = window.userId;
@@ -125,7 +158,7 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
                 const data = await response.json();
                 let avatarHtml = '';
                 if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
-                    avatarHtml = `<img src="static/files/avatars/${data.avatar}" class="ava">`;
+                    avatarHtml = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
                 } else {
                     const firstLetter = data.name ? data.name.charAt(0).toUpperCase() : '?';
                     avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
@@ -156,6 +189,7 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) {
+        avatar.classList.remove('avatar-pending');
         avatar.innerHTML = '';
         if (user.avatar) {
             const parser = new DOMParser();
@@ -165,6 +199,7 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
                 avatarElement.classList.replace('letter-ava', 'letter-ava1');
             }
             if (avatarElement) avatar.appendChild(avatarElement);
+            bindAvatarLoad(avatar);
         }
     }
 
@@ -285,7 +320,7 @@ async function openProfileByUsername(username) {
     // Формируем аватар
     let avatarHtml = '';
     if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
-        avatarHtml = `<img src="static/files/avatars/${user.avatar}" class="ava">`;
+        avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
     } else {
         const firstLetter = user.name ? user.name.charAt(0).toUpperCase() : '?';
         avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
@@ -527,7 +562,10 @@ async function openDirectWindow(chatId) {
         }
         const typingEl = document.getElementById('user-typing');
         if (typingEl) typingEl.classList.add('hidden');
-        if (headerAvatar) headerAvatar.innerHTML = user.avatar;
+        if (headerAvatar) {
+            headerAvatar.innerHTML = user.avatar;
+            bindAvatarLoad(headerAvatar);
+        }
 
         const container = document.getElementById('id_ept');
         container.textContent = chatId; 
@@ -920,7 +958,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 let avatarHtml = '';
                 if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
-                    avatarHtml = `<img src="static/files/avatars/${user.avatar}" class="ava">`;
+                    avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
                 } else {
                     const firstLetter = user.name ? user.name.charAt(0).toUpperCase() : '?';
                     avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;

@@ -622,9 +622,66 @@ function clampChatListWidth(widthPx) {
 
 function applyChatListWidth(widthPx) {
     const width = clampChatListWidth(widthPx);
-    document.documentElement.style.setProperty('--width-chat-list', `${width}px`);
+    const value = `${width}px`;
+    document.documentElement.style.setProperty('--width-chat-list', value);
+    const sidebar = document.getElementById('app');
+    if (sidebar) {
+        sidebar.style.width = value;
+        sidebar.style.minWidth = value;
+        sidebar.style.maxWidth = value;
+        sidebar.style.flexBasis = value;
+    }
     return width;
 }
+
+function canResizeChatList() {
+    return window.innerWidth >= 751;
+}
+
+function hideChatListResizer() {
+    const resizer = document.getElementById('dragbar');
+    if (!resizer) return;
+    resizer.classList.remove('is-active', 'dragging');
+    document.body.classList.remove('is-resizing-chats');
+}
+
+function showChatListResizer() {
+    if (!canResizeChatList()) return;
+    const resizer = document.getElementById('dragbar');
+    if (!resizer) return;
+    resizer.classList.add('is-active');
+}
+
+function beginChatListResize() {
+    if (!canResizeChatList()) return;
+    showChatListResizer();
+    if (typeof hideDropdown === 'function') hideDropdown();
+}
+
+window.beginChatListResize = beginChatListResize;
+window.showChatListResizer = showChatListResizer;
+window.hideChatListResizer = hideChatListResizer;
+window.canResizeChatList = canResizeChatList;
+
+function syncResizeMenuItem() {
+    if (!Array.isArray(window.list_items_icon_01)) return;
+    const idx = window.list_items_icon_01.findIndex((entry) => entry.id === 'resize-chats');
+    if (canResizeChatList()) {
+        const item = {
+            id: 'resize-chats',
+            label: 'Изменить',
+            onclick: 'beginChatListResize();',
+            icon: 'settings2'
+        };
+        if (idx >= 0) window.list_items_icon_01[idx] = item;
+        else window.list_items_icon_01.push(item);
+    } else if (idx >= 0) {
+        window.list_items_icon_01.splice(idx, 1);
+        hideChatListResizer();
+    }
+}
+
+window.syncResizeMenuItem = syncResizeMenuItem;
 
 function initChatListResizer() {
     const resizer = document.getElementById('dragbar');
@@ -633,15 +690,15 @@ function initChatListResizer() {
 
     const saved = parseInt(localStorage.getItem(CHAT_LIST_WIDTH_KEY), 10);
     if (Number.isFinite(saved)) applyChatListWidth(saved);
+    syncResizeMenuItem();
 
     let dragging = false;
+    let pointerId = null;
+    let startLeft = 0;
+    let grabOffset = 0;
+    let veil = null;
 
-    const stopDragging = () => {
-        if (!dragging) return;
-        dragging = false;
-        resizer.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
+    const persistWidth = () => {
         const current = parseInt(
             getComputedStyle(document.documentElement).getPropertyValue('--width-chat-list'),
             10
@@ -651,30 +708,60 @@ function initChatListResizer() {
         }
     };
 
-    resizer.addEventListener('pointerdown', (e) => {
-        if (window.innerWidth < 751) return;
-        e.preventDefault();
-        dragging = true;
-        resizer.classList.add('dragging');
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        if (resizer.setPointerCapture) resizer.setPointerCapture(e.pointerId);
-    });
+    const stopDragging = (e) => {
+        if (!dragging) return;
+        if (e && pointerId != null && e.pointerId !== pointerId) return;
+        dragging = false;
+        pointerId = null;
+        resizer.classList.remove('dragging');
+        document.body.classList.remove('is-resizing-chats');
+        if (veil) {
+            veil.remove();
+            veil = null;
+        }
+        persistWidth();
+        hideChatListResizer();
+    };
 
     const onPointerMove = (e) => {
         if (!dragging) return;
-        const left = sidebar.getBoundingClientRect().left;
-        applyChatListWidth(e.clientX - left);
+        if (pointerId != null && e.pointerId !== pointerId) return;
+        applyChatListWidth(e.clientX - grabOffset - startLeft);
     };
 
-    resizer.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointermove', onPointerMove);
+    resizer.addEventListener('pointerdown', (e) => {
+        if (!canResizeChatList() || !resizer.classList.contains('is-active')) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragging = true;
+        pointerId = e.pointerId;
+        const rect = sidebar.getBoundingClientRect();
+        startLeft = rect.left;
+        grabOffset = e.clientX - rect.right;
+        resizer.classList.add('dragging');
+        document.body.classList.add('is-resizing-chats');
+        veil = document.createElement('div');
+        veil.className = 'chat-list-resize-veil';
+        document.body.appendChild(veil);
+    });
 
-    resizer.addEventListener('pointerup', stopDragging);
-    resizer.addEventListener('pointercancel', stopDragging);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', stopDragging, true);
+    document.addEventListener('pointercancel', stopDragging, true);
+    window.addEventListener('blur', () => stopDragging());
+
+    document.addEventListener('click', (e) => {
+        if (!resizer.classList.contains('is-active') || dragging) return;
+        if (e.target.closest('#dragbar') || e.target.closest('#tagDropdown') || e.target.closest('#cntxt_menu_btn_01')) {
+            return;
+        }
+        hideChatListResizer();
+    });
 
     window.addEventListener('resize', () => {
-        if (window.innerWidth < 751) return;
+        syncResizeMenuItem();
+        if (!canResizeChatList()) return;
         const current = parseInt(
             getComputedStyle(document.documentElement).getPropertyValue('--width-chat-list'),
             10
@@ -2300,6 +2387,50 @@ window.getDoveryTheme = getDoveryTheme;
 window.toggleDoveryTheme = toggleDoveryTheme;
 window.syncThemeMenuItem = syncThemeMenuItem;
 window.applyDoveryTheme = applyDoveryTheme;
+
+const E2EE_EMOJI_POOL = [
+    '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈',
+    '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦',
+    '🌽', '🌶️', '🫑', '🥒', '🥬', '🥕', '🫒', '🧄', '🧅', '🥔',
+    '🍄', '🥜', '🌰', '🍞', '🥐', '🥖', '🫓', '🥨', '🥯', '🥞',
+    '🧇', '🧀', '🍖', '🍗', '🥩', '🥓', '🍔', '🍟', '🍕', '🌭',
+    '🥪', '🌮', '🌯', '🫔', '🥙', '🧆', '🥚', '🍳', '🥘', '🍲',
+    '🫕', '🥣', '🥗', '🍿', '🧈', '🧂', '🥫', '🍱', '🍘', '🍙',
+    '🍚', '🍛', '🍜', '🍝', '🍠', '🍢', '🍣', '🍤', '🍥', '🥮',
+    '🍡', '🥟', '🥠', '🥡', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂',
+    '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼', '🥛'
+];
+
+async function buildE2eeEmojiStrip(count = 6) {
+    const fallback = ['🔑', '🔒', '🛡️', '✨', '🤝', '🔐'];
+    try {
+        const key = window.keychat;
+        if (!key) return fallback.slice(0, count);
+        const raw = await crypto.subtle.exportKey('raw', key);
+        const bytes = new Uint8Array(raw);
+        const out = [];
+        for (let i = 0; i < count; i++) {
+            out.push(E2EE_EMOJI_POOL[bytes[i % bytes.length] % E2EE_EMOJI_POOL.length]);
+        }
+        return out;
+    } catch (e) {
+        return fallback.slice(0, count);
+    }
+}
+
+async function openE2eeOverlay() {
+    const strip = document.getElementById('e2ee-emoji-strip');
+    if (strip) {
+        const emojis = await buildE2eeEmojiStrip(6);
+        strip.innerHTML = emojis.map((emoji) => `<span>${emoji}</span>`).join('');
+    }
+    if (typeof window.openOverlay === 'function') {
+        window.openOverlay(2);
+    }
+}
+
+window.openE2eeOverlay = openE2eeOverlay;
+window.buildE2eeEmojiStrip = buildE2eeEmojiStrip;
 
 const inputField = document.querySelector('#messages-textarea');
 

@@ -8,19 +8,21 @@ html, body {
 }
 
 @media (min-width: 751px) {
-  body {
+  body,
+  body.one-page {
     display: flex;
     flex-direction: row;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   /* Список чатов не сжимается длинными сообщениями */
   .chats,
   #app.chats {
-    flex-shrink: 0;
+    flex: 0 0 var(--width-chat-list, 350px);
     width: var(--width-chat-list, 350px);
-    min-width: 250px;
-    max-width: min(560px, calc(100vw - 380px));
+    min-width: var(--width-chat-list, 350px);
+    max-width: var(--width-chat-list, 350px);
   }
 
   #messages-host {
@@ -30,10 +32,14 @@ html, body {
     max-width: 100%;
     height: 100dvh;
     overflow: hidden;
+    z-index: 1;
   }
 
-  .resizer {
+  .resizer.is-active {
     display: block;
+    height: 100%;
+    min-height: 100%;
+    z-index: 250;
   }
 
   #message-chats.messages.screen {
@@ -228,19 +234,19 @@ img.avatar-pending {
   }
 }
 
-/* Стили для разделителя */
+/* Слайдер ширины списка чатов — виден только после пункта «Изменить» */
 .resizer {
   display: none;
-  width: 10px;
-  margin-left: -5px;
-  margin-right: -5px;
+  width: 18px;
+  margin-left: -9px;
+  margin-right: -9px;
   padding: 0;
   cursor: col-resize;
   background-color: transparent;
   border: 0;
   outline: none;
-  z-index: 30;
-  flex-shrink: 0;
+  z-index: 250;
+  flex: 0 0 18px;
   align-self: stretch;
   position: relative;
   touch-action: none;
@@ -249,22 +255,78 @@ img.avatar-pending {
 .resizer::before {
   content: '';
   position: absolute;
-  top: var(--margin, 15px);
-  bottom: var(--margin, 15px);
+  top: 12%;
+  bottom: 12%;
   left: 50%;
-  width: 1px;
+  width: 4px;
   transform: translateX(-50%);
-  background-color: var(--tg-theme-section-separator-color);
-  opacity: 0.45;
-  transition: width 0.12s ease, opacity 0.12s ease, background-color 0.12s ease;
+  border-radius: 4px;
+  background-color: var(--tg-theme-button-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tg-theme-button-color) 28%, transparent);
   pointer-events: none;
 }
 
-.resizer:hover::before,
-.resizer.dragging::before {
-  width: 2px;
-  opacity: 1;
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle, var(--tg-theme-button-text-color) 1.4px, transparent 1.6px) center 8px / 100% 10px repeat-y,
+    radial-gradient(circle, var(--tg-theme-button-text-color) 1.4px, transparent 1.6px) center / 100% 10px repeat-y;
   background-color: var(--tg-theme-button-color);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--tg-theme-button-color) 45%, transparent);
+  pointer-events: none;
+}
+
+.resizer.dragging::before {
+  width: 5px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tg-theme-button-color) 35%, transparent);
+}
+
+.chat-list-resize-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+body.is-resizing-chats,
+body.is-resizing-chats * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.e2ee-emoji-strip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 18px var(--margin);
+  margin: 0 var(--margin) var(--margin);
+  border-radius: var(--radius);
+  background: var(--tg-theme-section-bg-color);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.e2ee-emoji-strip span {
+  display: inline-flex;
+  width: 1.35em;
+  justify-content: center;
+}
+
+.e2ee-hint {
+  padding: 0 var(--margin) var(--margin);
+  color: var(--tg-theme-subtitle-text-color);
+  text-align: center;
 }
 
 /* Изменения в медиа-запросах для ПК */
@@ -333,8 +395,9 @@ img.avatar-pending {
 
 /* Отключение разделителя на мобильных устройствах */
 @media (max-width: 750px) {
-  .resizer {
-    display: none;
+  .resizer,
+  .resizer.is-active {
+    display: none !important;
   }
 }
 

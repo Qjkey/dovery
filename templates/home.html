@@ -72,99 +72,6 @@ Dovery
     </div>
 </div>
 <button type="button" class="resizer" id="dragbar" tabindex="-1" aria-label="Изменить ширину списка чатов"></button>
-<!-- <div class="messages screen" data-screen="1" data-swipe>
-    <div id="profile-block" class="profile-blocks hidden">
-        <section>
-            <div style="position: relative;">
-                <div class="item-header" style="position: absolute; z-index: 2;">
-                    <div id="close-profile" class="left"> 
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="#fff"/>
-                        </svg>
-                    </div>
-                </div>
-                <div id="profileBlock1" style="position: relative; z-index: 1;" class="profile-block s-img defult">
-                    <div class="avatar" id="profile-avatar"></div>
-                    <div class="defult headline6" id="profile-name"></div>
-                    <div class="subname subtitle1" id="profile-status"></div>
-                    <div class="hidden" id="profile-id"></div>
-                </div>
-            </div>
-        </section>
-        <section class="bottom">
-            <div class="item">
-                <div class="right">
-                    <div class="title oneline second-title"> 
-                        <div class="button1-medium">Информация</div> 
-                    </div>
-                    <a class="second-title element">
-                        <div class="button1">⠀</div>
-                    </a>
-                </div>
-            </div>
-
-            <div class="item clicked" id="cntxt_menu_btn_05">
-                <div class="right">
-                    <div class="text twoline"> 
-                        <div class="label body1" id="profile-username"></div> 
-                        <div class="label subtitle subtitle1">Username</div> 
-                    </div>
-                    <div class=element>
-                        <svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface6855" inkscape:label="surface6855" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface6855" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 200.65,150.65 C 200.65,150.65 353.26,150.65 353.26,150.65 C 370.23,150.65 383.98,167.62 383.98,181.37 C 383.98,181.37 383.98,387.84 383.98,387.84 C 383.98,404.80999999999995 370.21999999999997,418.56 353.26,418.56 C 353.26,418.56 200.65,418.56 200.65,418.56 C 183.68,418.56 169.93,401.59 169.93,387.84 C 169.93,387.84 169.93,181.37 169.93,181.37 C 169.93,164.4 183.69,150.65 200.65,150.65 C 200.65,150.65 200.65,150.65 200.65,150.65 Z"/> </g> <g id="g_3" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-hint-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:round;stroke-linejoin:miter"> <path d="M 286.74,89.6 C 286.74,89.6 185.13,89.6 185.13,89.6 C 142.70999999999998,89.6 108.33,123.98 108.33,166.4 C 108.33,166.4 108.33,321.32 108.33,321.32 "/> </g> </g> </g> </svg>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <section>
-            <div class="item clicked" id="profile-open-chat">
-                <div class="right">
-                    <div class="text oneline"> 
-                        <div class="label body1">Открыть чат</div> 
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-    <div id="empty-state" class="body1-medium empty-state">
-        <p class="label-no-chats">Выберете чат, либо используйте поиск</p>
-    </div>
-    <div id="chat-active-content" class="chat-active-content" style="display: none;">
-        <header class="chat-header">
-            <div class="item-header clicked">
-                <div class="left" onclick="toggleChat(false);"> 
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 12C20 11.4477 19.5523 11 19 11H7.83L12.71 6.12C13.1017 5.72829 13.1006 5.09284 12.7075 4.70251C12.3164 4.31412 11.6848 4.31524 11.295 4.705L5.13137 10.8686C4.73535 11.2646 4.53735 11.4627 4.46316 11.691C4.3979 11.8918 4.3979 12.1082 4.46316 12.309C4.53735 12.5373 4.73535 12.7354 5.13137 13.1314L11.2947 19.2947C11.6842 19.6842 12.3158 19.6842 12.7053 19.2947C13.0946 18.9054 13.0949 18.2743 12.7059 17.8847L7.83 13H19C19.5523 13 20 12.5523 20 12Z" fill="var(--tg-theme-bg-color)"/>
-                    </svg>
-                </div>
-                <div class="second-left" id="chat-headers"> 
-                </div>
-                <div class="right">
-                    <div class="text twoline" id="chat-headers1"> 
-                        <div class="label-header body1-medium" id="chat-name"></div> 
-                        <div class="label-header-subtitle subtitle1" id="status_of_user"></div> 
-                        <div style="display: none;" id="id_ept"></div>
-                    </div>
-                    <div class="element" id="cntxt_menu_btn_02">
-                        <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12.5218 8C13.6696 8 14.6087 7.1 14.6087 6C14.6087 4.9 13.6696 4 12.5218 4C11.3739 4 10.4348 4.9 10.4348 6C10.4348 7.1 11.3739 8 12.5218 8ZM12.5218 10C11.3739 10 10.4348 10.9 10.4348 12C10.4348 13.1 11.3739 14 12.5218 14C13.6696 14 14.6087 13.1 14.6087 12C14.6087 10.9 13.6696 10 12.5218 10ZM12.5218 16C11.3739 16 10.4348 16.9 10.4348 18C10.4348 19.1 11.3739 20 12.5218 20C13.6696 20 14.6087 19.1 14.6087 18C14.6087 16.9 13.6696 16 12.5218 16Z" fill="var(--tg-theme-bg-color)" stroke="none"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        <div class="e2ee clicked" id="overlay_profile">
-            <div class="active caption1-medium">Сквозное шифрование E2EE</div> 
-        </div>
-        </header>
-
-        <div class="messages-area" id="messages-area">
-        </div>
-
-        <div id="welcome-panel" class="hidden">
-            <div class="caption1-medium label-header as">Добро пожаловать!</div>
-            <div class="caption1-medium label-header">Здесь пока ничего нет. Начните общение.</div>
-        </div>
-    </div>
-</div> -->
 <div id="messages-host" class="messages-host">
 <div class="messages screen" id="message-chats" data-screen="2" data-swipe>
     <div id="no-chat-content" class="body1-medium empty-state">
@@ -368,6 +275,33 @@ Dovery
         </section>
     </div>
 </div>
+<div class="overlay-container" data-overlay="2">
+    <div class="profile-modal">
+        <div class="header-wrapper">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-overlay="2">
+                        <div class="element-header">
+                            <svg class="close"><use href="#close"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-center-two header-capsule">
+                    <div class="label headline6">E2EE шифрование</div>
+                </div>
+            </div>
+        </div>
+        <div class="big-header" style="padding-top: 0;">
+            <div class="big-header-title label headline6">Сквозное шифрование</div>
+            <div class="label body1">Сверьте эмодзи с собеседником. Если наборы совпадают — третьего лица в переписке нет.</div>
+        </div>
+        <div class="e2ee-emoji-strip" id="e2ee-emoji-strip" aria-label="Ключ безопасности">
+            <span>🔑</span><span>🔒</span><span>🛡️</span><span>✨</span><span>🤝</span><span>🔐</span>
+        </div>
+        <div class="e2ee-hint subtitle2">Эмодзи строятся из общего ключа чата и одинаковы только у вас двоих.</div>
+    </div>
+</div>
 <script src="/static/js/tma-ui-kit-3-0.js"></script>
 <script>
 var list_items_icon_01 = [            
@@ -376,6 +310,7 @@ var list_items_icon_01 = [
 ];
 
 var list_items_icon_02 = [            
+    { label: "E2EE шифрование", onclick:"openE2eeOverlay();", icon: 'copy' },
     { label: "Удалить чат", danger: true, onclick:"delete_chat();", icon: 'delete'}
 ];
 
@@ -392,5 +327,6 @@ var list_items_icon_05 = [
     { label: "Username", onclick:"copy_username();", icon: 'copy' }
 ];
 if (typeof syncThemeMenuItem === 'function') syncThemeMenuItem();
+if (typeof syncResizeMenuItem === 'function') syncResizeMenuItem();
 </script>
 {% endblock %}

@@ -671,7 +671,7 @@ function syncResizeMenuItem() {
             id: 'resize-chats',
             label: 'Изменить',
             onclick: 'beginChatListResize();',
-            icon: 'settings2'
+            icon: 'edit'
         };
         if (idx >= 0) window.list_items_icon_01[idx] = item;
         else window.list_items_icon_01.push(item);

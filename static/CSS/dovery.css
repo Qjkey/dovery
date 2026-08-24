@@ -694,3 +694,13 @@ body.is-resizing-chats * {
 :root[data-theme="dark"] .message-status {
   color: var(--tg-theme-icon-message-color);
 }
+
+#messages-textarea:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+#sendBtn.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}

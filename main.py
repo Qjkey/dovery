@@ -188,6 +188,19 @@ def migrate_schema():
             cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_message_chat_time ON message(chat_id, time, id)'
             )
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS blocks (
+                    chat_id INTEGER NOT NULL,
+                    blocked_user_id INTEGER NOT NULL,
+                    UNIQUE(chat_id, blocked_user_id)
+                )
+            ''')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_blocks_chat_id ON blocks(chat_id)'
+            )
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_blocks_blocked_user_id ON blocks(blocked_user_id)'
+            )
             
             conn.commit()
     except Exception as e:
@@ -503,6 +516,83 @@ def get_chat_peer(chat_id, user_id):
         conn.close()
 
 
+def get_chat_users(chat_id, conn=None):
+    own = conn is None
+    if own:
+        conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT user_one_id, user_two_id FROM chats WHERE id = ?",
+            (chat_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return int(row[0]), int(row[1])
+    except Exception:
+        return None
+    finally:
+        if own:
+            conn.close()
+
+
+def get_block_state(chat_id, viewer_id, conn=None):
+    own = conn is None
+    if own:
+        conn = get_db_connection()
+    try:
+        users = get_chat_users(chat_id, conn=conn)
+        if not users:
+            return {
+                'blocked_by_me': False,
+                'blocked_me': False,
+                'can_send': True,
+                'hide_avatar': False,
+            }
+        user_one_id, user_two_id = users
+        viewer_id = int(viewer_id)
+        if viewer_id not in (user_one_id, user_two_id):
+            return {
+                'blocked_by_me': False,
+                'blocked_me': False,
+                'can_send': True,
+                'hide_avatar': False,
+            }
+
+        peer_id = user_two_id if viewer_id == user_one_id else user_one_id
+        rows = conn.execute(
+            "SELECT blocked_user_id FROM blocks WHERE chat_id = ?",
+            (chat_id,),
+        ).fetchall()
+        blocked_ids = {int(row[0]) for row in rows}
+        blocked_by_me = peer_id in blocked_ids
+        blocked_me = viewer_id in blocked_ids
+        return {
+            'blocked_by_me': blocked_by_me,
+            'blocked_me': blocked_me,
+            'can_send': not (blocked_by_me or blocked_me),
+            'hide_avatar': blocked_me,
+        }
+    except Exception:
+        return {
+            'blocked_by_me': False,
+            'blocked_me': False,
+            'can_send': True,
+            'hide_avatar': False,
+        }
+    finally:
+        if own:
+            conn.close()
+
+
+def emit_block_state(chat_id, user_id, conn=None):
+    state = get_block_state(chat_id, user_id, conn=conn)
+    socketio.emit(
+        'block_state_updated',
+        {'chat_id': str(chat_id), 'block_state': state},
+        to=f"user_{user_id}",
+    )
+
+
 def emit_partner_typing(chat_id, sender_id, is_typing):
     peer_id = get_chat_peer(chat_id, sender_id)
     if peer_id is None:
@@ -770,14 +860,18 @@ def get_my_chats():
     ).fetchall()
     chats = [dict(chat) for chat in chats_rows]
 
-    conn.close()
-
     for chat in chats:
         user_id_str = int(chat['id'])
-        if user_id_str in online_users:
-            chat['status'] = 'в сети'
-        else:
-            chat['status'] = 'был(а) недавно'
+        real_status = 'в сети' if user_id_str in online_users else 'был(а) недавно'
+        block_state = get_block_state(chat['chat_id'], current_user_id, conn=conn)
+        chat['real_status'] = real_status
+        chat['status'] = 'Вас заблокировали' if block_state['blocked_me'] else real_status
+        chat['hide_avatar'] = bool(block_state['hide_avatar'])
+        chat['block_state'] = block_state
+        if chat['hide_avatar']:
+            chat['avatar'] = ''
+
+    conn.close()
 
     return jsonify(chats)
 
@@ -816,6 +910,16 @@ def handle_message(data):
         
         user_one_id, user_two_id = chat_row[0], chat_row[1]
         receiver_id = user_two_id if sender_id == user_one_id else user_one_id
+        block_state = get_block_state(chat_id, sender_id, conn=conn)
+        if not block_state.get('can_send', True):
+            emit(
+                'message_error',
+                {
+                    'code': 'blocked_by_me' if block_state.get('blocked_by_me') else 'blocked_me',
+                    'msg_id': msg_id,
+                },
+            )
+            return
     except Exception as e:
         emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
         return
@@ -855,6 +959,13 @@ def handle_typing(data):
 
     peer_id = get_chat_peer(chat_id, sender_id)
     if peer_id is None:
+        return
+    if not get_block_state(chat_id, sender_id).get('can_send', True):
+        emit(
+            'partner_typing',
+            {'chat_id': str(chat_id), 'typing': False},
+            to=f"user_{peer_id}",
+        )
         return
 
     if is_typing:
@@ -1014,9 +1125,10 @@ def get_history(chat_id):
         has_more = len(rows) > HISTORY_PAGE_SIZE
         rows = rows[:HISTORY_PAGE_SIZE]
         messages = [dict(row) for row in reversed(rows)]
+        block_state = get_block_state(chat_id, user_id, conn=conn)
         conn.close()
 
-        return jsonify({'messages': messages, 'has_more': has_more})
+        return jsonify({'messages': messages, 'has_more': has_more, 'block_state': block_state})
     except Exception as e:
         print(f"Ошибка базы данных: {e}")
         return jsonify([]), 500
@@ -1073,24 +1185,44 @@ def get_user_data_api(user_id):
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
-    conn.close()
 
     if not user:
+        conn.close()
         return jsonify({"error": "User not found"}), 404
 
     user_id_int = int(user['id'])
+    current_user_id = get_current_user_id()
+    block_state = {
+        'blocked_by_me': False,
+        'blocked_me': False,
+        'can_send': True,
+        'hide_avatar': False,
+    }
+    if current_user_id:
+        u1, u2 = sorted([int(current_user_id), user_id_int])
+        chat_row = conn.execute(
+            "SELECT id FROM chats WHERE user_one_id = ? AND user_two_id = ?",
+            (u1, u2),
+        ).fetchone()
+        if chat_row:
+            block_state = get_block_state(chat_row['id'], current_user_id, conn=conn)
 
     if user_id_int in online_users:
-        status = 'в сети'
+        real_status = 'в сети'
     else:
-        status = 'был(а) недавно'
+        real_status = 'был(а) недавно'
+    conn.close()
+    status = 'Вас заблокировали' if block_state['blocked_me'] else real_status
     return jsonify({
         "id": user['id'],
         "username": user['username'],
         "name": user['name'],
-        "avatar": user['avatar'] if user['avatar'] else "",
+        "avatar": "" if block_state['hide_avatar'] else (user['avatar'] if user['avatar'] else ""),
         "public_key": user['public_key'],
-        "status": status
+        "status": status,
+        "real_status": real_status,
+        "hide_avatar": block_state['hide_avatar'],
+        "block_state": block_state
     })
 
 @app.route('/get_user_by_username/<username>')
@@ -1143,6 +1275,11 @@ def delete_chat(data):
         user_one_id, user_two_id = chat_row[0], chat_row[1]
         other_user_id = user_two_id if userid == user_one_id else user_one_id
 
+        if not get_block_state(chat_id, userid, conn=conn).get('can_send', True):
+            emit('chat_delete_error', {'code': 'blocked', 'chat_id': str(chat_id)}, to=f"user_{userid}")
+            conn.close()
+            return
+
         cursor.execute("DELETE FROM message WHERE chat_id = ?", (chat_id,))
         cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
         
@@ -1153,6 +1290,47 @@ def delete_chat(data):
         emit('chat_deleted', {'chat_id': chat_id}, to=f"user_{other_user_id}")
     except Exception as e:
         print(f"Ошибка при удалении чата через сокет: {e}")
+
+
+@socketio.on('toggle_block')
+def toggle_block(data):
+    user_id = get_current_user_id()
+    if not user_id or not isinstance(data, dict):
+        return
+    chat_id = data.get('chat_id')
+    if not chat_id:
+        return
+
+    conn = get_db_connection()
+    try:
+        users = get_chat_users(chat_id, conn=conn)
+        if not users:
+            return
+        user_one_id, user_two_id = users
+        user_id = int(user_id)
+        if user_id not in (user_one_id, user_two_id):
+            return
+        peer_id = user_two_id if user_id == user_one_id else user_one_id
+
+        state = get_block_state(chat_id, user_id, conn=conn)
+        if state.get('blocked_by_me'):
+            conn.execute(
+                "DELETE FROM blocks WHERE chat_id = ? AND blocked_user_id = ?",
+                (chat_id, peer_id),
+            )
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO blocks (chat_id, blocked_user_id) VALUES (?, ?)",
+                (chat_id, peer_id),
+            )
+        conn.commit()
+
+        emit_block_state(chat_id, user_id, conn=conn)
+        emit_block_state(chat_id, peer_id, conn=conn)
+    except Exception as e:
+        print(f"Ошибка блокировки чата: {e}")
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     # В DEV_MODE: threading + reloader — Ctrl+S перезапускает процесс на том же порту,

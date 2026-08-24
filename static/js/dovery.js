@@ -114,6 +114,37 @@ function photoAvatarHtml(src) {
     return `<img src="${src}" class="ava avatar-pending" alt="">`;
 }
 
+function normalizeBlockState(state) {
+    return {
+        blocked_by_me: !!state?.blocked_by_me,
+        blocked_me: !!state?.blocked_me,
+        can_send: state?.can_send !== false,
+        hide_avatar: !!state?.hide_avatar,
+    };
+}
+
+function letterAvatarHtml(name) {
+    const firstLetter = name ? String(name).charAt(0).toUpperCase() : '?';
+    return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+}
+
+function getDisplayAvatarHtml(user) {
+    if (!user) return '';
+    if (user.hideAvatar) return letterAvatarHtml(user.name);
+    return user.avatar || letterAvatarHtml(user.name);
+}
+
+function getEffectiveStatus(user) {
+    if (user?.blockState?.blocked_me) return 'Вас заблокировали';
+    return user?.realStatus || user?.status || 'был(а) недавно';
+}
+
+function getComposerBlockedText(state) {
+    if (state?.blocked_by_me) return 'Вы заблокировали';
+    if (state?.blocked_me) return 'Вас заблокировали';
+    return 'Сообщение';
+}
+
 function bindAvatarLoad(root) {
     if (!root) return;
     const imgs = [];
@@ -157,18 +188,23 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
             if (response.ok) {
                 const data = await response.json();
                 let avatarHtml = '';
-                if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
+                if (data.hide_avatar) {
+                    avatarHtml = letterAvatarHtml(data.name);
+                } else if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
                     avatarHtml = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
                 } else {
-                    const firstLetter = data.name ? data.name.charAt(0).toUpperCase() : '?';
-                    avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+                    avatarHtml = letterAvatarHtml(data.name);
                 }
                 chatsData[userId] = {
                     username: data.username,
                     name: data.name,
                     avatar: avatarHtml,
+                    avatarRaw: data.avatar,
+                    hideAvatar: !!data.hide_avatar,
                     publicKey: data.public_key,
-                    status: data.status
+                    status: data.status,
+                    realStatus: data.real_status || data.status,
+                    blockState: normalizeBlockState(data.block_state)
                 };
                 user = chatsData[userId];
             }
@@ -184,16 +220,16 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
 
     document.getElementById('profile-name').textContent = user.name || '';
     document.getElementById('profile-id').textContent = userId;
-    document.getElementById('profile-status').textContent = user.status || 'был(а) недавно';
+    document.getElementById('profile-status').textContent = getEffectiveStatus(user);
     document.getElementById('profile-username').textContent = '@' + (user.username || '');
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) {
         avatar.classList.remove('avatar-pending');
         avatar.innerHTML = '';
-        if (user.avatar) {
+        if (getDisplayAvatarHtml(user)) {
             const parser = new DOMParser();
-            const doc = parser.parseFromString(user.avatar, 'text/html');
+            const doc = parser.parseFromString(getDisplayAvatarHtml(user), 'text/html');
             const avatarElement = doc.body.firstChild;
             if (avatarElement && avatarElement.classList && avatarElement.classList.contains('letter-ava')) {
                 avatarElement.classList.replace('letter-ava', 'letter-ava1');
@@ -319,11 +355,12 @@ async function openProfileByUsername(username) {
 
     // Формируем аватар
     let avatarHtml = '';
-    if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
+    if (user.hide_avatar) {
+        avatarHtml = letterAvatarHtml(user.name);
+    } else if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
         avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
     } else {
-        const firstLetter = user.name ? user.name.charAt(0).toUpperCase() : '?';
-        avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+        avatarHtml = letterAvatarHtml(user.name);
     }
 
     // Добавляем в кэш
@@ -331,8 +368,12 @@ async function openProfileByUsername(username) {
         username: user.username,
         name: user.name,
         avatar: avatarHtml,
+        avatarRaw: user.avatar,
+        hideAvatar: !!user.hide_avatar,
         publicKey: user.public_key,
-        status: user.status
+        status: user.status,
+        realStatus: user.real_status || user.status,
+        blockState: normalizeBlockState(user.block_state)
     };
 
     openProfile(userId, false, false);
@@ -371,13 +412,14 @@ socket.on("user_status_update", (data) => {
         
         if (chatsData[userId]) {
             chatsData[userId].status = data.status;
+            chatsData[userId].realStatus = data.status;
         }
 
         if (idEpt && userId === activePartnerId) {
             const currentStatus = document.getElementById('user-status');
             if (currentStatus) {
                 const keepHidden = currentStatus.classList.contains('hidden') && !getConnectionStatusLabel();
-                setOpenChatPresence(data.status);
+                setOpenChatPresence(getEffectiveStatus(chatsData[userId]));
                 if (keepHidden) currentStatus.classList.add('hidden');
             }
         }
@@ -390,15 +432,16 @@ socket.on("user_status_update", (data) => {
             && profileId
             && profileId.textContent === userId
         ) {
-            document.getElementById('profile-status').textContent = data.status;
+            document.getElementById('profile-status').textContent = getEffectiveStatus(chatsData[userId]);
         }
 
         const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
         if (currentChatElem) {
             const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
             if (statusInList) {
-                statusInList.className = `label status_of_user_in_list_chats ${presenceClass(data.status, true)}`;
-                statusInList.textContent = displayedPresenceText(data.status, true);
+                const effectiveStatus = getEffectiveStatus(chatsData[userId]);
+                statusInList.className = `label status_of_user_in_list_chats ${presenceClass(effectiveStatus, true)}`;
+                statusInList.textContent = displayedPresenceText(effectiveStatus, true);
             }
         }
     } catch (err) {
@@ -446,11 +489,60 @@ function setOpenChatPresence(realStatus) {
     }
 }
 
+function getCurrentOpenPartner() {
+    const chatId = getOpenChatId() || getActiveChatId();
+    const partnerId = chatId && window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+    return partnerId ? chatsData[String(partnerId)] : null;
+}
+
+function getChatBlockState(chatId) {
+    const id = chatId != null ? String(chatId) : '';
+    if (!id) return normalizeBlockState();
+    if (chatHash[id]?.blockState) return normalizeBlockState(chatHash[id].blockState);
+    const partnerId = window.chatIdToUserId ? window.chatIdToUserId[id] : null;
+    if (partnerId && chatsData[String(partnerId)]?.blockState) {
+        return normalizeBlockState(chatsData[String(partnerId)].blockState);
+    }
+    return normalizeBlockState();
+}
+
+function syncBlockMenuItem() {
+    if (!Array.isArray(window.list_items_icon_02)) return;
+    const idx = window.list_items_icon_02.findIndex((entry) => entry.id === 'toggle-block');
+    const chatId = getActiveChatId();
+    const state = getChatBlockState(chatId);
+    const item = {
+        id: 'toggle-block',
+        label: state.blocked_by_me ? 'Разблокировать' : 'Заблокировать',
+        onclick: 'toggle_chat_block();',
+        icon: 'block'
+    };
+    if (idx >= 0) window.list_items_icon_02[idx] = item;
+    else window.list_items_icon_02.splice(1, 0, item);
+}
+
+function updateComposerBlockedState(chatId) {
+    if (!msgInput || !sendBtn) return;
+    const state = getChatBlockState(chatId);
+    const blocked = !state.can_send;
+    msgInput.disabled = blocked;
+    msgInput.readOnly = blocked;
+    msgInput.placeholder = getComposerBlockedText(state);
+    sendBtn.disabled = blocked;
+    sendBtn.classList.toggle('is-disabled', blocked);
+    if (blocked) {
+        msgInput.value = '';
+        syncComposerTyping();
+    }
+}
+
 function refreshAllPresenceDisplays() {
     const idEpt = document.getElementById('id_ept');
     const chatId = idEpt ? idEpt.innerText.trim() : '';
     const partnerId = chatId && window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
-    const real = (partnerId && chatsData[partnerId] && chatsData[partnerId].status) || 'был(а) недавно';
+    const real = partnerId && chatsData[partnerId]
+        ? getEffectiveStatus(chatsData[partnerId])
+        : 'был(а) недавно';
     setOpenChatPresence(real);
 
     if (!getConnectionStatusLabel() && typeof refreshPartnerTypingHeader === 'function') {
@@ -461,7 +553,7 @@ function refreshAllPresenceDisplays() {
         const el = item.querySelector('.status_of_user_in_list_chats');
         if (!el) return;
         const uid = item.getAttribute('data-user-id');
-        const st = (chatsData[uid] && chatsData[uid].status) || 'был(а) недавно';
+        const st = chatsData[uid] ? getEffectiveStatus(chatsData[uid]) : 'был(а) недавно';
         el.className = `label status_of_user_in_list_chats ${presenceClass(st, true)}`;
         el.textContent = displayedPresenceText(st, true);
     });
@@ -558,12 +650,12 @@ async function openDirectWindow(chatId) {
 
         if (headerName) headerName.innerText = user.name;
         if (headerStatus) {
-            setOpenChatPresence(user.status);
+            setOpenChatPresence(getEffectiveStatus(user));
         }
         const typingEl = document.getElementById('user-typing');
         if (typingEl) typingEl.classList.add('hidden');
         if (headerAvatar) {
-            headerAvatar.innerHTML = user.avatar;
+            headerAvatar.innerHTML = getDisplayAvatarHtml(user);
             bindAvatarLoad(headerAvatar);
         }
 
@@ -582,6 +674,8 @@ async function openDirectWindow(chatId) {
             console.error("Ошибка установки защищенного соединения:", err);
         }
         msgInput.value = '';
+        updateComposerBlockedState(chatId);
+        syncBlockMenuItem();
         loadChat(chatId);
         document.getElementById('no-chat-content').classList.add('hidden');
         document.getElementById('chat-content').classList.remove('hidden');
@@ -625,11 +719,20 @@ function applyChatListWidth(widthPx) {
     const value = `${width}px`;
     document.documentElement.style.setProperty('--width-chat-list', value);
     const sidebar = document.getElementById('app');
-    if (sidebar) {
+    if (!sidebar) return width;
+
+    // На узких экранах боковая панель должна растягиваться на всю ширину.
+    // Inline-сайзинг из сохранённого значения ломает это (и список начинает "вставать" по центру).
+    if (canResizeChatList()) {
         sidebar.style.width = value;
         sidebar.style.minWidth = value;
         sidebar.style.maxWidth = value;
         sidebar.style.flexBasis = value;
+    } else {
+        sidebar.style.width = '';
+        sidebar.style.minWidth = '';
+        sidebar.style.maxWidth = '';
+        sidebar.style.flexBasis = '';
     }
     return width;
 }
@@ -1044,19 +1147,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (typeof chatHash === 'undefined') window.chatHash = {};
 
                 let avatarHtml = '';
-                if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
+                if (user.hide_avatar) {
+                    avatarHtml = letterAvatarHtml(user.name);
+                } else if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
                     avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
                 } else {
-                    const firstLetter = user.name ? user.name.charAt(0).toUpperCase() : '?';
-                    avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+                    avatarHtml = letterAvatarHtml(user.name);
                 }
 
                 chatsData[userId] = {
                     username: user.username,
                     name: user.name,
                     avatar: avatarHtml,
+                    avatarRaw: user.avatar,
+                    hideAvatar: !!user.hide_avatar,
                     publicKey: user.public_key,
-                    status: user.status
+                    status: user.status,
+                    realStatus: user.real_status || user.status,
+                    blockState: normalizeBlockState(user.block_state)
                 };
                 console.log(chatsData);
                 openProfile(userId, false, true);
@@ -1567,7 +1675,7 @@ async function decryptText(encryptedBase64) {
 }
 
 async function decryptText_new_message(encryptedBase64, userid) {
-    const keychat = chatsData[userid].keychat;
+    const keychat = chatsData[userid]?.keychat || window.keychat;
     if (!keychat) throw new Error("Ключ не инициализирован");
     const combined = new Uint8Array(atob(encryptedBase64).split("").map(c => c.charCodeAt(0)));
     const iv = combined.slice(0, 12);
@@ -1772,6 +1880,11 @@ async function sendMessage() {
     const time = getPreciseISOString();
 
     const chatId = document.getElementById('id_ept').innerText;
+    const blockState = getChatBlockState(chatId);
+    if (!blockState.can_send) {
+        updateComposerBlockedState(chatId);
+        return;
+    }
 
     noteMessageSentClient();
 
@@ -1822,6 +1935,12 @@ socket.on('message_error', (data) => {
         d_pop("Слишком длинное сообщение", `Максимум ${MAX_MESSAGE_LENGTH} символов`, "Хорошо");
     } else if (code === 'rate_limit') {
         d_pop("Слишком часто", "Не больше 20 сообщений в минуту", "Хорошо");
+    } else if (code === 'blocked_by_me') {
+        d_alert("Сообщения заблокированы", "Вы заблокировали этого пользователя", "ok");
+        updateComposerBlockedState(getActiveChatId());
+    } else if (code === 'blocked_me') {
+        d_alert("Сообщения заблокированы", "Вас заблокировали", "ok");
+        updateComposerBlockedState(getActiveChatId());
     } else if (code === 'unauthorized') {
         d_alert("Ошибка", "Сессия истекла, войдите снова", "ok");
     } else {
@@ -1861,12 +1980,11 @@ socket.on('new_message', async (data) => {
         // 2. Рендерим в DOM только если этот чат сейчас открыт перед глазами
         if (activeChatId == chatId) {
             const keyOwnerId = partnerId;
-            console.log(keyOwnerId);
-            console.log(chatsData[keyOwnerId]);
-            if (!chatsData[keyOwnerId] || !chatsData[keyOwnerId].keychat) {
-                if (!chatsData[keyOwnerId].keychat) {
-                    console.warn(`Нету ключа чата`);
-                }
+            const partner = keyOwnerId ? chatsData[keyOwnerId] : null;
+            if (partner && !partner.keychat && window.keychat) {
+                partner.keychat = window.keychat;
+            }
+            if (!partner || !partner.keychat) {
                 console.warn(`Не найден ключ для дешифровки чата ${keyOwnerId}. Возможно чат еще не инициализирован.`);
                 return;
             }
@@ -1952,10 +2070,14 @@ function getActiveChatId() {
 
 function parseHistoryResponse(data) {
     if (Array.isArray(data)) {
-        return { messages: data, hasMore: data.length >= HISTORY_PAGE_SIZE };
+        return { messages: data, hasMore: data.length >= HISTORY_PAGE_SIZE, blockState: normalizeBlockState() };
     }
     const messages = Array.isArray(data?.messages) ? data.messages : [];
-    return { messages, hasMore: Boolean(data?.has_more) };
+    return {
+        messages,
+        hasMore: Boolean(data?.has_more),
+        blockState: normalizeBlockState(data?.block_state)
+    };
 }
 
 function mapHistoryMessages(list) {
@@ -2092,6 +2214,7 @@ async function loadOlderMessages(chatId) {
         const existingIds = new Set((cache.messages || []).map((m) => m.id));
         const fresh = mapHistoryMessages(parsed.messages).filter((m) => m.id && !existingIds.has(m.id));
         cache.hasMore = parsed.hasMore;
+        cache.blockState = parsed.blockState;
         if (fresh.length) {
             cache.messages = fresh.concat(cache.messages);
         } else {
@@ -2143,6 +2266,8 @@ async function loadChat(chatId) {
         const messages = await decryptAll(chatHash[chatId].messages);
         if (String(getActiveChatId()) !== String(chatId)) return;
         renderChat(messagesArea, messages, window.userId);
+        updateComposerBlockedState(chatId);
+        syncBlockMenuItem();
         setupHistoryLoader(chatId);
         return;
     } else {
@@ -2158,13 +2283,16 @@ async function loadChat(chatId) {
             chatHash[chatId] = {
                 id: chatId,
                 messages: mapHistoryMessages(parsed.messages),
-                hasMore: parsed.hasMore
+                hasMore: parsed.hasMore,
+                blockState: parsed.blockState
             };
 
             messagesArea.innerHTML = '';
             const decrypted = await decryptAll(chatHash[chatId].messages);
             if (String(getActiveChatId()) !== String(chatId)) return;
             renderChat(messagesArea, decrypted, window.userId);
+            updateComposerBlockedState(chatId);
+            syncBlockMenuItem();
             setupHistoryLoader(chatId);
         } catch (err) {
             console.error("Ошибка загрузки истории:", err);
@@ -2293,21 +2421,34 @@ function setMessageContent(el, text) {
 }
 
 
-function delete_chat() {
+async function delete_chat() {
     const targetElement = document.getElementById('id_ept');
     if (!targetElement) return;
     
     const chatId = targetElement.textContent.trim();
+    const result = await d_alert('Удалить чат', 'Чат будет удалён. Продолжить?', 'ok_cancel');
+    if (result !== 'ok') return;
 
     socket.emit('delete_chat', { id: chatId });
-
-    // Удаление объекта из локального списка chatHash
-    if (typeof chatHash !== 'undefined' && chatHash[chatId]) {
-        delete chatHash[chatId];
-    }
 }
 
 window.delete_chat = delete_chat; 
+
+async function toggle_chat_block() {
+    const chatId = getActiveChatId();
+    if (!chatId) return;
+    const state = getChatBlockState(chatId);
+    const isUnblock = !!state.blocked_by_me;
+    const result = await d_alert(
+        isUnblock ? 'Разблокировать пользователя' : 'Заблокировать пользователя',
+        isUnblock ? 'Разблокировать этого пользователя?' : 'Заблокировать этого пользователя?',
+        'ok_cancel'
+    );
+    if (result !== 'ok') return;
+    socket.emit('toggle_block', { chat_id: chatId });
+}
+
+window.toggle_chat_block = toggle_chat_block;
 
 socket.on('chat_deleted', async (data) => {
     try {
@@ -2329,6 +2470,70 @@ socket.on('chat_deleted', async (data) => {
         console.error('Ошибка при обработке удаления чата на клиенте:', error);
     }
 });
+
+socket.on('chat_delete_error', (data) => {
+    if (data?.code === 'blocked') {
+        d_alert("Чат нельзя удалить", "Сначала снимите блокировку, затем удалите чат", "ok");
+    }
+});
+
+socket.on('block_state_updated', async (data) => {
+    const chatId = data?.chat_id != null ? String(data.chat_id) : '';
+    if (!chatId) return;
+    const state = normalizeBlockState(data.block_state);
+    if (!chatHash[chatId]) {
+        chatHash[chatId] = { id: chatId, messages: [], hasMore: true };
+    }
+    chatHash[chatId].blockState = state;
+
+    const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+    if (partnerId && chatsData[partnerId]) {
+        const user = chatsData[partnerId];
+        user.blockState = state;
+        user.hideAvatar = !!state.hide_avatar;
+        user.status = state.blocked_me ? 'Вас заблокировали' : (user.realStatus || user.status);
+        if (state.hide_avatar) {
+            user.avatar = letterAvatarHtml(user.name);
+        }
+    }
+
+    syncBlockMenuItem();
+    updateComposerBlockedState(chatId);
+    refreshAllPresenceDisplays();
+    renderPartnerAvatar(partnerId, chatId);
+
+    await loadMyChats();
+    const refreshedPartnerId = (window.chatIdToUserId && window.chatIdToUserId[chatId]) || partnerId;
+    renderPartnerAvatar(refreshedPartnerId, chatId);
+});
+
+function renderPartnerAvatar(partnerId, chatId) {
+    if (!partnerId || !chatsData[partnerId]) return;
+    const user = chatsData[partnerId];
+    if (String(getActiveChatId()) === String(chatId)) {
+        const headerAvatar = document.getElementById('user-avatar');
+        if (headerAvatar) {
+            headerAvatar.innerHTML = getDisplayAvatarHtml(user);
+            bindAvatarLoad(headerAvatar);
+        }
+    }
+    const profileIdEl = document.getElementById('profile-id');
+    const profileAvatar = document.getElementById('profile-avatar');
+    if (profileIdEl && profileAvatar && String(profileIdEl.textContent) === String(partnerId)) {
+        profileAvatar.classList.remove('avatar-pending');
+        profileAvatar.innerHTML = '';
+        const html = getDisplayAvatarHtml(user);
+        if (!html) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const avatarElement = doc.body.firstChild;
+        if (avatarElement && avatarElement.classList && avatarElement.classList.contains('letter-ava')) {
+            avatarElement.classList.replace('letter-ava', 'letter-ava1');
+        }
+        if (avatarElement) profileAvatar.appendChild(avatarElement);
+        bindAvatarLoad(profileAvatar);
+    }
+}
 
 const THEME_STORAGE_KEY = 'dovery-theme';
 

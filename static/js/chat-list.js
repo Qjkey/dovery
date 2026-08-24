@@ -10,6 +10,22 @@ function cacheImage(src) {
     img.src = src;
 }
 
+function buildChatListAvatar(chat) {
+    if (chat.hide_avatar) {
+        const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
+        return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+    }
+    if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
+        const avatarSrc = `static/files/avatars/${chat.avatar}`;
+        cacheImage(avatarSrc);
+        return typeof window.photoAvatarHtml === 'function'
+            ? window.photoAvatarHtml(avatarSrc)
+            : `<img src="${avatarSrc}" class="ava avatar-pending" alt="">`;
+    }
+    const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
+    return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+}
+
 async function loadMyChats() {
     try {
         const response = await fetch('/get_my_chats');
@@ -40,26 +56,23 @@ async function loadMyChats() {
                 ? window.displayedPresenceText(currentStatus, true)
                 : currentStatus;
 
-            let avatarHtml = '';
-            if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
-                const avatarSrc = `static/files/avatars/${chat.avatar}`;
-                cacheImage(avatarSrc); 
-                avatarHtml = typeof window.photoAvatarHtml === 'function'
-                    ? window.photoAvatarHtml(avatarSrc)
-                    : `<img src="${avatarSrc}" class="ava avatar-pending" alt="">`;
-            } else {
-                const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
-                avatarHtml = `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
-            }
+            const avatarHtml = buildChatListAvatar(chat);
+            const userKey = String(chat.id);
+            const prev = chatsData[userKey] || {};
 
-            chatsData[String(chat.id)] = {
+            chatsData[userKey] = {
                 chatId: chat.chat_id,
                 userId: chat.id,
                 username: chat.username,
                 name: chat.name,
                 avatar: avatarHtml,
+                avatarRaw: chat.avatar,
+                hideAvatar: !!chat.hide_avatar,
                 publicKey: chat.public_key,
-                status: currentStatus
+                status: currentStatus,
+                realStatus: chat.real_status || currentStatus,
+                blockState: chat.block_state || null,
+                keychat: prev.keychat
             };
             window.chatIdToUserId[chat.chat_id] = String(chat.id);
             if (String(chat.id) === String(window.userId)) return;

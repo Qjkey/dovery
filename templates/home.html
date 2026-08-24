@@ -305,13 +305,15 @@ Dovery
 </div>
 <script src="/static/js/tma-ui-kit-3-0.js"></script>
 <script>
-var list_items_icon_01 = [            
-    { label: "Мой профиль", onclick:"openProfile();", icon:'copy'},
-    { id: "theme", label: "Тёмная тема", onclick:"toggleDoveryTheme();", icon:'moon'}
+var list_items_icon_01 = [    
+    { id: "theme", label: "Настройки", onclick:"toggleDoveryTheme();", icon:'settings3'}, 
+    { separator: true },       
+    { label: "Мой профиль", onclick:"openProfile();", icon:'my_profile'}
 ];
 
 var list_items_icon_02 = [            
     { label: "E2EE шифрование", onclick:"openE2eeOverlay();", icon: 'lock' },
+    { id: "toggle-block", label: "Заблокировать", onclick:"toggle_chat_block();", icon: 'block' },
     { label: "Удалить чат", danger: true, onclick:"delete_chat();", icon: 'delete'}
 ];
 
@@ -324,8 +326,8 @@ var list_items_icon_04 = [
     { label: "Вставить", onclick:"paste_text();", icon: 'paste' }
 ];
 var list_items_icon_05 = [ 
-    { label: "Ссылку", onclick:"copy_link_username();", icon: 'copy' },
-    { label: "Username", onclick:"copy_username();", icon: 'copy' }
+    { label: "Ссылку", onclick:"copy_link_username();", icon: 'copy_username' },
+    { label: "Username", onclick:"copy_username();", icon: 'copy_username_link' }
 ];
 if (typeof syncThemeMenuItem === 'function') syncThemeMenuItem();
 if (typeof syncResizeMenuItem === 'function') syncResizeMenuItem();

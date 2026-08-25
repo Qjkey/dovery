@@ -49,7 +49,7 @@ async function loadMyChats() {
             listContainer.appendChild(big_header);
         }
 
-        window.chatIdToUserId = window.chatIdToUserId || {};
+        window.chatIdToUserId = {};
         chats.forEach((chat, index) => {
             const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
             const shownStatus = typeof window.displayedPresenceText === 'function'
@@ -59,9 +59,10 @@ async function loadMyChats() {
             const avatarHtml = buildChatListAvatar(chat);
             const userKey = String(chat.id);
             const prev = chatsData[userKey] || {};
+            const chatId = chat.chat_id != null ? String(chat.chat_id) : '';
 
             chatsData[userKey] = {
-                chatId: chat.chat_id,
+                chatId: chatId || prev.chatId || null,
                 userId: chat.id,
                 username: chat.username,
                 name: chat.name,
@@ -74,7 +75,9 @@ async function loadMyChats() {
                 blockState: chat.block_state || null,
                 keychat: prev.keychat
             };
-            window.chatIdToUserId[chat.chat_id] = String(chat.id);
+            if (chatId) {
+                window.chatIdToUserId[chatId] = userKey;
+            }
             if (String(chat.id) === String(window.userId)) return;
             const item = document.createElement('div');
             item.className = 'item clicked';

@@ -218,6 +218,8 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
         return;
     }
 
+    const isSelf = !!is_my_profile || String(userId) === String(window.userId);
+
     document.getElementById('profile-name').textContent = user.name || '';
     document.getElementById('profile-id').textContent = userId;
     document.getElementById('profile-status').textContent = getEffectiveStatus(user);
@@ -239,25 +241,67 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
         }
     }
 
-    const openChatBtn = document.getElementById('profile-open-chat');
-    if (openChatBtn) {
-        if (is_my_profile) {
-            openChatBtn.classList.add('hidden');
-        } else {
-            openChatBtn.classList.remove('hidden');
-            openChatBtn.onclick = function () {
-                closeProfile();
-                const chatId = getChatIdByUserId(userId);
-                if (chatId) {
-                    openDirectWindow(chatId);
-                } else {
-                    startChat(userId);
-                }
-            };
-        }
-    }
+    syncProfileActionButtons(userId, isSelf);
 
     openScreen('3');
+}
+
+function openProfileChat(userId) {
+    closeProfile();
+    const chatId = getChatIdByUserId(userId);
+    if (chatId) {
+        openDirectWindow(chatId);
+    } else {
+        startChat(userId);
+    }
+}
+
+function syncProfileBlockLabel(userId) {
+    const blockText = document.getElementById('profile-block-text');
+    if (!blockText) return;
+    const chatId = getChatIdByUserId(userId);
+    const state = getChatBlockState(chatId);
+    blockText.textContent = state.blocked_by_me ? 'Разблокировать' : 'Заблокировать';
+}
+
+function syncProfileActionButtons(userId, isSelf = false) {
+    const actions = document.getElementById('profileBlock3');
+    const openChatSection = document.getElementById('profile-open-chat-section');
+    const writeBtn = document.getElementById('profile-write-btn');
+    const deleteBtn = document.getElementById('profile-delete-btn');
+    const blockBtn = document.getElementById('profile-block-btn');
+
+    if (openChatSection) openChatSection.classList.add('hidden');
+
+    if (isSelf) {
+        if (actions) actions.classList.add('hidden');
+        return;
+    }
+
+    if (actions) actions.classList.remove('hidden');
+    syncProfileBlockLabel(userId);
+
+    if (writeBtn) {
+        writeBtn.onclick = (e) => {
+            e.preventDefault();
+            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
+            openProfileChat(uid);
+        };
+    }
+    if (deleteBtn) {
+        deleteBtn.onclick = async (e) => {
+            e.preventDefault();
+            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
+            await delete_chat(getChatIdByUserId(uid));
+        };
+    }
+    if (blockBtn) {
+        blockBtn.onclick = async (e) => {
+            e.preventDefault();
+            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
+            await toggle_chat_block(getChatIdByUserId(uid));
+        };
+    }
 }
 
 function closeProfile() {
@@ -392,8 +436,12 @@ async function startChat(userId) {
 
         if (response.ok) {
             const data = await response.json();
+            if (data.chat_id) {
+                rememberChatUserMapping(data.chat_id, userId);
+            }
             await loadMyChats();
             if (data.chat_id) {
+                rememberChatUserMapping(data.chat_id, userId);
                 await openDirectWindow(data.chat_id);
             }
             closeActiveScreen(1);
@@ -519,6 +567,9 @@ function syncBlockMenuItem() {
     };
     if (idx >= 0) window.list_items_icon_02[idx] = item;
     else window.list_items_icon_02.splice(1, 0, item);
+
+    const profileId = document.getElementById('profile-id')?.textContent?.trim();
+    if (profileId) syncProfileBlockLabel(profileId);
 }
 
 function updateComposerBlockedState(chatId) {
@@ -566,12 +617,50 @@ window.refreshAllPresenceDisplays = refreshAllPresenceDisplays;
 window.keychat = null;
 
 function getChatIdByUserId(userId) {
-    for (const chatId in window.chatIdToUserId) {
-        if (window.chatIdToUserId[chatId] === String(userId)) {
-            return chatId;
+    if (userId == null || String(userId).trim() === '') return null;
+    const uid = String(userId).trim();
+
+    // 1) Открытый чат с этим собеседником — самый надёжный источник (как в меню чата)
+    const activeId = getActiveChatId();
+    if (activeId) {
+        const activePartner = window.chatIdToUserId
+            ? (window.chatIdToUserId[activeId] ?? window.chatIdToUserId[String(activeId)])
+            : null;
+        if (activePartner != null && String(activePartner) === uid) {
+            return String(activeId);
+        }
+        if (chatsData[uid]?.chatId != null && String(chatsData[uid].chatId) === String(activeId)) {
+            return String(activeId);
         }
     }
+
+    // 2) Кэш профиля/списка
+    const cached = chatsData[uid]?.chatId;
+    if (cached != null && String(cached).trim() !== '') {
+        return String(cached);
+    }
+
+    // 3) Карта chat → user
+    if (window.chatIdToUserId) {
+        for (const chatId of Object.keys(window.chatIdToUserId)) {
+            if (String(window.chatIdToUserId[chatId]) === uid) {
+                return String(chatId);
+            }
+        }
+    }
+
     return null;
+}
+
+function rememberChatUserMapping(chatId, userId) {
+    if (chatId == null || userId == null) return;
+    const cid = String(chatId);
+    const uid = String(userId);
+    window.chatIdToUserId = window.chatIdToUserId || {};
+    window.chatIdToUserId[cid] = uid;
+    if (chatsData[uid]) {
+        chatsData[uid].chatId = cid;
+    }
 }
 
 const tx = document.getElementById('messages-textarea');
@@ -622,10 +711,22 @@ tx.addEventListener('input', function() {
 
 async function openDirectWindow(chatId) {
     try {
-        const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+        chatId = chatId != null ? String(chatId) : '';
+        let partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
+        if (!partnerId && window.chatIdToUserId) {
+            // на случай числового ключа в карте
+            for (const [cid, uid] of Object.entries(window.chatIdToUserId)) {
+                if (String(cid) === chatId) {
+                    partnerId = uid;
+                    break;
+                }
+            }
+        }
         if (!partnerId) { 
             return;
         }
+        partnerId = String(partnerId);
+        rememberChatUserMapping(chatId, partnerId);
         const user = chatsData[partnerId];
         if (!user) { 
             return;
@@ -2421,23 +2522,32 @@ function setMessageContent(el, text) {
 }
 
 
-async function delete_chat() {
-    const targetElement = document.getElementById('id_ept');
-    if (!targetElement) return;
-    
-    const chatId = targetElement.textContent.trim();
+async function delete_chat(chatId = null) {
+    const id = chatId != null && String(chatId).trim() !== ''
+        ? String(chatId).trim()
+        : getActiveChatId();
+    if (!id) {
+        d_alert('Удалить чат', 'Чат с этим пользователем ещё не создан', 'ok');
+        return;
+    }
+
     const result = await d_alert('Удалить чат', 'Чат будет удалён. Продолжить?', 'ok_cancel');
     if (result !== 'ok') return;
 
-    socket.emit('delete_chat', { id: chatId });
+    socket.emit('delete_chat', { id });
 }
 
 window.delete_chat = delete_chat; 
 
-async function toggle_chat_block() {
-    const chatId = getActiveChatId();
-    if (!chatId) return;
-    const state = getChatBlockState(chatId);
+async function toggle_chat_block(chatId = null) {
+    const id = chatId != null && String(chatId).trim() !== ''
+        ? String(chatId).trim()
+        : getActiveChatId();
+    if (!id) {
+        d_alert('Блокировка', 'Сначала начните переписку с пользователем', 'ok');
+        return;
+    }
+    const state = getChatBlockState(id);
     const isUnblock = !!state.blocked_by_me;
     const result = await d_alert(
         isUnblock ? 'Разблокировать пользователя' : 'Заблокировать пользователя',
@@ -2445,7 +2555,7 @@ async function toggle_chat_block() {
         'ok_cancel'
     );
     if (result !== 'ok') return;
-    socket.emit('toggle_block', { chat_id: chatId });
+    socket.emit('toggle_block', { chat_id: id });
 }
 
 window.toggle_chat_block = toggle_chat_block;
@@ -2453,6 +2563,11 @@ window.toggle_chat_block = toggle_chat_block;
 socket.on('chat_deleted', async (data) => {
     try {
         const deletedChatId = data.chat_id;
+        const partnerId = window.chatIdToUserId ? window.chatIdToUserId[deletedChatId] : null;
+        const profileId = document.getElementById('profile-id')?.textContent?.trim();
+        if (profileId && partnerId && String(profileId) === String(partnerId)) {
+            closeProfile();
+        }
 
         if (typeof chatHash !== 'undefined' && chatHash[deletedChatId]) {
             delete chatHash[deletedChatId];
@@ -2812,3 +2927,139 @@ if (messagesArea) {
     messagesArea.addEventListener('touchcancel', cancelMessagePress);
     messagesArea.addEventListener('touchmove', cancelMessagePress);
 }
+
+function sessionDeviceIcon(deviceOs) {
+    const key = String(deviceOs || '').toLowerCase();
+    if (key === 'windows') return '/static/img/signup_avatarka.png';
+    if (key === 'android') return '/static/img/avatarkins.png';
+    if (key === 'apple') return '/static/img/dovery.png';
+    return '/static/img/error.png';
+}
+
+function formatSessionStamp(createdAt) {
+    if (!createdAt) return '—';
+    let raw = String(createdAt).trim();
+    if (raw && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw) && raw.includes(' ')) {
+        raw = raw.replace(' ', 'T') + 'Z';
+    }
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return String(createdAt);
+    const day = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return `${day} • ${time}`;
+}
+
+function escapeSessionHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+}
+
+function buildSessionItem(item, { separator = false, current = false } = {}) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.dataset.sessionId = String(item.id);
+    const sep = separator ? 'separator' : '';
+    const title = escapeSessionHtml(item.device_name || 'Неизвестно');
+    const stamp = escapeSessionHtml(formatSessionStamp(item.created_at));
+    const subtitle = current ? `Это устройство • ${stamp}` : stamp;
+    const icon = sessionDeviceIcon(item.device_os);
+    row.innerHTML = `
+        <div class="left">
+            <img src="${icon}" class="ava" alt="">
+        </div>
+        <div class="right ${sep}">
+            <div class="right">
+                <div class="text twoline">
+                    <div class="label body1">${title}</div>
+                    <div class="label subtitle subtitle1">${subtitle}</div>
+                </div>
+            </div>
+            <div class="element">
+                <a href="javascript:void(0)" class="button subtitle2-medium session-delete-btn">Удалить</a>
+            </div>
+        </div>
+    `;
+    const btn = row.querySelector('.session-delete-btn');
+    if (btn) {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await deleteDeviceSession(item.id);
+        });
+    }
+    return row;
+}
+
+async function loadDevicesList() {
+    const currentBox = document.getElementById('devices-current');
+    const list = document.getElementById('devices-list');
+    if (!list) return;
+    if (currentBox) currentBox.innerHTML = '';
+    list.innerHTML = '';
+    try {
+        const response = await fetch('/api/sessions');
+        if (!response.ok) {
+            d_alert('Ошибка', 'Не удалось загрузить список устройств', 'ok');
+            return;
+        }
+        const data = await response.json();
+        const current = data.current || null;
+        const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+        if (currentBox && current) {
+            currentBox.appendChild(buildSessionItem(current, { current: true }));
+        }
+
+        if (!current && !sessions.length) {
+            list.innerHTML = '<p class="body1" style="padding:var(--margin); color:var(--tg-theme-hint-color);">Активных сессий нет</p>';
+            return;
+        }
+
+        sessions.forEach((item, index) => {
+            list.appendChild(buildSessionItem(item, {
+                separator: index < sessions.length - 1
+            }));
+        });
+    } catch (err) {
+        console.error(err);
+        d_alert('Ошибка', 'Не удалось загрузить список устройств', 'ok');
+    }
+}
+
+async function deleteDeviceSession(sessionId) {
+    const result = await d_alert('Удалить сессию', 'Точно удалить сессию?', 'ok_cancel');
+    if (result !== 'ok') return;
+    try {
+        const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            d_alert('Ошибка', 'Не удалось удалить сессию', 'ok');
+            return;
+        }
+        if (data.logout) {
+            window.location.href = '/';
+            return;
+        }
+        await loadDevicesList();
+    } catch (err) {
+        console.error(err);
+        d_alert('Ошибка', 'Не удалось удалить сессию', 'ok');
+    }
+}
+
+async function openDevicesScreen() {
+    if (typeof window.hideDropdown === 'function') hideDropdown();
+    await loadDevicesList();
+    openScreen('5');
+}
+
+socket.on('session_revoked', () => {
+    window.location.href = '/';
+});
+
+window.openDevicesScreen = openDevicesScreen;
+window.loadDevicesList = loadDevicesList;
+window.deleteDeviceSession = deleteDeviceSession;

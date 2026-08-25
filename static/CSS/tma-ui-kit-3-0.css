@@ -337,6 +337,7 @@
     padding: 6px 12px 6px 12px;
     color: #fff;
     cursor: pointer;
+    text-decoration: none;
     transition: scale 1s linear(0, 0.038 1.6%, 0.154 3.4%, 1.026 12.6%, 1.166 15.2%, 1.234 18%, 1.221 21.6%, 1.005 31.2%, 0.944 37%, 1.013 56%, 1);
 }
 .button:active {

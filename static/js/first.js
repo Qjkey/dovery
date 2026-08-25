@@ -52,6 +52,82 @@ async function hashPassword(password) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function detectDeviceInfo() {
+    const ua = navigator.userAgent || '';
+    let deviceOs = 'unknown';
+    let deviceName = '';
+
+    try {
+        const uaData = navigator.userAgentData;
+        if (uaData) {
+            const platform = String(uaData.platform || '').toLowerCase();
+            if (platform.includes('win')) deviceOs = 'windows';
+            else if (platform.includes('android')) deviceOs = 'android';
+            else if (platform.includes('mac') || platform.includes('ios')) deviceOs = 'apple';
+
+            if (typeof uaData.getHighEntropyValues === 'function') {
+                const hints = await uaData.getHighEntropyValues(['model', 'platformVersion', 'platform']);
+                if (hints.model && String(hints.model).trim()) {
+                    deviceName = String(hints.model).trim();
+                }
+                const plat = String(hints.platform || uaData.platform || '').toLowerCase();
+                if (plat.includes('win')) {
+                    deviceOs = 'windows';
+                    if (!deviceName) {
+                        const major = parseInt(String(hints.platformVersion || '0').split('.')[0], 10);
+                        deviceName = Number.isFinite(major) && major >= 13 ? 'Windows 11' : 'Windows 10';
+                    }
+                } else if (plat.includes('android')) {
+                    deviceOs = 'android';
+                } else if (plat.includes('mac') || plat.includes('ios')) {
+                    deviceOs = 'apple';
+                }
+            }
+        }
+    } catch (e) {
+        // Client Hints могут быть недоступны — fallback по UA
+    }
+
+    if (!deviceOs || deviceOs === 'unknown') {
+        if (/iPhone|iPad|iPod|Macintosh|Mac OS X/i.test(ua)) deviceOs = 'apple';
+        else if (/Android/i.test(ua)) deviceOs = 'android';
+        else if (/Windows/i.test(ua)) deviceOs = 'windows';
+    }
+
+    if (!deviceName) {
+        if (/iPhone/i.test(ua)) deviceName = 'iPhone';
+        else if (/iPad/i.test(ua)) deviceName = 'iPad';
+        else if (/Macintosh|Mac OS X/i.test(ua)) deviceName = 'macOS';
+        else if (/Android/i.test(ua)) {
+            const m = ua.match(/;\s*([^;)]+?)\s+Build\//i);
+            deviceName = (m && m[1].trim()) || 'Android';
+        } else if (/Windows NT 10/i.test(ua)) deviceName = 'Windows 10';
+        else if (/Windows NT 6\.3/i.test(ua)) deviceName = 'Windows 8.1';
+        else if (/Windows NT 6\.1/i.test(ua)) deviceName = 'Windows 7';
+        else if (/Windows/i.test(ua)) deviceName = 'Windows';
+        else if (/Linux/i.test(ua)) deviceName = 'Linux';
+        else deviceName = 'Неизвестное устройство';
+    }
+
+    if (deviceOs === 'unknown' && deviceName) {
+        const lower = deviceName.toLowerCase();
+        if (lower.includes('windows')) deviceOs = 'windows';
+        else if (lower.includes('android')) deviceOs = 'android';
+        else if (/iphone|ipad|mac|ios|apple/.test(lower)) deviceOs = 'apple';
+    }
+
+    return {
+        device_name: String(deviceName).slice(0, 80),
+        device_os: deviceOs
+    };
+}
+
+function appendDeviceInfo(formData, info) {
+    if (!formData || !info) return;
+    formData.append('device_name', info.device_name || '');
+    formData.append('device_os', info.device_os || 'unknown');
+}
+
 let selectedAvatarFile = null;
 
 document.getElementById('overlay_profile').addEventListener('click', () => {
@@ -114,6 +190,7 @@ async function validateAndSubmit_login(el) {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', hashedForServer);
+    appendDeviceInfo(formData, await detectDeviceInfo());
 
     try {
         const response = await fetch('/login', {
@@ -232,6 +309,7 @@ async function validateAndSubmit(el) {
         formData.append('password', hashedPass);
         formData.append('public_key', pubBase64);
         formData.append('encrypted_private_key', privBase64);
+        appendDeviceInfo(formData, await detectDeviceInfo());
 
         if (selectedAvatarFile) {
             formData.append('avatar', selectedAvatarFile);

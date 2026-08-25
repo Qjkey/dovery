@@ -89,6 +89,7 @@ def allow_message_send(user_id):
 online_users = {}
 typing_in_chat = {}  # user_id -> chat_id
 viewing_by_sid = {}  # sid -> {"chat_id", "ts"}
+session_by_sid = {}  # sid -> {"user_id", "token_hash"}
 VIEWING_EXPIRE_SEC = 6.0
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
@@ -201,6 +202,24 @@ def migrate_schema():
             cursor.execute(
                 'CREATE INDEX IF NOT EXISTS idx_blocks_blocked_user_id ON blocks(blocked_user_id)'
             )
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    device_name TEXT,
+                    device_os TEXT
+                )
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_token_hash ON sessions(token_hash)')
+            cursor.execute("PRAGMA table_info(sessions)")
+            session_columns = [row[1] for row in cursor.fetchall()]
+            if 'device_name' not in session_columns:
+                cursor.execute('ALTER TABLE sessions ADD COLUMN device_name TEXT')
+            if 'device_os' not in session_columns:
+                cursor.execute('ALTER TABLE sessions ADD COLUMN device_os TEXT')
             
             conn.commit()
     except Exception as e:
@@ -214,8 +233,22 @@ def generate_id(length=10):
     other_digits = ''.join(secrets.choice(string.digits) for _ in range(length - 1))
     return first_digit + other_digits
 
+def normalize_device_info(device_name=None, device_os=None):
+    name = (device_name or '').strip()[:80] or None
+    os_key = (device_os or '').strip().lower()
+    if os_key not in ('windows', 'android', 'apple', 'unknown'):
+        os_key = 'unknown'
+    if not name:
+        name = {
+            'windows': 'Windows',
+            'android': 'Android',
+            'apple': 'Apple',
+        }.get(os_key, 'Неизвестное устройство')
+    return name, os_key
+
+
 # Сохранение сессии
-def save_session(raw_token, user_id):
+def save_session(raw_token, user_id, device_name=None, device_os=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -225,19 +258,24 @@ def save_session(raw_token, user_id):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    device_name TEXT,
+                    device_os TEXT
                 )
             ''')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_token_hash ON sessions(token_hash)')
 
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+            name, os_key = normalize_device_info(device_name, device_os)
+            created_at = datetime.now(timezone.utc).isoformat()
             cursor.execute(
-                "INSERT INTO sessions (user_id, token_hash) VALUES (?, ?)",
-                (user_id, token_hash)
+                "INSERT INTO sessions (user_id, token_hash, created_at, device_name, device_os) VALUES (?, ?, ?, ?, ?)",
+                (user_id, token_hash, created_at, name, os_key)
             )
             conn.commit()
             return True
     except Exception as e:
+        print(f"Ошибка сохранения сессии: {e}")
         return False
 
 # Сохранение сообщения
@@ -490,6 +528,30 @@ def handle_connect():
             send_user_status(user_id, 'в сети')
 
         online_users[user_id].add(request.sid)
+        raw_token = session.get('auth_token')
+        if raw_token:
+            session_by_sid[request.sid] = {
+                'user_id': int(user_id),
+                'token_hash': hashlib.sha256(raw_token.encode()).hexdigest(),
+            }
+
+
+def kick_session_sockets(token_hash):
+    """Отключает все активные сокеты с данной сессией и шлёт session_revoked."""
+    if not token_hash:
+        return
+    for sid, info in list(session_by_sid.items()):
+        if info.get('token_hash') != token_hash:
+            continue
+        try:
+            socketio.emit('session_revoked', {'reason': 'deleted'}, to=sid)
+        except Exception:
+            pass
+        try:
+            socketio.server.disconnect(sid)
+        except Exception:
+            pass
+        session_by_sid.pop(sid, None)
 
 def get_chat_peer(chat_id, user_id):
     if not chat_id or user_id is None:
@@ -612,7 +674,8 @@ def clear_user_typing(user_id):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    user_id = get_current_user_id()
+    sid_info = session_by_sid.pop(request.sid, None)
+    user_id = sid_info['user_id'] if sid_info else get_current_user_id()
     if not user_id:
         return
 
@@ -650,6 +713,84 @@ def index():
         session.clear()
         return render_template("first.html")
 
+
+@app.route('/api/sessions', methods=['GET'])
+def list_sessions():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error"}), 401
+
+    raw_token = session.get('auth_token')
+    current_hash = hashlib.sha256(raw_token.encode()).hexdigest() if raw_token else None
+
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            '''SELECT id, created_at, device_name, device_os, token_hash
+               FROM sessions
+               WHERE user_id = ?
+               ORDER BY datetime(created_at) DESC, id DESC''',
+            (user_id,),
+        ).fetchall()
+        current = None
+        others = []
+        for row in rows:
+            name, os_key = normalize_device_info(row['device_name'], row['device_os'])
+            item = {
+                'id': row['id'],
+                'device_name': name,
+                'device_os': os_key,
+                'created_at': row['created_at'],
+                'is_current': bool(current_hash and row['token_hash'] == current_hash),
+            }
+            if item['is_current'] and current is None:
+                current = item
+            else:
+                others.append(item)
+        return jsonify({'status': 'ok', 'current': current, 'sessions': others})
+    except Exception as e:
+        print(f"Ошибка списка сессий: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/sessions/<int:session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error"}), 401
+
+    raw_token = session.get('auth_token')
+    current_hash = hashlib.sha256(raw_token.encode()).hexdigest() if raw_token else None
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            'SELECT id, token_hash FROM sessions WHERE id = ? AND user_id = ?',
+            (session_id, user_id),
+        ).fetchone()
+        if not row:
+            return jsonify({"status": "error", "message": "not_found"}), 404
+
+        token_hash = row['token_hash']
+        is_current = bool(current_hash and token_hash == current_hash)
+        conn.execute('DELETE FROM sessions WHERE id = ? AND user_id = ?', (session_id, user_id))
+        conn.commit()
+
+        kick_session_sockets(token_hash)
+
+        if is_current:
+            session.clear()
+            return jsonify({"status": "ok", "logout": True})
+        return jsonify({"status": "ok", "logout": False})
+    except Exception as e:
+        print(f"Ошибка удаления сессии: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
+
 # Вход в аккаунт
 @app.route("/login", methods=['POST'])
 @limiter.limit("10 per hour")
@@ -675,8 +816,10 @@ def login():
     if user and password_ok:
         session.clear()
         raw_token = secrets.token_urlsafe(64)
+        device_name = request.form.get('device_name')
+        device_os = request.form.get('device_os')
 
-        if save_session(raw_token, user['id']):
+        if save_session(raw_token, user['id'], device_name=device_name, device_os=device_os):
             session['auth_token'] = raw_token
             session.permanent = True
 
@@ -738,8 +881,10 @@ def signup():
     if success:
         user_id = message
         raw_token = secrets.token_urlsafe(64)
+        device_name = request.form.get('device_name')
+        device_os = request.form.get('device_os')
 
-        if save_session(raw_token, user_id):
+        if save_session(raw_token, user_id, device_name=device_name, device_os=device_os):
             session.clear()
             session['auth_token'] = raw_token
             session.permanent = True

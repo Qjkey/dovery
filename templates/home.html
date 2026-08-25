@@ -70,6 +70,74 @@ Dovery
         </div>
         <section><div id="search-results"></div></section>
     </div>
+    <div data-screen="4" data-swipe class="screen hidden">
+        <div class="header-wrapper header-bg">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="4">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-center">
+                    <div class="label headline6">Настройки</div>
+                </div>
+            </div>
+        </div>
+        <section class="bottom">
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline second-title">
+                        <div class="button1-medium">Основные</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="item clicked">
+                <div class="left">
+                    <svg class="chat"><use href="#chat"></use></svg>
+                </div>
+                <div class="right separator">
+                    <div class="text oneline">  
+                        <div class="label body1">Аккаунт</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg class="link"><use href="#link"></use></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="item clicked">
+                <div class="left">
+                    <svg class="chat"><use href="#chat"></use></svg>
+                </div>
+                <div class="right separator">
+                    <div class="text oneline">  
+                        <div class="label body1">Настройки чатов</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg class="link"><use href="#link"></use></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="item clicked" id="settings-devices-btn" onclick="openDevicesScreen();">
+                <div class="left">
+                    <svg class="chat"><use href="#chat"></use></svg>
+                </div>
+                <div class="right">
+                    <div class="text oneline">  
+                        <div class="label body1">Устройства</div> 
+                    </div>
+                    <div class="element"> 
+                        <svg class="link"><use href="#link"></use></svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
 </div>
 <button type="button" class="resizer" id="dragbar" tabindex="-1" aria-label="Изменить ширину списка чатов"></button>
 <div id="messages-host" class="messages-host">
@@ -188,6 +256,22 @@ Dovery
                 <div class="subname subtitle1" id="profile-status"></div>
                 <div class="hidden" id="profile-id"></div>
             </div>
+            <div id="profileBlock3" class="big-profile-block defult hidden">
+                <div class="buttons">
+                    <a class="button-link caption2-medium" id="profile-write-btn" href="javascript:void(0)">
+                        <span class="button-icon"><svg class="settings"><use href="#chat_profile"></use></svg></span>
+                        <span class="button-text">Написать</span>
+                    </a>
+                    <a class="button-link caption2-medium" id="profile-delete-btn" href="javascript:void(0)">
+                        <span class="button-icon"><svg class="settings"><use href="#delete_profile"></use></svg></span>
+                        <span class="button-text">Удалить чат</span>
+                    </a>
+                    <a class="button-link caption2-medium" id="profile-block-btn" href="javascript:void(0)">
+                        <span class="button-icon"><svg class="settings"><use href="#block_profile"></use></svg></span>
+                        <span class="button-text" id="profile-block-text">Заблокировать</span>
+                    </a>
+                </div>
+            </div>
         </div>
         <section class="bottom top">
             <div class="item">
@@ -209,7 +293,7 @@ Dovery
                 </div>
             </div>
         </section>
-        <section>
+        <section class="bottom hidden" id="profile-open-chat-section">
             <div class="item clicked" id="profile-open-chat">
                 <div class="right">
                     <div class="text oneline">
@@ -221,6 +305,25 @@ Dovery
                 </div>
             </div>
         </section>
+    </div>
+
+    <div class="screen hidden devices-screen-dovery" id="devices-screen" data-screen="5" data-swipe data-inset-margin data-reveal-behind="#chat-content, #no-chat-content">
+        <div class="header-wrapper header-bg">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="5" id="close-devices">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-center">
+                    <div class="label headline6">Устройства</div>
+                </div>
+            </div>
+        </div>
+        <section class="bottom" id="devices-current"></section>
+        <section class="bottom" id="devices-list"></section>
     </div>
 </div>
 <div id="tagDropdown" class="tag-dropdown"></div>
@@ -308,7 +411,8 @@ Dovery
 var list_items_icon_01 = [    
     { id: "theme", label: "Настройки", onclick:"toggleDoveryTheme();", icon:'settings3'}, 
     { separator: true },       
-    { label: "Мой профиль", onclick:"openProfile();", icon:'my_profile'}
+    { label: "Мой профиль", onclick:"openProfile(); hideDropdown();", icon:'my_profile'},
+    { label: "Настройки", onclick:"openScreen(4); hideDropdown();", icon:'settings3'}
 ];
 
 var list_items_icon_02 = [            

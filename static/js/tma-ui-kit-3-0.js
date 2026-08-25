@@ -368,6 +368,16 @@ function hideDropdown() {
     setTimeout(finish, 280);
 }
 
+/** Закрывает контекстное меню чата (list_items_icon_02 / cntxt_menu_btn_02). */
+function closeChatContextMenu() {
+    if (!tagDropdown || tagDropdown.style.display !== 'block') return;
+    if (currentOpenButton?.id !== 'cntxt_menu_btn_02') return;
+    hideDropdown();
+}
+
+window.hideDropdown = hideDropdown;
+window.closeChatContextMenu = closeChatContextMenu;
+
 
 // Прикрепляем обработчики событий ко всем кнопкам с id, начинающимся на "cntxt_menu_btn_"
 document.querySelectorAll('[id^="cntxt_menu_btn_"]').forEach(button => {
@@ -837,10 +847,14 @@ function isDoveryProfileScreen(screen) {
   return !!(screen && (screen.id === 'profile-screen' || screen.getAttribute('data-screen') === '3'));
 }
 
+function isDoveryDevicesScreen(screen) {
+  return !!(screen && (screen.id === 'devices-screen' || screen.getAttribute('data-screen') === '5'));
+}
+
 function shouldPreserveChatsScroll(screen) {
-  // Чат и профиль на desktop не должны блокировать скролл списка чатов
+  // Чат, профиль и устройства на desktop не должны блокировать скролл списка чатов
   return isDoveryChatListLayout()
-    && (isDoveryMessagesScreen(screen) || isDoveryProfileScreen(screen));
+    && (isDoveryMessagesScreen(screen) || isDoveryProfileScreen(screen) || isDoveryDevicesScreen(screen));
 }
 
 function isInsetMarginScreen(screen) {
@@ -1080,9 +1094,18 @@ function openScreen(screenId) {
   const screen = document.querySelector(`[data-screen="${screenId}"]`);
   if (!screen || !screenId) return;
 
-  // Не дублируем уже открытый экран в стеке
+  // Отменяем незавершённое закрытие (иначе finalizeClose снова спрячет экран)
+  delete screen.dataset.closing;
+
+  // Залипшая запись в стеке при скрытом экране — убираем и открываем заново
   if (openedScreens[openedScreens.length - 1] === screenId) {
-    return;
+    if (!screen.classList.contains('hidden') && screen.classList.contains('active')) {
+      return;
+    }
+    openedScreens.pop();
+  }
+  for (let i = openedScreens.length - 1; i >= 0; i--) {
+    if (openedScreens[i] === screenId) openedScreens.splice(i, 1);
   }
 
   const parentContainer = screen.closest('.page, .messages, .chats');
@@ -1130,6 +1153,7 @@ function openScreen(screenId) {
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (screen.dataset.closing === '1') return;
       screen.style.transition = 'transform 0.18s ease';
       screen.classList.add('active');
       screen.style.transform = '';
@@ -1162,7 +1186,10 @@ function closeActiveScreen(screenId, isSwiped = false) {
       openedScreens.splice(index, 1);
     }
 
+    screen.dataset.closing = '1';
     const finalizeClose = () => {
+      if (screen.dataset.closing !== '1') return;
+      delete screen.dataset.closing;
       clearRevealBehind(screen);
       screen.classList.add('hidden');
       screen.classList.remove('active');

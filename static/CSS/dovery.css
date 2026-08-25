@@ -382,8 +382,30 @@ body.is-resizing-chats * {
   pointer-events: none;
 }
 
+[data-screen="5"].devices-screen-dovery.screen {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  margin: 0;
+  border-radius: 0;
+  overflow: hidden;
+  overflow-y: auto;
+  background: var(--tg-theme-secondary-bg-color);
+}
+
 @media (min-width: 751px) {
   [data-screen="3"].profile-block-dovery.screen {
+    position: absolute;
+    width: calc(100% - 2 * var(--margin));
+    height: calc(100% - 2 * var(--margin));
+    top: var(--margin);
+    left: var(--margin);
+    border-radius: var(--radius);
+  }
+
+  [data-screen="5"].devices-screen-dovery.screen {
     position: absolute;
     width: calc(100% - 2 * var(--margin));
     height: calc(100% - 2 * var(--margin));

@@ -95,9 +95,9 @@ Dovery
                 </div>
             </div>
 
-            <div class="item clicked">
+            <div class="item clicked" id="settings-account-btn" onclick="openAccountScreen();">
                 <div class="left">
-                    <svg class="chat"><use href="#chat"></use></svg>
+                    <svg class="chat"><use href="#my_profile"></use></svg>
                 </div>
                 <div class="right separator">
                     <div class="text oneline">  
@@ -125,7 +125,7 @@ Dovery
 
             <div class="item clicked" id="settings-devices-btn" onclick="openDevicesScreen();">
                 <div class="left">
-                    <svg class="chat"><use href="#chat"></use></svg>
+                    <svg class="chat"><use href="#device"></use></svg>
                 </div>
                 <div class="right">
                     <div class="text oneline">  
@@ -322,8 +322,114 @@ Dovery
                 </div>
             </div>
         </div>
-        <section class="bottom" id="devices-current"></section>
-        <section class="bottom" id="devices-list"></section>
+        <section class="bottom" id="devices-current">
+            <div class="item devices-section-title">
+                <div class="right">
+                    <div class="title oneline second-title">
+                        <div class="button1-medium">Это устройство</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="bottom" id="devices-list">
+            <div class="item devices-section-title">
+                <div class="right">
+                    <div class="title oneline second-title">
+                        <div class="button1-medium">Активные сеансы</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="screen hidden account-screen-dovery" id="account-screen" data-screen="6" data-swipe data-inset-margin data-reveal-behind="#chat-content, #no-chat-content">
+        <div class="header-wrapper header-bg">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-screen="6" id="close-account">
+                        <div class="element-header">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-center">
+                    <div class="label headline6">Аккаунт</div>
+                </div>
+                <div class="header-right">
+                    <div class="header-capsule one-btn hidden" id="account-save-btn" onclick="saveAccountSettings();" title="Сохранить">
+                        <div class="element-header">
+                            <svg class="check"><use href="#check"></use></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="bottom">
+            <div class="item" id="account-preview">
+                <div class="left" id="account-preview-avatar"></div>
+                <div class="right">
+                    <div class="text twoline">
+                        <div class="label body1" id="account-preview-name"></div>
+                        <div class="label subtitle subtitle1 active" id="account-preview-status">в сети</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="bottom">
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline">
+                        <div class="button1-medium">Аватарка</div>
+                    </div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">
+                    <img src="/static/img/signup_avatarka.png" class="ava" id="account-avatar-img" alt="">
+                </div>
+                <div class="right">
+                    <div class="text oneline">
+                        <div class="label body1">Изменить аватар</div>
+                    </div>
+                    <div class="element">
+                        <a href="javascript:void(0)" class="button subtitle2-medium" id="account-avatar-pick">Выбрать</a>
+                        <input type="file" id="account-avatar-input" style="display: none;" accept="image/*">
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="item footer">
+            <div class="right">
+                <div class="subtitle2">Можно оставить текущую аватарку</div>
+            </div>
+        </div>
+
+        <section class="bottom">
+            <div class="item">
+                <div class="right">
+                    <div class="title oneline">
+                        <div class="button1-medium">Данные</div>
+                    </div>
+                </div>
+            </div>
+            <div class="input-container">
+                <input type="text" class="input-field" id="account-name-input" data-limit="32" spellcheck="false" placeholder="Имя" name="account_name" autocomplete="name">
+                <label class="input-label">Имя</label>
+                <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
+            </div>
+            <div class="input-container">
+                <input type="text" class="input-field" id="account-username-input" data-limit="16" spellcheck="false" autocapitalize="none" autocomplete="username" placeholder="Username" name="account_username">
+                <label class="input-label">Username</label>
+                <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
+            </div>
+        </section>
+        <div class="item footer">
+            <div class="right">
+                <div class="subtitle2">Имя и username обязательны</div>
+            </div>
+        </div>
     </div>
 </div>
 <div id="tagDropdown" class="tag-dropdown"></div>

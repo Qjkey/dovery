@@ -436,10 +436,16 @@ def send_user_status(user_id, status):
             to=f"user_{chat['contact_id']}"
         )
 
-def check_username(username):
+def check_username(username, exclude_user_id=None):
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+        if exclude_user_id is not None:
+            cursor.execute(
+                "SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND CAST(id AS TEXT) != ?",
+                (username, str(exclude_user_id)),
+            )
+        else:
+            cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,))
         if cursor.fetchone():
             return False
         else:
@@ -714,6 +720,113 @@ def index():
         return render_template("first.html")
 
 
+@app.route('/api/me', methods=['GET', 'POST'])
+def api_me():
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error"}), 401
+
+    if request.method == 'GET':
+        conn = get_db_connection()
+        try:
+            uid_str = str(user_id)
+            user = conn.execute(
+                "SELECT id, name, username, avatar FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+                (user_id, uid_str),
+            ).fetchone()
+            if not user:
+                return jsonify({"status": "error", "message": "user_not_found"}), 404
+            online = (
+                user_id in online_users
+                or uid_str in online_users
+                or user['id'] in online_users
+                or str(user['id']) in online_users
+                or (str(user['id']).isdigit() and int(user['id']) in online_users)
+            )
+            return jsonify({
+                "status": "ok",
+                "id": user['id'],
+                "name": user['name'] or '',
+                "username": user['username'] or '',
+                "avatar": user['avatar'] or '',
+                "status": 'в сети' if online else 'был(а) недавно',
+                "real_status": 'в сети' if online else 'был(а) недавно',
+            })
+        except Exception as e:
+            print(f"Ошибка /api/me GET: {e}")
+            return jsonify({"status": "error"}), 500
+        finally:
+            conn.close()
+
+    name = (request.form.get('name') or '').strip()
+    username = (request.form.get('username') or '').strip()
+    avatar_file = request.files.get('avatar')
+
+    if not name or not username:
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not (1 <= len(name) <= 32):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not (4 <= len(username) <= 16):
+        return jsonify({"status": "error", "message": "d208"}), 400
+    if not USERNAME_RE.fullmatch(username):
+        return jsonify({"status": "error", "message": "d206"}), 400
+    if not check_username(username, exclude_user_id=user_id):
+        return jsonify({"status": "error", "message": "d203"}), 409
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT avatar FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return jsonify({"status": "error"}), 404
+
+        avatar_name = row['avatar'] or 'avatarkins.png'
+        if avatar_file and avatar_file.filename:
+            processed = process_avatar(avatar_file)
+            if processed:
+                avatar_name = processed
+
+        conn.execute(
+            "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ?",
+            (name, username, avatar_name, user_id),
+        )
+        conn.commit()
+
+        payload = {
+            "status": "ok",
+            "id": user_id,
+            "name": name,
+            "username": username,
+            "avatar": avatar_name,
+        }
+        socketio.emit('profile_updated', payload, to=f"user_{user_id}")
+        # Собеседники подхватят имя/аватар при следующем обновлении списка
+        try:
+            for chat in get_user_s_chats(user_id):
+                socketio.emit(
+                    'contact_profile_updated',
+                    {
+                        'user_id': user_id,
+                        'name': name,
+                        'username': username,
+                        'avatar': avatar_name,
+                    },
+                    to=f"user_{chat['contact_id']}",
+                )
+        except Exception:
+            pass
+        return jsonify(payload)
+    except sqlite3.IntegrityError:
+        return jsonify({"status": "error", "message": "d203"}), 409
+    except Exception as e:
+        print(f"Ошибка /api/me POST: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/sessions', methods=['GET'])
 def list_sessions():
     user_id = get_current_user_id()
@@ -909,6 +1022,8 @@ def ratelimit_handler(e):
 # Обработчик ошибки 404
 @app.errorhandler(404)
 def page_not_found(e):
+    if request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({"status": "error", "message": "not_found"}), 404
     return render_template('error.html', error="404"), 404
 
 # Поиск

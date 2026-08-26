@@ -2930,10 +2930,10 @@ if (messagesArea) {
 
 function sessionDeviceIcon(deviceOs) {
     const key = String(deviceOs || '').toLowerCase();
-    if (key === 'windows') return '/static/img/signup_avatarka.png';
-    if (key === 'android') return '/static/img/avatarkins.png';
-    if (key === 'apple') return '/static/img/dovery.png';
-    return '/static/img/error.png';
+    if (key === 'windows') return '/static/img/Windows_device.png';
+    if (key === 'android') return '/static/img/android_device.png';
+    if (key === 'apple') return '/static/img/apple_device.png';
+    return '/static/img/none_device.png';
 }
 
 function formatSessionStamp(createdAt) {
@@ -2955,6 +2955,70 @@ function escapeSessionHtml(text) {
     return div.innerHTML;
 }
 
+function devicesSectionTitle(label) {
+    const row = document.createElement('div');
+    row.className = 'item devices-section-title';
+    row.innerHTML = `
+        <div class="right">
+            <div class="title oneline second-title">
+                <div class="button1-medium">${escapeSessionHtml(label)}</div>
+            </div>
+        </div>
+    `;
+    return row;
+}
+
+function clearDevicesSection(section, titleLabel) {
+    if (!section) return;
+    section.querySelectorAll('[data-session-id]').forEach((el) => el.remove());
+    section.querySelectorAll('.loading-skeleton').forEach((el) => el.remove());
+    section.querySelectorAll('p').forEach((el) => el.remove());
+    let title = section.querySelector('.devices-section-title');
+    if (!title) {
+        title = devicesSectionTitle(titleLabel);
+        section.prepend(title);
+    }
+}
+
+function buildSessionSkeleton(separator = false) {
+    const row = document.createElement('div');
+    row.className = 'item loading-skeleton';
+    const sep = separator ? 'separator' : '';
+    row.innerHTML = `
+        <div class="left">
+            <div class="ava"></div>
+        </div>
+        <div class="right ${sep}">
+            <div class="right">
+                <div class="text twoline">
+                    <div class="label body1"><span class="skeleton-line title"></span></div>
+                    <div class="label subtitle subtitle1"><span class="skeleton-line subtitle"></span></div>
+                </div>
+            </div>
+            <div class="element">
+                <span class="skeleton-btn"></span>
+            </div>
+        </div>
+    `;
+    return row;
+}
+
+function showDevicesLoadingSkeletons() {
+    const currentBox = document.getElementById('devices-current');
+    const list = document.getElementById('devices-list');
+    clearDevicesSection(currentBox, 'Это устройство');
+    clearDevicesSection(list, 'Активные сеансы');
+    if (currentBox) {
+        currentBox.classList.remove('hidden');
+        currentBox.appendChild(buildSessionSkeleton(false));
+    }
+    if (list) {
+        list.appendChild(buildSessionSkeleton(true));
+        list.appendChild(buildSessionSkeleton(true));
+        list.appendChild(buildSessionSkeleton(false));
+    }
+}
+
 function buildSessionItem(item, { separator = false, current = false } = {}) {
     const row = document.createElement('div');
     row.className = 'item';
@@ -2962,7 +3026,6 @@ function buildSessionItem(item, { separator = false, current = false } = {}) {
     const sep = separator ? 'separator' : '';
     const title = escapeSessionHtml(item.device_name || 'Неизвестно');
     const stamp = escapeSessionHtml(formatSessionStamp(item.created_at));
-    const subtitle = current ? `Это устройство • ${stamp}` : stamp;
     const icon = sessionDeviceIcon(item.device_os);
     row.innerHTML = `
         <div class="left">
@@ -2972,7 +3035,7 @@ function buildSessionItem(item, { separator = false, current = false } = {}) {
             <div class="right">
                 <div class="text twoline">
                     <div class="label body1">${title}</div>
-                    <div class="label subtitle subtitle1">${subtitle}</div>
+                    <div class="label subtitle subtitle1">${stamp}</div>
                 </div>
             </div>
             <div class="element">
@@ -2991,15 +3054,20 @@ function buildSessionItem(item, { separator = false, current = false } = {}) {
     return row;
 }
 
-async function loadDevicesList() {
+async function loadDevicesList({ showSkeleton = true } = {}) {
     const currentBox = document.getElementById('devices-current');
     const list = document.getElementById('devices-list');
     if (!list) return;
-    if (currentBox) currentBox.innerHTML = '';
-    list.innerHTML = '';
+
+    if (showSkeleton) {
+        showDevicesLoadingSkeletons();
+    }
+
     try {
         const response = await fetch('/api/sessions');
         if (!response.ok) {
+            clearDevicesSection(currentBox, 'Это устройство');
+            clearDevicesSection(list, 'Активные сеансы');
             d_alert('Ошибка', 'Не удалось загрузить список устройств', 'ok');
             return;
         }
@@ -3007,12 +3075,22 @@ async function loadDevicesList() {
         const current = data.current || null;
         const sessions = Array.isArray(data.sessions) ? data.sessions : [];
 
-        if (currentBox && current) {
-            currentBox.appendChild(buildSessionItem(current, { current: true }));
+        clearDevicesSection(currentBox, 'Это устройство');
+        clearDevicesSection(list, 'Активные сеансы');
+
+        if (currentBox) {
+            currentBox.classList.toggle('hidden', !current);
+            if (current) {
+                currentBox.appendChild(buildSessionItem(current, { current: true }));
+            }
         }
 
-        if (!current && !sessions.length) {
-            list.innerHTML = '<p class="body1" style="padding:var(--margin); color:var(--tg-theme-hint-color);">Активных сессий нет</p>';
+        if (!sessions.length) {
+            const empty = document.createElement('p');
+            empty.className = 'body1';
+            empty.style.cssText = 'padding:var(--margin); color:var(--tg-theme-hint-color);';
+            empty.textContent = 'Других активных сеансов нет';
+            list.appendChild(empty);
             return;
         }
 
@@ -3023,6 +3101,8 @@ async function loadDevicesList() {
         });
     } catch (err) {
         console.error(err);
+        clearDevicesSection(currentBox, 'Это устройство');
+        clearDevicesSection(list, 'Активные сеансы');
         d_alert('Ошибка', 'Не удалось загрузить список устройств', 'ok');
     }
 }
@@ -3050,10 +3130,11 @@ async function deleteDeviceSession(sessionId) {
     }
 }
 
-async function openDevicesScreen() {
+function openDevicesScreen() {
     if (typeof window.hideDropdown === 'function') hideDropdown();
-    await loadDevicesList();
     openScreen('5');
+    showDevicesLoadingSkeletons();
+    loadDevicesList({ showSkeleton: false });
 }
 
 socket.on('session_revoked', () => {
@@ -3063,3 +3144,399 @@ socket.on('session_revoked', () => {
 window.openDevicesScreen = openDevicesScreen;
 window.loadDevicesList = loadDevicesList;
 window.deleteDeviceSession = deleteDeviceSession;
+
+const accountState = {
+    name: '',
+    username: '',
+    avatar: '',
+    avatarFile: null,
+    avatarPreviewUrl: null,
+    saving: false,
+};
+
+function accountAvatarSrc(avatar) {
+    if (avatar && avatar !== 'avatarkins.png' && avatar !== 'null' && avatar !== '') {
+        return `/static/files/avatars/${avatar}`;
+    }
+    return '/static/img/signup_avatarka.png';
+}
+
+function setAccountPreviewAvatar(srcOrHtml, isHtml = false) {
+    const preview = document.getElementById('account-preview-avatar');
+    const img = document.getElementById('account-avatar-img');
+    if (img && !isHtml) {
+        img.src = srcOrHtml;
+    }
+    if (!preview) return;
+    preview.innerHTML = '';
+    if (isHtml) {
+        preview.innerHTML = srcOrHtml;
+        bindAvatarLoad(preview);
+        return;
+    }
+    if (srcOrHtml.includes('signup_avatarka') || !accountState.avatar || accountState.avatar === 'avatarkins.png') {
+        const letter = (document.getElementById('account-name-input')?.value || accountState.name || '?').charAt(0).toUpperCase();
+        preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+        return;
+    }
+    preview.innerHTML = photoAvatarHtml(srcOrHtml);
+    bindAvatarLoad(preview);
+}
+
+function syncAccountSaveButton() {
+    const btn = document.getElementById('account-save-btn');
+    if (!btn) return;
+    const name = (document.getElementById('account-name-input')?.value || '').trim();
+    const username = (document.getElementById('account-username-input')?.value || '').trim();
+    const dirty = !!accountState.avatarFile
+        || name !== accountState.name
+        || username !== accountState.username;
+    btn.classList.toggle('hidden', !dirty || accountState.saving);
+}
+
+function fillAccountForm(data) {
+    accountState.name = (data.name || '').trim();
+    accountState.username = (data.username || '').trim();
+    accountState.avatar = data.avatar || '';
+    accountState.avatarFile = null;
+    if (accountState.avatarPreviewUrl) {
+        URL.revokeObjectURL(accountState.avatarPreviewUrl);
+        accountState.avatarPreviewUrl = null;
+    }
+
+    const nameInput = document.getElementById('account-name-input');
+    const usernameInput = document.getElementById('account-username-input');
+    const previewName = document.getElementById('account-preview-name');
+    const previewStatus = document.getElementById('account-preview-status');
+
+    if (nameInput) nameInput.value = accountState.name;
+    if (usernameInput) usernameInput.value = accountState.username;
+    if (previewName) previewName.textContent = accountState.name || 'Без имени';
+    if (previewStatus) previewStatus.textContent = data.status || 'в сети';
+
+    const src = accountAvatarSrc(accountState.avatar);
+    const img = document.getElementById('account-avatar-img');
+    if (img) img.src = src;
+    if (accountState.avatar && accountState.avatar !== 'avatarkins.png' && accountState.avatar !== 'null') {
+        setAccountPreviewAvatar(src, false);
+        const preview = document.getElementById('account-preview-avatar');
+        if (preview) {
+            preview.innerHTML = photoAvatarHtml(src);
+            bindAvatarLoad(preview);
+        }
+    } else {
+        const letter = (accountState.name || '?').charAt(0).toUpperCase();
+        const preview = document.getElementById('account-preview-avatar');
+        if (preview) preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+        if (img) img.src = '/static/img/signup_avatarka.png';
+    }
+    syncAccountSaveButton();
+}
+
+function waitForUserId(timeoutMs = 3000) {
+    if (window.userId) return Promise.resolve(String(window.userId));
+    return new Promise((resolve) => {
+        const started = Date.now();
+        const tick = () => {
+            if (window.userId) {
+                resolve(String(window.userId));
+                return;
+            }
+            if (Date.now() - started >= timeoutMs) {
+                resolve(null);
+                return;
+            }
+            setTimeout(tick, 50);
+        };
+        tick();
+    });
+}
+
+function readLocalUserProfile() {
+    return new Promise((resolve) => {
+        try {
+            const dbReq = indexedDB.open('Dovery');
+            dbReq.onerror = () => resolve(null);
+            dbReq.onsuccess = () => {
+                try {
+                    const db = dbReq.result;
+                    const tx = db.transaction('secrets', 'readonly');
+                    const store = tx.objectStore('secrets');
+                    const getReq = store.get('user_profile');
+                    getReq.onerror = () => resolve(null);
+                    getReq.onsuccess = () => resolve(getReq.result || null);
+                } catch (_) {
+                    resolve(null);
+                }
+            };
+        } catch (_) {
+            resolve(null);
+        }
+    });
+}
+
+async function fetchJsonSafe(url, options) {
+    const response = await fetch(url, options);
+    const contentType = response.headers.get('content-type') || '';
+    let data = null;
+    if (contentType.includes('application/json')) {
+        data = await response.json().catch(() => null);
+    } else {
+        await response.text().catch(() => '');
+    }
+    return { response, data };
+}
+
+async function loadAccountSettings() {
+    try {
+        const local = await readLocalUserProfile();
+        if (local?.id && !window.userId) {
+            window.userId = String(local.id);
+        }
+        if (local?.name || local?.username) {
+            fillAccountForm({
+                id: local.id,
+                name: local.name || '',
+                username: local.username || '',
+                avatar: local.avatar || '',
+                status: 'в сети',
+            });
+        }
+
+        let data = null;
+
+        // Сначала /api/me — по cookie-сессии, без ожидания window.userId
+        {
+            const { response, data: payload } = await fetchJsonSafe('/api/me');
+            if (response.ok && payload && payload.status !== 'error') {
+                data = payload;
+            }
+        }
+
+        if (!data) {
+            const uid = (await waitForUserId(1500)) || (local?.id ? String(local.id) : null);
+            if (uid) {
+                const { response, data: payload } = await fetchJsonSafe(
+                    `/get_use_profile/${encodeURIComponent(uid)}`
+                );
+                if (response.ok && payload && !payload.error) {
+                    data = payload;
+                }
+            }
+        }
+
+        if (!data) {
+            if (!(local?.name || local?.username)) {
+                d_alert('Ошибка', 'Не удалось загрузить данные аккаунта', 'ok');
+            }
+            return;
+        }
+
+        fillAccountForm({
+            id: data.id,
+            name: data.name,
+            username: data.username,
+            avatar: data.avatar,
+            status: data.real_status || data.status || 'в сети',
+        });
+        if (data.id != null) window.userId = String(data.id);
+    } catch (err) {
+        console.error(err);
+        d_alert('Ошибка', 'Не удалось загрузить данные аккаунта', 'ok');
+    }
+}
+
+function bindAccountSettingsUi() {
+    if (bindAccountSettingsUi.done) return;
+    bindAccountSettingsUi.done = true;
+
+    const nameInput = document.getElementById('account-name-input');
+    const usernameInput = document.getElementById('account-username-input');
+    const pickBtn = document.getElementById('account-avatar-pick');
+    const fileInput = document.getElementById('account-avatar-input');
+
+    const onFieldChange = () => {
+        const previewName = document.getElementById('account-preview-name');
+        if (previewName && nameInput) {
+            previewName.textContent = nameInput.value.trim() || 'Без имени';
+        }
+        if (!accountState.avatarFile
+            && (!accountState.avatar || accountState.avatar === 'avatarkins.png' || accountState.avatar === 'null')) {
+            const letter = (nameInput?.value || '?').charAt(0).toUpperCase();
+            const preview = document.getElementById('account-preview-avatar');
+            if (preview) preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+        }
+        syncAccountSaveButton();
+    };
+
+    nameInput?.addEventListener('input', onFieldChange);
+    usernameInput?.addEventListener('input', syncAccountSaveButton);
+
+    pickBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput?.click();
+    });
+
+    fileInput?.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        accountState.avatarFile = file;
+        if (accountState.avatarPreviewUrl) URL.revokeObjectURL(accountState.avatarPreviewUrl);
+        accountState.avatarPreviewUrl = URL.createObjectURL(file);
+        const img = document.getElementById('account-avatar-img');
+        if (img) img.src = accountState.avatarPreviewUrl;
+        const preview = document.getElementById('account-preview-avatar');
+        if (preview) {
+            preview.innerHTML = photoAvatarHtml(accountState.avatarPreviewUrl);
+            bindAvatarLoad(preview);
+        }
+        syncAccountSaveButton();
+    });
+}
+
+async function updateLocalUserProfile(data) {
+    try {
+        const dbReq = indexedDB.open('Dovery');
+        await new Promise((resolve, reject) => {
+            dbReq.onerror = () => reject(dbReq.error);
+            dbReq.onsuccess = () => {
+                const db = dbReq.result;
+                const tx = db.transaction('secrets', 'readwrite');
+                const store = tx.objectStore('secrets');
+                const getReq = store.get('user_profile');
+                getReq.onsuccess = () => {
+                    const prev = getReq.result || {};
+                    store.put({
+                        ...prev,
+                        id: data.id != null ? data.id : prev.id,
+                        username: data.username,
+                        name: data.name,
+                    }, 'user_profile');
+                };
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            };
+        });
+    } catch (e) {
+        console.warn('Не удалось обновить IndexedDB профиль', e);
+    }
+}
+
+function applyAccountDataLocally(data, { isSelf = false } = {}) {
+    const uid = String(data.id || data.user_id || '');
+    if (!uid) return;
+    if (isSelf) window.userId = uid;
+    let avatarHtml = '';
+    if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
+        avatarHtml = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
+    } else {
+        avatarHtml = letterAvatarHtml(data.name);
+    }
+    if (!chatsData[uid]) chatsData[uid] = {};
+    Object.assign(chatsData[uid], {
+        name: data.name,
+        username: data.username,
+        avatar: avatarHtml,
+        avatarRaw: data.avatar,
+        hideAvatar: false,
+    });
+}
+
+async function saveAccountSettings() {
+    if (accountState.saving) return;
+    const name = (document.getElementById('account-name-input')?.value || '').trim();
+    const username = (document.getElementById('account-username-input')?.value || '').trim();
+
+    if (!name || !username) {
+        d_pop('Заполните имя и username', '', 'Хорошо');
+        return;
+    }
+    if (name.length > 32) {
+        d_pop('Имя слишком длинное', 'Максимум 32 символа', 'Хорошо');
+        return;
+    }
+    if (!(username.length >= 4 && username.length <= 16)) {
+        d_alert('Ошибка', 'Username короче 4 символов либо длиннее 16', 'ok');
+        return;
+    }
+    if (!/^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$/.test(username)) {
+        d_alert('Ошибка', 'Username может содержать только латинские буквы, цифры и символ подчеркивания', 'ok');
+        return;
+    }
+
+    accountState.saving = true;
+    syncAccountSaveButton();
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('username', username);
+    if (accountState.avatarFile) {
+        formData.append('avatar', accountState.avatarFile);
+    }
+
+    try {
+        const response = await fetch('/api/me', { method: 'POST', body: formData });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            if (data.message === 'd203') d_pop('Username занят', '', 'Хорошо');
+            else if (data.message === 'd206') d_alert('Ошибка', 'Некорректный username', 'ok');
+            else if (data.message === 'd208') d_alert('Ошибка', 'Username короче 4 символов либо длиннее 16', 'ok');
+            else d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
+            return;
+        }
+        await updateLocalUserProfile(data);
+        applyAccountDataLocally(data, { isSelf: true });
+        fillAccountForm(data);
+        if (typeof loadMyChats === 'function') {
+            loadMyChats({ showSkeleton: false });
+        }
+        d_pop('Сохранено', 'Данные аккаунта обновлены', 'Хорошо');
+    } catch (err) {
+        console.error(err);
+        d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
+    } finally {
+        accountState.saving = false;
+        syncAccountSaveButton();
+    }
+}
+
+function openAccountScreen() {
+    if (typeof window.hideDropdown === 'function') hideDropdown();
+    bindAccountSettingsUi();
+    openScreen('6');
+    loadAccountSettings();
+}
+
+socket.on('contact_profile_updated', (data) => {
+    if (!data?.user_id) return;
+    const uid = String(data.user_id);
+    if (!chatsData[uid]) return;
+    applyAccountDataLocally({ ...data, id: uid }, { isSelf: false });
+    const listItem = document.querySelector(`#chats-list .item[data-user-id="${uid}"]`);
+    if (listItem) {
+        const nameEl = listItem.querySelector('.label.body1');
+        if (nameEl) nameEl.textContent = data.name || '';
+        const left = listItem.querySelector('.left');
+        if (left) {
+            if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
+                left.innerHTML = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
+            } else {
+                left.innerHTML = letterAvatarHtml(data.name);
+            }
+            bindAvatarLoad(listItem);
+        }
+    }
+    if (String(getActiveChatId()) && window.chatIdToUserId?.[getActiveChatId()] === uid) {
+        const headerName = document.getElementById('user-name');
+        const headerAvatar = document.getElementById('user-avatar');
+        if (headerName) headerName.textContent = data.name || '';
+        if (headerAvatar) {
+            headerAvatar.innerHTML = getDisplayAvatarHtml(chatsData[uid]);
+            bindAvatarLoad(headerAvatar);
+        }
+    }
+});
+
+window.openAccountScreen = openAccountScreen;
+window.saveAccountSettings = saveAccountSettings;
+window.loadAccountSettings = loadAccountSettings;

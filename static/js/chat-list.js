@@ -26,14 +26,66 @@ function buildChatListAvatar(chat) {
     return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
 }
 
-async function loadMyChats() {
+function buildChatListSkeleton(separator = false, widths = {}) {
+    const row = document.createElement('div');
+    row.className = 'item loading-skeleton';
+    const sep = separator ? 'separator' : '';
+    const titleW = widths.title || '42%';
+    const subtitleW = widths.subtitle || '28%';
+    row.innerHTML = `
+        <div class="left">
+            <div class="ava"></div>
+        </div>
+        <div class="right ${sep}">
+            <div class="text twoline">
+                <div class="label body1"><span class="skeleton-line title" style="width:${titleW}"></span></div>
+                <div class="label subtitle subtitle1"><span class="skeleton-line subtitle" style="width:${subtitleW}"></span></div>
+            </div>
+        </div>
+    `;
+    return row;
+}
+
+function showChatListSkeletons(count = 7) {
+    const listContainer = document.getElementById('chats-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+    const widths = [
+        { title: '48%', subtitle: '32%' },
+        { title: '36%', subtitle: '24%' },
+        { title: '54%', subtitle: '40%' },
+        { title: '40%', subtitle: '22%' },
+        { title: '44%', subtitle: '30%' },
+        { title: '52%', subtitle: '26%' },
+        { title: '38%', subtitle: '34%' },
+    ];
+    for (let i = 0; i < count; i++) {
+        listContainer.appendChild(buildChatListSkeleton(i < count - 1, widths[i % widths.length]));
+    }
+}
+
+function shouldShowChatListSkeleton(listContainer) {
+    if (!listContainer) return true;
+    return listContainer.querySelectorAll('.item[data-user-id]').length === 0;
+}
+
+async function loadMyChats({ showSkeleton = null } = {}) {
+    const listContainer = document.getElementById('chats-list');
+    if (!listContainer) return;
+
+    const useSkeleton = showSkeleton == null
+        ? shouldShowChatListSkeleton(listContainer)
+        : !!showSkeleton;
+    if (useSkeleton) {
+        showChatListSkeletons();
+    }
+
     try {
         const response = await fetch('/get_my_chats');
         if (!response.ok) {
             d_alert("Ошибка", `Ошибка загрузки списка чатов`, "ok");
         }
         const chats = await response.json();
-        const listContainer = document.getElementById('chats-list');
         let inx = 0;
         listContainer.innerHTML = ''; 
 
@@ -128,12 +180,14 @@ async function loadMyChats() {
     }
 }
 
+showChatListSkeletons();
+
 window.onload = () => {
-    loadMyChats();
+    loadMyChats({ showSkeleton: false });
 };
 
 socket.on("chat_created", (data) => {
-    loadMyChats(); 
+    loadMyChats({ showSkeleton: false }); 
 });
 
 function setChatUnreadBadge(chatId, count) {
@@ -171,6 +225,7 @@ function setChatUnreadBadge(chatId, count) {
 }
 
 window.setChatUnreadBadge = setChatUnreadBadge;
+window.showChatListSkeletons = showChatListSkeletons;
 
 socket.on('unread_update', (data) => {
     if (!data) return;

@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none">
+   <defs/>
+   <sodipodi:namedview inkscape:pagecheckerboard="true" borderlayer="true" bordercolor="#666666" pagecolor="#ffffff"/>
+   <g inkscape:groupmode="layer" id="g_1" transform="matrix(5.069306930693069, 0.0, 0.0, 5.069306930693069, 2.534653465346537, 0.0)" inkscape:label="PreCompLayer">
+      <g inkscape:groupmode="layer" id="g_2" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" inkscape:label="ShapeLayer" style="">
+         <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="stroke:rgb(255, 255, 255);stroke-opacity:1.0;stroke-width:6.0;stroke-miterlimit:0.0;stroke-linecap:round;stroke-linejoin:round">
+            <path d="M 12.438,77.669 C 12.438,77.669 87.563,77.669 87.563,77.669 
+M 50,66.294 C 50,66.294 76.188,66.294 76.188,66.294 C 76.73658377035487,66.294 77.188,65.84258377035486 77.188,65.294 C 77.188,65.294 77.188,28.669 77.188,28.669 C 77.188,25.37749737787082 74.47950262212919,22.669 71.188,22.669 C 71.188,22.669 28.813,22.669 28.813,22.669 C 25.52149737787082,22.669 22.813,25.37749737787082 22.813,28.669 C 22.813,28.669 22.813,65.294 22.813,65.294 C 22.813,65.84258377035486 23.264416229645136,66.294 23.813,66.294 C 23.813,66.294 50,66.294 50,66.294 C 50,66.294 50,66.294 50,66.294 Z" style=""/>
+         </g>
+      </g>
+   </g>
+</svg>

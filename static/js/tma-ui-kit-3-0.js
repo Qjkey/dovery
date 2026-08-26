@@ -851,10 +851,17 @@ function isDoveryDevicesScreen(screen) {
   return !!(screen && (screen.id === 'devices-screen' || screen.getAttribute('data-screen') === '5'));
 }
 
+function isDoveryAccountScreen(screen) {
+  return !!(screen && (screen.id === 'account-screen' || screen.getAttribute('data-screen') === '6'));
+}
+
 function shouldPreserveChatsScroll(screen) {
-  // Чат, профиль и устройства на desktop не должны блокировать скролл списка чатов
+  // Чат, профиль, устройства и аккаунт на desktop не должны блокировать скролл списка чатов
   return isDoveryChatListLayout()
-    && (isDoveryMessagesScreen(screen) || isDoveryProfileScreen(screen) || isDoveryDevicesScreen(screen));
+    && (isDoveryMessagesScreen(screen)
+      || isDoveryProfileScreen(screen)
+      || isDoveryDevicesScreen(screen)
+      || isDoveryAccountScreen(screen));
 }
 
 function isInsetMarginScreen(screen) {

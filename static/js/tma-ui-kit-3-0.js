@@ -51,6 +51,62 @@ function d_alert(title = "", description = "", type = "ok") {
     });
 }
 
+/** Диалог с полем пароля. Возвращает строку пароля или null при отмене. */
+function d_password_prompt(title = "", description = "") {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'd-alert-overlay';
+        overlay.innerHTML = `
+            <div class="d-alert-box">
+                ${title ? `<div class="d-alert-title headline6">${title}</div>` : ''}
+                ${description ? `<div class="d-alert-description body1">${description}</div>` : ''}
+                <div class="d-alert-input-wrap">
+                    <input type="password" class="d-alert-input body1" autocomplete="current-password" placeholder="Пароль" />
+                </div>
+                <div class="d-alert-buttons body1-medium">
+                    <button type="button" class="d-alert-btn clicked activing body1-medium" data-res="cancel">Отмена</button>
+                    <button type="button" class="d-alert-btn clicked activing body1-medium" data-res="ok">OK</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('.d-alert-input');
+        setTimeout(() => {
+            overlay.classList.add('active');
+            input?.focus();
+        }, 10);
+
+        const finish = (value) => {
+            if (input) input.value = '';
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 200);
+            resolve(value);
+        };
+
+        overlay.addEventListener('click', (e) => {
+            const btn = e.target.closest('.d-alert-btn');
+            if (btn) {
+                const res = btn.getAttribute('data-res');
+                if (res === 'ok') finish((input?.value || '').trim() || null);
+                else finish(null);
+            } else if (e.target === overlay) {
+                finish(null);
+            }
+        });
+
+        input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                finish((input.value || '').trim() || null);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                finish(null);
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const MIN_ANIMATION_TIME = 200;
 

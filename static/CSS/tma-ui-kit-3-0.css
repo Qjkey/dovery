@@ -15,6 +15,7 @@
     --tg-theme-section-separator-color: #d9d9d9;
     --tg-theme-bottom-bar-bg-color: #f1f1f3;
     --tg-theme-profile-block-bg-color: var(--tg-theme-section-header-text-color);
+    --tg-theme-button-profile-color: rgba(0, 0, 0, 0.15);
 
     --bg-one: #99BF8D;
     --bg-two: #BDC985;
@@ -52,6 +53,7 @@
         --tg-theme-section-separator-color: #000000;
         --tg-theme-bottom-bar-bg-color: #000000;
         --tg-theme-profile-block-bg-color: var(--tg-theme-header-bg-color);
+        --tg-theme-button-profile-color: rgba(0, 0, 0, 0.3);
 
         --bg-one: #172431;
         --bg-two: #0E141A;
@@ -167,6 +169,19 @@
     color: var(--tg-theme-text-color);
     margin-bottom: 24px;
     opacity: 0.9;
+}
+.d-alert-input-wrap {
+    margin: -8px 12px 20px 0;
+}
+.d-alert-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: var(--tg-theme-secondary-bg-color, rgba(127, 127, 127, 0.16));
+    color: var(--tg-theme-text-color);
+    outline: none;
 }
 .d-alert-buttons {
     display: flex;
@@ -1410,7 +1425,7 @@ td .img_s {
     justify-content: center;
     text-decoration: none;
     color: white;
-    background-color: rgba(0, 0, 0, 0.12);
+    background-color: var(--tg-theme-button-profile-color);
     border-radius: var(--radius);
     padding: 3px 15px 8px 15px;
     width: 31%;

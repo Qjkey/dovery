@@ -1,57 +1,6 @@
 const dbName = "Dovery";
 const storeName = "secrets";
 
-async function deriveEncryptionKey(password, username) {
-    const encoder = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey(
-        "raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]
-    );
-    return crypto.subtle.deriveKey(
-        {
-            name: "PBKDF2",
-            salt: encoder.encode(username),
-            iterations: 100000,
-            hash: "SHA-256"
-        },
-        keyMaterial,
-        { name: "AES-GCM", length: 256 },
-        false, ["encrypt", "decrypt"]
-    );
-}
-
-async function decryptAndImportKey(encryptedBase64, password, username) {
-    const combined = new Uint8Array(atob(encryptedBase64).split("").map(c => c.charCodeAt(0)));
-    const iv = combined.slice(0, 12);
-    const ciphertext = combined.slice(12);
-
-    const encryptionKey = await deriveEncryptionKey(password, username);
-
-    const decryptedRaw = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: iv },
-        encryptionKey,
-        ciphertext
-    );
-
-    return await window.crypto.subtle.importKey(
-        "pkcs8",
-        decryptedRaw,
-        { 
-            name: "ECDH", 
-            namedCurve: "P-256" 
-        },
-        true,
-        ["deriveKey", "deriveBits"]
-    );
-}
-
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 async function detectDeviceInfo() {
     const ua = navigator.userAgent || '';
     let deviceOs = 'unknown';
@@ -144,32 +93,26 @@ document.getElementById('overlay_profile').addEventListener('click', () => {
 });
 
 function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(storeName)) {
-                db.createObjectStore(storeName);
-            }
-        };
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+    return openDoveryDB();
 }
 
 async function saveUserData(userData, privateKey) {
     const db = await initDB();
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
+    try {
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
 
-    store.put(privateKey, "private_key");
-    store.put(userData, "user_profile");
+        store.put(privateKey, "private_key");
+        store.put(userData, "user_profile");
 
-    return new Promise((resolve) => {
-        tx.oncomplete = () => resolve();
-    });
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('idb_abort'));
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function validateAndSubmit_login(el) {
@@ -284,20 +227,8 @@ async function validateAndSubmit(el) {
         const pubBase64 = btoa(String.fromCharCode(...new Uint8Array(pubExport)));
 
         // Соль = username ровно в том регистре, как ввёл пользователь
-        const encryptionKey = await deriveEncryptionKey(passwordValue, username);
         const privExport = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-        
-        const iv = crypto.getRandomValues(new Uint8Array(12)); 
-        const encryptedContent = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
-            encryptionKey,
-            privExport
-        );
-
-        const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
-        combined.set(iv);
-        combined.set(new Uint8Array(encryptedContent), iv.length);
-        const privBase64 = btoa(String.fromCharCode(...combined));
+        const privBase64 = await encryptPrivateKeyRaw(privExport, passwordValue, username);
         
         const hashedPass = await hashPassword(passwordValue);
 

@@ -84,6 +84,14 @@ Dovery
                 <div class="header-center">
                     <div class="label headline6">Настройки</div>
                 </div>
+
+                <div class="header-right">
+                    <div class="header-capsule one-btn" id="cntxt_menu_btn_06">
+                        <div class="element-header">
+                            <svg class="menu"><use href="#menu"></use></svg>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <section class="bottom">
@@ -343,7 +351,7 @@ Dovery
     </div>
 
     <div class="screen hidden account-screen-dovery" id="account-screen" data-screen="6" data-swipe data-inset-margin data-reveal-behind="#chat-content, #no-chat-content">
-        <div class="header-wrapper header-bg">
+        <div class="header-wrapper header-bg stick">
             <div class="header">
                 <div class="header-left">
                     <div class="header-capsule one-btn" data-close-screen="6" id="close-account">
@@ -353,7 +361,6 @@ Dovery
                     </div>
                 </div>
                 <div class="header-center">
-                    <div class="label headline6">Аккаунт</div>
                 </div>
                 <div class="header-right">
                     <div class="header-capsule one-btn hidden" id="account-save-btn" onclick="saveAccountSettings();" title="Сохранить">
@@ -365,19 +372,13 @@ Dovery
             </div>
         </div>
 
-        <section class="bottom">
-            <div class="item" id="account-preview">
-                <div class="left" id="account-preview-avatar"></div>
-                <div class="right">
-                    <div class="text twoline">
-                        <div class="label body1" id="account-preview-name"></div>
-                        <div class="label subtitle subtitle1 active" id="account-preview-status">в сети</div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <div id="profileBlock3" class="profile-block s-img defult">
+            <div class="avatar" id="account-preview-avatar"></div>
+            <div class="defult headline6" style="color: var(--tg-theme-text-color);" id="account-preview-name"></div>
+            <div class="subname subtitle1" id="account-preview-status"></div>
+        </div>
 
-        <section class="bottom">
+        <section class="top bottom">
             <div class="item">
                 <div class="right">
                     <div class="title oneline">
@@ -400,11 +401,6 @@ Dovery
                 </div>
             </div>
         </section>
-        <div class="item footer">
-            <div class="right">
-                <div class="subtitle2">Можно оставить текущую аватарку</div>
-            </div>
-        </div>
 
         <section class="bottom">
             <div class="item">
@@ -425,16 +421,27 @@ Dovery
                 <button type="button" class="clear-button"><svg class="close2"><use href="#close2"></use></svg></button>
             </div>
         </section>
-        <div class="item footer">
-            <div class="right">
-                <div class="subtitle2">Имя и username обязательны</div>
+
+        <section class="bottom">
+            <div class="item clicked" id="account-logout-btn" onclick="logoutAccount();">
+                <div class="left">
+                    <svg class="chat"><use href="#leave"></use></svg>
+                </div>
+                <div class="right">
+                    <div class="text oneline">  
+                        <div class="label-destructive body1">Выйти</div> 
+                    </div>
+                    <div class="element"> 
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
     </div>
 </div>
 <div id="tagDropdown" class="tag-dropdown"></div>
 <script src="/static/js/sockets.js"></script>
 <script src="/static/js/html_canvas.js"></script>
+<script src="/static/js/key-crypto.js"></script>
 <script src="/static/js/dovery.js"></script>
 <script src="/static/js/search.js"></script>
 <script src="/static/js/chat-list.js"></script>
@@ -538,6 +545,12 @@ var list_items_icon_04 = [
 var list_items_icon_05 = [ 
     { label: "Ссылку", onclick:"copy_link_username();", icon: 'copy_username' },
     { label: "Username", onclick:"copy_username();", icon: 'copy_username_link' }
+];
+
+var list_items_icon_06 = [ 
+    { label: "Выход", danger: true, onclick:"logoutAccount();", icon: 'leave' },
+    { separator: true },
+    { label: "Кнопка позволяет выйти из аккаунта", onclick:"return();"}
 ];
 if (typeof syncThemeMenuItem === 'function') syncThemeMenuItem();
 if (typeof syncResizeMenuItem === 'function') syncResizeMenuItem();

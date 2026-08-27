@@ -78,24 +78,18 @@ async function get_public_key(pem) {
 }
 
 async function get_private_key() {
-    return new Promise((resolve, reject) => {
-        const DB_NAME = 'Dovery'; 
-        const STORE_NAME = 'secrets';
-
-        const request = indexedDB.open(DB_NAME);
-
-        request.onerror = () => reject("Ошибка в открытии IndexedDB");
-        
-        request.onsuccess = (event) => {
-            const db = event.target.result;
-            const transaction = db.transaction(STORE_NAME, "readonly");
-            const store = transaction.objectStore(STORE_NAME);
-            const getRequest = store.get("private_key");
-
+    const db = await openDoveryDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            const transaction = db.transaction(DOVERY_STORE_NAME, 'readonly');
+            const store = transaction.objectStore(DOVERY_STORE_NAME);
+            const getRequest = store.get('private_key');
             getRequest.onsuccess = () => resolve(getRequest.result);
-            getRequest.onerror = () => reject("Ошибка извлечения ключа");
-        };
-    });
+            getRequest.onerror = () => reject(getRequest.error || new Error('Ошибка извлечения ключа'));
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function calc_key_chat(myPrivateKey, opponentPublicKey) {
@@ -1414,8 +1408,22 @@ socket.on('message_deleted', async (data) => {
     }
 });
 
-window.userId = null; 
-const request = indexedDB.open("Dovery");
+window.userId = null;
+openDoveryDB().then((db) => {
+  const transaction = db.transaction(DOVERY_STORE_NAME, 'readonly');
+  const store = transaction.objectStore(DOVERY_STORE_NAME);
+  const getRequest = store.get('user_profile');
+  getRequest.onsuccess = () => {
+    const data = getRequest.result;
+    if (data) {
+      window.userId = String(data.id);
+    }
+  };
+  transaction.oncomplete = () => db.close();
+  transaction.onerror = () => db.close();
+}).catch((err) => {
+  console.warn('Не удалось открыть IndexedDB профиля', err);
+});
 
 function getShortDateLabel(timeString) {
     const date = new Date(timeString);
@@ -1721,21 +1729,6 @@ function applyMessageGrouping(area) {
         }
     }
 }
-
-request.onsuccess = (event) => {
-  const db = event.target.result;
-  const transaction = db.transaction("secrets", "readonly");
-  const store = transaction.objectStore("secrets");
-
-  const getRequest = store.get("user_profile");
-
-  getRequest.onsuccess = () => {
-    const data = getRequest.result;
-    if (data) {
-      window.userId = String(data.id);
-    }
-  };
-};
 
 const msgInput = document.getElementById('messages-textarea');
 const sendBtn = document.getElementById('sendBtn');
@@ -3120,6 +3113,7 @@ async function deleteDeviceSession(sessionId) {
             return;
         }
         if (data.logout) {
+            await clearDoveryDB();
             window.location.href = '/';
             return;
         }
@@ -3137,13 +3131,39 @@ function openDevicesScreen() {
     loadDevicesList({ showSkeleton: false });
 }
 
-socket.on('session_revoked', () => {
+socket.on('session_revoked', async () => {
+    try {
+        await clearDoveryDB();
+    } catch (err) {
+        console.warn(err);
+    }
     window.location.href = '/';
 });
+
+async function logoutAccount() {
+    if (typeof window.hideDropdown === 'function') hideDropdown();
+    if (logoutAccount._busy) return;
+    const result = await d_alert('Выход', 'Выйти из аккаунта на этом устройстве?', 'ok_cancel');
+    if (result !== 'ok') return;
+    logoutAccount._busy = true;
+    try {
+        await fetch('/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch (err) {
+        console.error(err);
+    } finally {
+        try {
+            await clearDoveryDB();
+        } catch (err) {
+            console.warn(err);
+        }
+        window.location.href = '/';
+    }
+}
 
 window.openDevicesScreen = openDevicesScreen;
 window.loadDevicesList = loadDevicesList;
 window.deleteDeviceSession = deleteDeviceSession;
+window.logoutAccount = logoutAccount;
 
 const accountState = {
     name: '',
@@ -3212,7 +3232,13 @@ function fillAccountForm(data) {
     if (nameInput) nameInput.value = accountState.name;
     if (usernameInput) usernameInput.value = accountState.username;
     if (previewName) previewName.textContent = accountState.name || 'Без имени';
-    if (previewStatus) previewStatus.textContent = data.status || 'в сети';
+    if (previewStatus) {
+        const presence = data.real_status
+            || (data.status && data.status !== 'ok' && data.status !== 'error' ? data.status : null)
+            || previewStatus.textContent
+            || 'в сети';
+        previewStatus.textContent = presence;
+    }
 
     const src = accountAvatarSrc(accountState.avatar);
     const img = document.getElementById('account-avatar-img');
@@ -3253,21 +3279,20 @@ function waitForUserId(timeoutMs = 3000) {
 }
 
 function readLocalUserProfile() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
         try {
-            const dbReq = indexedDB.open('Dovery');
-            dbReq.onerror = () => resolve(null);
-            dbReq.onsuccess = () => {
-                try {
-                    const db = dbReq.result;
-                    const tx = db.transaction('secrets', 'readonly');
-                    const store = tx.objectStore('secrets');
-                    const getReq = store.get('user_profile');
-                    getReq.onerror = () => resolve(null);
-                    getReq.onsuccess = () => resolve(getReq.result || null);
-                } catch (_) {
-                    resolve(null);
-                }
+            const db = await openDoveryDB();
+            const tx = db.transaction(DOVERY_STORE_NAME, 'readonly');
+            const store = tx.objectStore(DOVERY_STORE_NAME);
+            const getReq = store.get('user_profile');
+            getReq.onerror = () => {
+                db.close();
+                resolve(null);
+            };
+            getReq.onsuccess = () => {
+                const value = getReq.result || null;
+                tx.oncomplete = () => db.close();
+                resolve(value);
             };
         } catch (_) {
             resolve(null);
@@ -3396,27 +3421,24 @@ function bindAccountSettingsUi() {
 
 async function updateLocalUserProfile(data) {
     try {
-        const dbReq = indexedDB.open('Dovery');
+        const db = await openDoveryDB();
         await new Promise((resolve, reject) => {
-            dbReq.onerror = () => reject(dbReq.error);
-            dbReq.onsuccess = () => {
-                const db = dbReq.result;
-                const tx = db.transaction('secrets', 'readwrite');
-                const store = tx.objectStore('secrets');
-                const getReq = store.get('user_profile');
-                getReq.onsuccess = () => {
-                    const prev = getReq.result || {};
-                    store.put({
-                        ...prev,
-                        id: data.id != null ? data.id : prev.id,
-                        username: data.username,
-                        name: data.name,
-                    }, 'user_profile');
-                };
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
+            const tx = db.transaction(DOVERY_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(DOVERY_STORE_NAME);
+            const getReq = store.get('user_profile');
+            getReq.onsuccess = () => {
+                const prev = getReq.result || {};
+                store.put({
+                    ...prev,
+                    id: data.id != null ? data.id : prev.id,
+                    username: data.username,
+                    name: data.name,
+                }, 'user_profile');
             };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
         });
+        db.close();
     } catch (e) {
         console.warn('Не удалось обновить IndexedDB профиль', e);
     }
@@ -3464,23 +3486,81 @@ async function saveAccountSettings() {
         return;
     }
 
+    const usernameChanged = username !== accountState.username;
+    let passwordValue = null;
+    let reencryptedKey = null;
+
+    if (usernameChanged) {
+        passwordValue = await d_password_prompt(
+            'Смена username',
+            'Username — соль шифрования ключа. Введите пароль аккаунта, чтобы перешифровать приватный ключ.'
+        );
+        if (!passwordValue) return;
+        if (passwordValue.length < 8) {
+            d_pop('Слишком короткий пароль', 'Минимум 8 символов', 'Хорошо');
+            passwordValue = null;
+            return;
+        }
+    }
+
     accountState.saving = true;
     syncAccountSaveButton();
 
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('username', username);
-    if (accountState.avatarFile) {
-        formData.append('avatar', accountState.avatarFile);
-    }
-
     try {
+        if (usernameChanged) {
+            const keyRes = await fetch('/api/me/private_key', { credentials: 'same-origin' });
+            const keyData = await keyRes.json().catch(() => ({}));
+            if (!keyRes.ok || !keyData.private_key) {
+                d_alert('Ошибка', 'Не удалось получить ключ для перешифровки', 'ok');
+                return;
+            }
+
+            const oldUsername = keyData.username || accountState.username;
+            let localKey = null;
+            try {
+                localKey = await get_private_key();
+            } catch (_) {
+                localKey = null;
+            }
+
+            try {
+                reencryptedKey = await reencryptPrivateKeyForUsername({
+                    encryptedPrivateKey: keyData.private_key,
+                    oldUsername,
+                    newUsername: username,
+                    password: passwordValue,
+                    localPrivateKey: localKey,
+                });
+            } catch (err) {
+                console.error(err);
+                if (err && (err.name === 'OperationError' || err.message === 'decrypt_failed')) {
+                    d_alert('Ошибка', 'Неверный пароль или не удалось расшифровать ключ', 'ok');
+                } else {
+                    d_alert('Ошибка', 'Не удалось перешифровать приватный ключ', 'ok');
+                }
+                return;
+            }
+        }
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('username', username);
+        if (accountState.avatarFile) {
+            formData.append('avatar', accountState.avatarFile);
+        }
+        if (usernameChanged) {
+            formData.append('password', await hashPassword(passwordValue));
+            formData.append('encrypted_private_key', reencryptedKey);
+        }
+
         const response = await fetch('/api/me', { method: 'POST', body: formData });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             if (data.message === 'd203') d_pop('Username занят', '', 'Хорошо');
             else if (data.message === 'd206') d_alert('Ошибка', 'Некорректный username', 'ok');
             else if (data.message === 'd208') d_alert('Ошибка', 'Username короче 4 символов либо длиннее 16', 'ok');
+            else if (data.message === 'd102') d_alert('Ошибка', 'Неверный пароль', 'ok');
+            else if (data.message === 'd209') d_alert('Ошибка', 'Некорректный перешифрованный ключ', 'ok');
             else d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
             return;
         }
@@ -3495,6 +3575,8 @@ async function saveAccountSettings() {
         console.error(err);
         d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
     } finally {
+        passwordValue = null;
+        reencryptedKey = null;
         accountState.saving = false;
         syncAccountSaveButton();
     }

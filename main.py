@@ -749,7 +749,6 @@ def api_me():
                 "name": user['name'] or '',
                 "username": user['username'] or '',
                 "avatar": user['avatar'] or '',
-                "status": 'в сети' if online else 'был(а) недавно',
                 "real_status": 'в сети' if online else 'был(а) недавно',
             })
         except Exception as e:
@@ -761,6 +760,8 @@ def api_me():
     name = (request.form.get('name') or '').strip()
     username = (request.form.get('username') or '').strip()
     avatar_file = request.files.get('avatar')
+    client_hash = (request.form.get('password') or '').strip()
+    new_priv_key = (request.form.get('encrypted_private_key') or '').strip()
 
     if not name or not username:
         return jsonify({"status": "error", "message": "d201"}), 400
@@ -776,11 +777,26 @@ def api_me():
     conn = get_db_connection()
     try:
         row = conn.execute(
-            "SELECT avatar FROM users WHERE id = ?",
-            (user_id,),
+            "SELECT avatar, username, password, private_key FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+            (user_id, str(user_id)),
         ).fetchone()
         if not row:
             return jsonify({"status": "error"}), 404
+
+        old_username = row['username'] or ''
+        username_changed = old_username != username
+
+        # Смена username меняет соль PBKDF2 — обязательны пароль и перешифрованный ключ
+        if username_changed:
+            if not CLIENT_HASH_RE.fullmatch(client_hash):
+                return jsonify({"status": "error", "message": "d102"}), 401
+            if not check_password_hash(row['password'], client_hash):
+                return jsonify({"status": "error", "message": "d102"}), 401
+            if not is_valid_base64(new_priv_key, min_len=80, max_len=1024):
+                return jsonify({"status": "error", "message": "d209"}), 400
+            # Нельзя подменить ключ без смены username
+        elif new_priv_key:
+            return jsonify({"status": "error", "message": "d210"}), 400
 
         avatar_name = row['avatar'] or 'avatarkins.png'
         if avatar_file and avatar_file.filename:
@@ -788,10 +804,16 @@ def api_me():
             if processed:
                 avatar_name = processed
 
-        conn.execute(
-            "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ?",
-            (name, username, avatar_name, user_id),
-        )
+        if username_changed:
+            conn.execute(
+                "UPDATE users SET name = ?, username = ?, avatar = ?, private_key = ? WHERE id = ? OR CAST(id AS TEXT) = ?",
+                (name, username, avatar_name, new_priv_key, user_id, str(user_id)),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ? OR CAST(id AS TEXT) = ?",
+                (name, username, avatar_name, user_id, str(user_id)),
+            )
         conn.commit()
 
         payload = {
@@ -822,6 +844,33 @@ def api_me():
         return jsonify({"status": "error", "message": "d203"}), 409
     except Exception as e:
         print(f"Ошибка /api/me POST: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/me/private_key', methods=['GET'])
+def api_me_private_key():
+    """Отдаёт зашифрованный private_key текущего пользователя (только авторизованному)."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error"}), 401
+
+    conn = get_db_connection()
+    try:
+        user = conn.execute(
+            "SELECT username, private_key FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+            (user_id, str(user_id)),
+        ).fetchone()
+        if not user or not user['private_key']:
+            return jsonify({"status": "error", "message": "not_found"}), 404
+        return jsonify({
+            "status": "ok",
+            "username": user['username'] or '',
+            "private_key": user['private_key'],
+        })
+    except Exception as e:
+        print(f"Ошибка /api/me/private_key: {e}")
         return jsonify({"status": "error"}), 500
     finally:
         conn.close()
@@ -902,6 +951,23 @@ def delete_session(session_id):
         return jsonify({"status": "error"}), 500
     finally:
         conn.close()
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    """Удаляет текущий токен сессии и очищает cookie-сессию."""
+    raw_token = session.get('auth_token')
+    if raw_token:
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        try:
+            with get_db_connection() as conn:
+                conn.execute('DELETE FROM sessions WHERE token_hash = ?', (token_hash,))
+                conn.commit()
+        except Exception as e:
+            print(f"Ошибка logout: {e}")
+        kick_session_sockets(token_hash)
+    session.clear()
+    return jsonify({"status": "ok"})
 
 
 # Вход в аккаунт

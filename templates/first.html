@@ -35,7 +35,7 @@
         </a>
     </section>
     <!-- Вход в аккаунт -->
-    <div data-screen="1" class="screen hidden">
+    <div data-screen="1" data-swipe class="screen hidden">
         <div class="header-wrapper header-bg">
             <div class="header">
                 <div class="header-left">
@@ -86,7 +86,7 @@
         </form>
     </div>
     <!-- Регистрация -->
-    <div data-screen="2" class="screen hidden">
+    <div data-screen="2" data-swipe class="screen hidden">
         <div class="header-wrapper header-bg">
             <div class="header">
                 <div class="header-left">
@@ -131,7 +131,7 @@
             </div>
         </div>
         <form action="/" method="POST" id="regForm">
-            <section class="bottom">
+            <section>
                 <div class="item">
                     <div class="right">
                         <div class="title oneline"> 
@@ -180,6 +180,7 @@
         </form>
     </div>
 </div>
+<script src="/static/js/key-crypto.js"></script>
 <script src="/static/js/first.js"></script>
 <script src="/static/js/tma-ui-kit-3-0.js"></script>
 {% endblock %}

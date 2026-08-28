@@ -196,6 +196,8 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
                     avatarRaw: data.avatar,
                     hideAvatar: !!data.hide_avatar,
                     publicKey: data.public_key,
+                    signingPublicKey: data.signing_public_key || '',
+                    publicKeySig: data.public_key_sig || '',
                     status: data.status,
                     realStatus: data.real_status || data.status,
                     blockState: normalizeBlockState(data.block_state)
@@ -409,6 +411,8 @@ async function openProfileByUsername(username) {
         avatarRaw: user.avatar,
         hideAvatar: !!user.hide_avatar,
         publicKey: user.public_key,
+        signingPublicKey: user.signing_public_key || '',
+        publicKeySig: user.public_key_sig || '',
         status: user.status,
         realStatus: user.real_status || user.status,
         blockState: normalizeBlockState(user.block_state)
@@ -703,6 +707,31 @@ tx.addEventListener('input', function() {
     syncComposerBarLayout();
 });
 
+async function assertContactPublicKeyTrusted(user) {
+    if (!user?.publicKey) return false;
+    const result = await verifyEcdhPublicKey(
+        user.signingPublicKey,
+        user.publicKey,
+        user.publicKeySig
+    );
+    if (result.reason === 'invalid') {
+        d_alert(
+            'Безопасность',
+            'Публичный ключ собеседника не прошёл проверку подписи. Возможна подмена на сервере.',
+            'ok'
+        );
+        return false;
+    }
+    if (result.reason === 'unsigned') {
+        d_pop(
+            'Безопасность',
+            'Ключ собеседника ещё не подписан. Попросите войти в аккаунт снова для обновления ключей.',
+            'Хорошо'
+        );
+    }
+    return true;
+}
+
 async function openDirectWindow(chatId) {
     try {
         chatId = chatId != null ? String(chatId) : '';
@@ -761,6 +790,9 @@ async function openDirectWindow(chatId) {
             headerPanel.onclick = () => openProfile(partnerId, false, false);
         }
         try {
+            if (!await assertContactPublicKeyTrusted(user)) {
+                return;
+            }
             const private_key = await get_private_key(); 
             const public_key = await get_public_key(user.publicKey);
             window.keychat = await calc_key_chat(private_key, public_key);
@@ -1257,6 +1289,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     avatarRaw: user.avatar,
                     hideAvatar: !!user.hide_avatar,
                     publicKey: user.public_key,
+                    signingPublicKey: user.signing_public_key || '',
+                    publicKeySig: user.public_key_sig || '',
                     status: user.status,
                     realStatus: user.real_status || user.status,
                     blockState: normalizeBlockState(user.block_state)
@@ -3486,81 +3520,23 @@ async function saveAccountSettings() {
         return;
     }
 
-    const usernameChanged = username !== accountState.username;
-    let passwordValue = null;
-    let reencryptedKey = null;
-
-    if (usernameChanged) {
-        passwordValue = await d_password_prompt(
-            'Смена username',
-            'Username — соль шифрования ключа. Введите пароль аккаунта, чтобы перешифровать приватный ключ.'
-        );
-        if (!passwordValue) return;
-        if (passwordValue.length < 8) {
-            d_pop('Слишком короткий пароль', 'Минимум 8 символов', 'Хорошо');
-            passwordValue = null;
-            return;
-        }
-    }
-
     accountState.saving = true;
     syncAccountSaveButton();
 
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('username', username);
+    if (accountState.avatarFile) {
+        formData.append('avatar', accountState.avatarFile);
+    }
+
     try {
-        if (usernameChanged) {
-            const keyRes = await fetch('/api/me/private_key', { credentials: 'same-origin' });
-            const keyData = await keyRes.json().catch(() => ({}));
-            if (!keyRes.ok || !keyData.private_key) {
-                d_alert('Ошибка', 'Не удалось получить ключ для перешифровки', 'ok');
-                return;
-            }
-
-            const oldUsername = keyData.username || accountState.username;
-            let localKey = null;
-            try {
-                localKey = await get_private_key();
-            } catch (_) {
-                localKey = null;
-            }
-
-            try {
-                reencryptedKey = await reencryptPrivateKeyForUsername({
-                    encryptedPrivateKey: keyData.private_key,
-                    oldUsername,
-                    newUsername: username,
-                    password: passwordValue,
-                    localPrivateKey: localKey,
-                });
-            } catch (err) {
-                console.error(err);
-                if (err && (err.name === 'OperationError' || err.message === 'decrypt_failed')) {
-                    d_alert('Ошибка', 'Неверный пароль или не удалось расшифровать ключ', 'ok');
-                } else {
-                    d_alert('Ошибка', 'Не удалось перешифровать приватный ключ', 'ok');
-                }
-                return;
-            }
-        }
-
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('username', username);
-        if (accountState.avatarFile) {
-            formData.append('avatar', accountState.avatarFile);
-        }
-        if (usernameChanged) {
-            formData.append('password', await hashPassword(passwordValue));
-            formData.append('encrypted_private_key', reencryptedKey);
-        }
-
         const response = await fetch('/api/me', { method: 'POST', body: formData });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             if (data.message === 'd203') d_pop('Username занят', '', 'Хорошо');
             else if (data.message === 'd206') d_alert('Ошибка', 'Некорректный username', 'ok');
             else if (data.message === 'd208') d_alert('Ошибка', 'Username короче 4 символов либо длиннее 16', 'ok');
-            else if (data.message === 'd102') d_alert('Ошибка', 'Неверный пароль', 'ok');
-            else if (data.message === 'd209') d_alert('Ошибка', 'Некорректный перешифрованный ключ', 'ok');
             else d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
             return;
         }
@@ -3575,8 +3551,6 @@ async function saveAccountSettings() {
         console.error(err);
         d_alert('Ошибка', 'Не удалось сохранить изменения', 'ok');
     } finally {
-        passwordValue = null;
-        reencryptedKey = null;
         accountState.saving = false;
         syncAccountSaveButton();
     }

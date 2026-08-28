@@ -96,13 +96,16 @@ function initDB() {
     return openDoveryDB();
 }
 
-async function saveUserData(userData, privateKey) {
+async function saveUserData(userData, privateKey, signingPrivateKey = null) {
     const db = await initDB();
     try {
         const tx = db.transaction(storeName, "readwrite");
         const store = tx.objectStore(storeName);
 
         store.put(privateKey, "private_key");
+        if (signingPrivateKey) {
+            store.put(signingPrivateKey, "signing_private_key");
+        }
         store.put(userData, "user_profile");
 
         await new Promise((resolve, reject) => {
@@ -113,6 +116,64 @@ async function saveUserData(userData, privateKey) {
     } finally {
         db.close();
     }
+}
+
+async function loginWithKeyBundle(data, passwordValue, passwordInput) {
+    const legacyUsername = data.user_data.username;
+    const salt = data.key_salt || legacyUsername;
+
+    let ecdhKey = await decryptAndImportEcdhKey(data.priv_key, passwordValue, salt);
+    let signingKey = null;
+    if (data.signing_priv_key) {
+        signingKey = await decryptAndImportSigningKey(data.signing_priv_key, passwordValue, salt);
+    }
+
+  if (!data.key_salt) {
+        const hadSigning = !!signingKey;
+        const migrated = await migrateLegacyKeysToRandomSalt({
+            password: passwordValue,
+            legacyUsername: legacyUsername,
+            encryptedPrivateKey: data.priv_key,
+            encryptedSigningPrivateKey: data.signing_priv_key,
+            ecdhPrivateKey: ecdhKey,
+            signingPrivateKey: signingKey,
+        });
+        ecdhKey = migrated.ecdhKey;
+        signingKey = migrated.signingKey;
+
+        let signingPublicB64 = data.signing_public_key || '';
+        let publicKeySig = data.public_key_sig || '';
+
+        if (!hadSigning || !signingPublicB64 || !publicKeySig) {
+            const signPair = await generateSigningKeyPair();
+            signingKey = signPair.privateKey;
+            signingPublicB64 = await exportSpkiBase64(signPair.publicKey);
+            publicKeySig = await signEcdhPublicKey(signingKey, data.public_key);
+            migrated.bundle.encrypted_signing_private_key = await encryptPrivateKeyRaw(
+                await crypto.subtle.exportKey('pkcs8', signingKey),
+                passwordValue,
+                migrated.newSalt
+            );
+        }
+
+        const migrateForm = new FormData();
+        migrateForm.append('password', await hashPassword(passwordValue));
+        migrateForm.append('key_salt', migrated.bundle.key_salt);
+        migrateForm.append('encrypted_private_key', migrated.bundle.encrypted_private_key);
+        migrateForm.append('encrypted_signing_private_key', migrated.bundle.encrypted_signing_private_key);
+        migrateForm.append('signing_public_key', signingPublicB64);
+        migrateForm.append('public_key_sig', publicKeySig);
+
+        const migrateRes = await fetch('/api/me/key_migrate', { method: 'POST', body: migrateForm });
+        if (!migrateRes.ok) {
+            throw new Error('key_migrate_failed');
+        }
+    }
+
+    passwordValue = null;
+    passwordInput.value = "";
+    await saveUserData(data.user_data, ecdhKey, signingKey);
+    window.location.href = "/";
 }
 
 async function validateAndSubmit_login(el) {
@@ -144,13 +205,7 @@ async function validateAndSubmit_login(el) {
         const data = await response.json();
 
         if (response.ok && data.status === "success") {
-            // Соль = username как при регистрации (канонический с сервера)
-            const keyUsername = data.user_data.username;
-            const privateKeyObject = await decryptAndImportKey(data.priv_key, passwordValue, keyUsername);
-            passwordValue = null;
-            passwordInput.value = "";
-            await saveUserData(data.user_data, privateKeyObject);
-            window.location.href = "/";
+            await loginWithKeyBundle(data, passwordValue, passwordInput);
         } else {
             if (data.message === "d102") {
                 d_pop("Неверный логин или пароль", "", "Хорошо");
@@ -217,29 +272,43 @@ async function validateAndSubmit(el) {
     }
 
     try {
-        const keyPair = await window.crypto.subtle.generateKey(
+        const ecdhPair = await window.crypto.subtle.generateKey(
             { name: "ECDH", namedCurve: "P-256" },
-            true, 
+            true,
             ["deriveKey", "deriveBits"]
         );
+        const signingPair = await generateSigningKeyPair();
 
-        const pubExport = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-        const pubBase64 = btoa(String.fromCharCode(...new Uint8Array(pubExport)));
+        const pubBase64 = await exportSpkiBase64(ecdhPair.publicKey);
+        const signingPublicB64 = await exportSpkiBase64(signingPair.publicKey);
+        const publicKeySig = await signEcdhPublicKey(signingPair.privateKey, pubBase64);
+        const keySalt = generateKeySaltBase64();
 
-        // Соль = username ровно в том регистре, как ввёл пользователь
-        const privExport = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-        const privBase64 = await encryptPrivateKeyRaw(privExport, passwordValue, username);
-        
+        const bundle = await encryptKeyBundleForServer(
+            ecdhPair.privateKey,
+            signingPair.privateKey,
+            passwordValue,
+            keySalt
+        );
+
         const hashedPass = await hashPassword(passwordValue);
 
-        await saveUserData({ username: username, id: "pending" }, keyPair.privateKey);
+        await saveUserData(
+            { username: username, id: "pending" },
+            ecdhPair.privateKey,
+            signingPair.privateKey
+        );
 
         const formData = new FormData();
         formData.append('name', name);
         formData.append('username', username);
         formData.append('password', hashedPass);
         formData.append('public_key', pubBase64);
-        formData.append('encrypted_private_key', privBase64);
+        formData.append('encrypted_private_key', bundle.encrypted_private_key);
+        formData.append('key_salt', bundle.key_salt);
+        formData.append('signing_public_key', signingPublicB64);
+        formData.append('encrypted_signing_private_key', bundle.encrypted_signing_private_key);
+        formData.append('public_key_sig', publicKeySig);
         appendDeviceInfo(formData, await detectDeviceInfo());
 
         if (selectedAvatarFile) {
@@ -262,7 +331,7 @@ async function validateAndSubmit(el) {
         }
 
         if (response.ok && data.status === "success") {
-            await saveUserData(data.user_data, keyPair.privateKey);
+            await saveUserData(data.user_data, ecdhPair.privateKey, signingPair.privateKey);
             window.location.href = "/";
             return;
         } 

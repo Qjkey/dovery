@@ -122,6 +122,8 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 avatarRaw: chat.avatar,
                 hideAvatar: !!chat.hide_avatar,
                 publicKey: chat.public_key,
+                signingPublicKey: chat.signing_public_key || '',
+                publicKeySig: chat.public_key_sig || '',
                 status: currentStatus,
                 realStatus: chat.real_status || currentStatus,
                 blockState: chat.block_state || null,

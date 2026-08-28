@@ -29,6 +29,22 @@ load_dotenv(dotenv_path=env_path)
 # threading + reloader в dev; gevent — для продакшена (DOVERY_DEV=0)
 DEV_MODE = os.getenv('DOVERY_DEV', '1') == '1'
 
+
+def _socketio_cors_origins():
+    """Список origin для WebSocket; без * — только явные домены."""
+    raw = os.getenv('SOCKETIO_CORS_ORIGINS', '').strip()
+    if raw:
+        return [part.strip() for part in raw.split(',') if part.strip()]
+    if DEV_MODE:
+        return [
+            'http://localhost:5000',
+            'http://127.0.0.1:5000',
+            'http://localhost:8000',
+            'http://127.0.0.1:8000',
+        ]
+    return False
+
+
 app = Flask(__name__)
 app.secret_key = os.getenv('secret')
 if not app.secret_key:
@@ -94,7 +110,7 @@ VIEWING_EXPIRE_SEC = 6.0
 logging.basicConfig(level=logging.INFO)
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
+    cors_allowed_origins=_socketio_cors_origins(),
     async_mode="threading" if DEV_MODE else "gevent",
     ping_timeout=60,
     ping_interval=25,
@@ -220,6 +236,17 @@ def migrate_schema():
                 cursor.execute('ALTER TABLE sessions ADD COLUMN device_name TEXT')
             if 'device_os' not in session_columns:
                 cursor.execute('ALTER TABLE sessions ADD COLUMN device_os TEXT')
+
+            cursor.execute("PRAGMA table_info(users)")
+            user_columns = [row[1] for row in cursor.fetchall()]
+            if 'key_salt' not in user_columns:
+                cursor.execute('ALTER TABLE users ADD COLUMN key_salt TEXT')
+            if 'signing_public_key' not in user_columns:
+                cursor.execute('ALTER TABLE users ADD COLUMN signing_public_key TEXT')
+            if 'signing_private_key' not in user_columns:
+                cursor.execute('ALTER TABLE users ADD COLUMN signing_private_key TEXT')
+            if 'public_key_sig' not in user_columns:
+                cursor.execute('ALTER TABLE users ADD COLUMN public_key_sig TEXT')
             
             conn.commit()
     except Exception as e:
@@ -452,7 +479,18 @@ def check_username(username, exclude_user_id=None):
             return True 
 
 # Функция сохранения пользователя
-def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
+def save_user(
+    name,
+    username,
+    secure_db_hash,
+    pub_key,
+    priv_key,
+    ava,
+    key_salt=None,
+    signing_public_key=None,
+    signing_private_key=None,
+    public_key_sig=None,
+):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -470,10 +508,16 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
                 return False, "d205"
 
             cursor.execute(
-                "INSERT INTO users (id, name, username, password, public_key, private_key, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, name, username, secure_db_hash, pub_key, priv_key, ava)
+                '''INSERT INTO users (
+                    id, name, username, password, public_key, private_key, avatar,
+                    key_salt, signing_public_key, signing_private_key, public_key_sig
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    user_id, name, username, secure_db_hash, pub_key, priv_key, ava,
+                    key_salt, signing_public_key, signing_private_key, public_key_sig,
+                ),
             )
-            conn.commit() 
+            conn.commit()
             return True, user_id
             
     except sqlite3.IntegrityError:
@@ -482,27 +526,32 @@ def save_user(name, username, secure_db_hash, pub_key, priv_key, ava):
         print(f"Ошибка БД: {e}")
         return False, "d204"
 
-# Удаление сообщения
-def delete_message(msg_id):
+# Удаление сообщения (только участник чата)
+def delete_message(msg_id, requester_id):
+    if not msg_id or requester_id is None:
+        return False
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT chat_id, sender_id FROM message WHERE id = ?", (msg_id,)) 
+            cursor.execute("SELECT chat_id, sender_id FROM message WHERE id = ?", (msg_id,))
             row = cursor.fetchone()
-        
-            if not row: 
+
+            if not row:
                 return False
-            
+
             chat_id, sender_id = row[0], row[1]
-            
+
             cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
             chat_row = cursor.fetchone()
             if not chat_row:
                 return False
-            
+
             user_one_id, user_two_id = chat_row[0], chat_row[1]
-            other_user_id = user_two_id if sender_id == user_one_id else user_one_id
-            
+            if not user_is_chat_member(requester_id, user_one_id, user_two_id):
+                return False
+
+            other_user_id = user_two_id if str(sender_id) == str(user_one_id) else user_one_id
+
             cursor.execute("DELETE FROM message WHERE id = ?", (msg_id,))
             conn.commit()
             return chat_id, sender_id, other_user_id
@@ -601,6 +650,13 @@ def get_chat_users(chat_id, conn=None):
     finally:
         if own:
             conn.close()
+
+
+def user_is_chat_member(user_id, user_one_id, user_two_id):
+    if user_id is None:
+        return False
+    uid = str(user_id)
+    return uid in (str(user_one_id), str(user_two_id))
 
 
 def get_block_state(chat_id, viewer_id, conn=None):
@@ -760,8 +816,6 @@ def api_me():
     name = (request.form.get('name') or '').strip()
     username = (request.form.get('username') or '').strip()
     avatar_file = request.files.get('avatar')
-    client_hash = (request.form.get('password') or '').strip()
-    new_priv_key = (request.form.get('encrypted_private_key') or '').strip()
 
     if not name or not username:
         return jsonify({"status": "error", "message": "d201"}), 400
@@ -777,26 +831,11 @@ def api_me():
     conn = get_db_connection()
     try:
         row = conn.execute(
-            "SELECT avatar, username, password, private_key FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+            "SELECT avatar FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
             (user_id, str(user_id)),
         ).fetchone()
         if not row:
             return jsonify({"status": "error"}), 404
-
-        old_username = row['username'] or ''
-        username_changed = old_username != username
-
-        # Смена username меняет соль PBKDF2 — обязательны пароль и перешифрованный ключ
-        if username_changed:
-            if not CLIENT_HASH_RE.fullmatch(client_hash):
-                return jsonify({"status": "error", "message": "d102"}), 401
-            if not check_password_hash(row['password'], client_hash):
-                return jsonify({"status": "error", "message": "d102"}), 401
-            if not is_valid_base64(new_priv_key, min_len=80, max_len=1024):
-                return jsonify({"status": "error", "message": "d209"}), 400
-            # Нельзя подменить ключ без смены username
-        elif new_priv_key:
-            return jsonify({"status": "error", "message": "d210"}), 400
 
         avatar_name = row['avatar'] or 'avatarkins.png'
         if avatar_file and avatar_file.filename:
@@ -804,16 +843,10 @@ def api_me():
             if processed:
                 avatar_name = processed
 
-        if username_changed:
-            conn.execute(
-                "UPDATE users SET name = ?, username = ?, avatar = ?, private_key = ? WHERE id = ? OR CAST(id AS TEXT) = ?",
-                (name, username, avatar_name, new_priv_key, user_id, str(user_id)),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ? OR CAST(id AS TEXT) = ?",
-                (name, username, avatar_name, user_id, str(user_id)),
-            )
+        conn.execute(
+            "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ? OR CAST(id AS TEXT) = ?",
+            (name, username, avatar_name, user_id, str(user_id)),
+        )
         conn.commit()
 
         payload = {
@@ -849,9 +882,67 @@ def api_me():
         conn.close()
 
 
+@app.route('/api/me/key_migrate', methods=['POST'])
+def api_me_key_migrate():
+    """Миграция legacy ключей (соль username) на случайную соль + подписи."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({"status": "error"}), 401
+
+    client_hash = (request.form.get('password') or '').strip()
+    key_salt = (request.form.get('key_salt') or '').strip()
+    priv_key = (request.form.get('encrypted_private_key') or '').strip()
+    signing_priv_key = (request.form.get('encrypted_signing_private_key') or '').strip()
+    signing_public_key = (request.form.get('signing_public_key') or '').strip()
+    public_key_sig = (request.form.get('public_key_sig') or '').strip()
+
+    if not CLIENT_HASH_RE.fullmatch(client_hash):
+        return jsonify({"status": "error", "message": "d102"}), 401
+    if not is_valid_base64(key_salt, min_len=16, max_len=64):
+        return jsonify({"status": "error", "message": "d209"}), 400
+    if not is_valid_base64(priv_key, min_len=80, max_len=2048):
+        return jsonify({"status": "error", "message": "d209"}), 400
+    if not is_valid_base64(signing_priv_key, min_len=80, max_len=2048):
+        return jsonify({"status": "error", "message": "d209"}), 400
+    if not is_valid_base64(signing_public_key, min_len=80, max_len=512):
+        return jsonify({"status": "error", "message": "d209"}), 400
+    if not is_valid_base64(public_key_sig, min_len=40, max_len=512):
+        return jsonify({"status": "error", "message": "d209"}), 400
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            "SELECT password FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+            (user_id, str(user_id)),
+        ).fetchone()
+        if not row:
+            return jsonify({"status": "error"}), 404
+        if not check_password_hash(row['password'], client_hash):
+            return jsonify({"status": "error", "message": "d102"}), 401
+
+        conn.execute(
+            '''UPDATE users SET
+               key_salt = ?, private_key = ?, signing_private_key = ?,
+               signing_public_key = ?, public_key_sig = ?
+               WHERE id = ? OR CAST(id AS TEXT) = ?''',
+            (
+                key_salt, priv_key, signing_priv_key,
+                signing_public_key, public_key_sig,
+                user_id, str(user_id),
+            ),
+        )
+        conn.commit()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        print(f"Ошибка /api/me/key_migrate: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/me/private_key', methods=['GET'])
 def api_me_private_key():
-    """Отдаёт зашифрованный private_key текущего пользователя (только авторизованному)."""
+    """Отдаёт зашифрованные ключи текущего пользователя (только авторизованному)."""
     user_id = get_current_user_id()
     if not user_id:
         return jsonify({"status": "error"}), 401
@@ -859,7 +950,9 @@ def api_me_private_key():
     conn = get_db_connection()
     try:
         user = conn.execute(
-            "SELECT username, private_key FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+            '''SELECT username, private_key, signing_private_key, key_salt,
+                      signing_public_key, public_key_sig, public_key
+               FROM users WHERE id = ? OR CAST(id AS TEXT) = ?''',
             (user_id, str(user_id)),
         ).fetchone()
         if not user or not user['private_key']:
@@ -868,6 +961,11 @@ def api_me_private_key():
             "status": "ok",
             "username": user['username'] or '',
             "private_key": user['private_key'],
+            "signing_private_key": user['signing_private_key'] or '',
+            "key_salt": user['key_salt'] or '',
+            "signing_public_key": user['signing_public_key'] or '',
+            "public_key_sig": user['public_key_sig'] or '',
+            "public_key": user['public_key'] or '',
         })
     except Exception as e:
         print(f"Ошибка /api/me/private_key: {e}")
@@ -1005,6 +1103,11 @@ def login():
             return jsonify({
                 "status": "success",
                 "priv_key": user['private_key'],
+                "signing_priv_key": user['signing_private_key'] or '',
+                "public_key": user['public_key'] or '',
+                "key_salt": user['key_salt'] or '',
+                "signing_public_key": user['signing_public_key'] or '',
+                "public_key_sig": user['public_key_sig'] or '',
                 "user_data": {"id": user['id'], "username": user['username']}
             })
         return jsonify({"status": "error", "message": "d103"}), 500
@@ -1021,6 +1124,10 @@ def signup():
     client_hash = request.form.get('password') or ''
     pub_key = request.form.get('public_key') or ''
     priv_key = request.form.get('encrypted_private_key') or ''
+    key_salt = (request.form.get('key_salt') or '').strip()
+    signing_public_key = (request.form.get('signing_public_key') or '').strip()
+    signing_priv_key = (request.form.get('encrypted_signing_private_key') or '').strip()
+    public_key_sig = (request.form.get('public_key_sig') or '').strip()
     avatar_file = request.files.get('avatar')
 
     if not name or not username or not client_hash:
@@ -1041,7 +1148,15 @@ def signup():
     # Без ключей аккаунт бесполезен и опасен — не принимаем пустые/битые
     if not is_valid_base64(pub_key, min_len=80, max_len=512):
         return jsonify({"status": "error", "message": "d201"}), 400
-    if not is_valid_base64(priv_key, min_len=80, max_len=1024):
+    if not is_valid_base64(priv_key, min_len=80, max_len=2048):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not is_valid_base64(key_salt, min_len=16, max_len=64):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not is_valid_base64(signing_public_key, min_len=80, max_len=512):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not is_valid_base64(signing_priv_key, min_len=80, max_len=2048):
+        return jsonify({"status": "error", "message": "d201"}), 400
+    if not is_valid_base64(public_key_sig, min_len=40, max_len=512):
         return jsonify({"status": "error", "message": "d201"}), 400
 
     if not check_username(username):
@@ -1055,7 +1170,18 @@ def signup():
 
     secure_db_hash = generate_password_hash(client_hash)
 
-    success, message = save_user(name, username, secure_db_hash, pub_key, priv_key, avatar_name)
+    success, message = save_user(
+        name,
+        username,
+        secure_db_hash,
+        pub_key,
+        priv_key,
+        avatar_name,
+        key_salt=key_salt,
+        signing_public_key=signing_public_key,
+        signing_private_key=signing_priv_key,
+        public_key_sig=public_key_sig,
+    )
 
     if success:
         user_id = message
@@ -1170,6 +1296,8 @@ def get_my_chats():
             u.name, 
             u.avatar,
             u.public_key,
+            u.signing_public_key,
+            u.public_key_sig,
             (
                 SELECT COUNT(*) FROM message m
                 WHERE m.chat_id = c.id
@@ -1235,7 +1363,11 @@ def handle_message(data):
             return
         
         user_one_id, user_two_id = chat_row[0], chat_row[1]
-        receiver_id = user_two_id if sender_id == user_one_id else user_one_id
+        if not user_is_chat_member(sender_id, user_one_id, user_two_id):
+            emit('message_error', {'code': 'forbidden', 'msg_id': msg_id})
+            return
+
+        receiver_id = user_two_id if str(sender_id) == str(user_one_id) else user_one_id
         block_state = get_block_state(chat_id, sender_id, conn=conn)
         if not block_state.get('can_send', True):
             emit(
@@ -1386,9 +1518,15 @@ def handle_mark_chat_read(data):
 # Удаление сообщения сокет
 @socketio.on('delete_message')
 def handle_delete(data):
-    msg_id = data.get('msg_id')
+    user_id = get_current_user_id()
+    if not user_id or not isinstance(data, dict):
+        return
 
-    result = delete_message(msg_id)
+    msg_id = data.get('msg_id')
+    if not msg_id:
+        return
+
+    result = delete_message(msg_id, user_id)
     if result:
         chat_id, sender_id, other_user_id = result
         emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{other_user_id}")
@@ -1545,6 +1683,8 @@ def get_user_data_api(user_id):
         "name": user['name'],
         "avatar": "" if block_state['hide_avatar'] else (user['avatar'] if user['avatar'] else ""),
         "public_key": user['public_key'],
+        "signing_public_key": user['signing_public_key'] or '',
+        "public_key_sig": user['public_key_sig'] or '',
         "status": status,
         "real_status": real_status,
         "hide_avatar": block_state['hide_avatar'],
@@ -1553,7 +1693,11 @@ def get_user_data_api(user_id):
 
 @app.route('/get_user_by_username/<username>')
 def get_user_by_username_api(username):
-    """API для получения данных пользователя по username (без авторизации)."""
+    """Профиль по username — только для авторизованных (ключи не для публичного API)."""
+    current_user_id = get_current_user_id()
+    if not current_user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
@@ -1575,6 +1719,8 @@ def get_user_by_username_api(username):
         "name": user['name'],
         "avatar": user['avatar'] if user['avatar'] else "",
         "public_key": user['public_key'],
+        "signing_public_key": user['signing_public_key'] or '',
+        "public_key_sig": user['public_key_sig'] or '',
         "status": status
     })
 
@@ -1585,21 +1731,28 @@ def delete_chat(data):
         chat_id = data.get('id')
         if not chat_id:
             return
+        userid = get_current_user_id()
+        if not userid:
+            return
+
         conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute("PRAGMA foreign_keys = ON;")
-
-        userid = get_current_user_id()
 
         cursor.execute("SELECT user_one_id, user_two_id FROM chats WHERE id = ?", (chat_id,))
         chat_row = cursor.fetchone()
         if not chat_row:
             conn.close()
             return
-        
+
         user_one_id, user_two_id = chat_row[0], chat_row[1]
-        other_user_id = user_two_id if userid == user_one_id else user_one_id
+        if not user_is_chat_member(userid, user_one_id, user_two_id):
+            emit('chat_delete_error', {'code': 'forbidden', 'chat_id': str(chat_id)}, to=f"user_{userid}")
+            conn.close()
+            return
+
+        other_user_id = user_two_id if str(userid) == str(user_one_id) else user_one_id
 
         if not get_block_state(chat_id, userid, conn=conn).get('can_send', True):
             emit('chat_delete_error', {'code': 'blocked', 'chat_id': str(chat_id)}, to=f"user_{userid}")
@@ -1608,10 +1761,10 @@ def delete_chat(data):
 
         cursor.execute("DELETE FROM message WHERE chat_id = ?", (chat_id,))
         cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-        
+
         conn.commit()
-        conn.close() 
-        
+        conn.close()
+
         emit('chat_deleted', {'chat_id': chat_id}, to=f"user_{userid}")
         emit('chat_deleted', {'chat_id': chat_id}, to=f"user_{other_user_id}")
     except Exception as e:

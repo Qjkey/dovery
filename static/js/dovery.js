@@ -3436,12 +3436,20 @@ function bindAccountSettingsUi() {
         fileInput?.click();
     });
 
-    fileInput?.addEventListener('change', () => {
+    fileInput?.addEventListener('change', async () => {
         const file = fileInput.files && fileInput.files[0];
+        fileInput.value = '';
         if (!file) return;
-        accountState.avatarFile = file;
+        let croppedFile = file;
+        try {
+            croppedFile = await openAvatarCrop(file);
+        } catch (err) {
+            if (err && err.message !== 'cancelled') console.error(err);
+            return;
+        }
+        accountState.avatarFile = croppedFile;
         if (accountState.avatarPreviewUrl) URL.revokeObjectURL(accountState.avatarPreviewUrl);
-        accountState.avatarPreviewUrl = URL.createObjectURL(file);
+        accountState.avatarPreviewUrl = URL.createObjectURL(croppedFile);
         const img = document.getElementById('account-avatar-img');
         if (img) img.src = accountState.avatarPreviewUrl;
         const preview = document.getElementById('account-preview-avatar');

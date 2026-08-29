@@ -1,0 +1,67 @@
+.avatar-crop-screen {
+    --tg-theme-text-color: #ffffff;
+    --tg-theme-bg-color: #000000;
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    display: none;
+    flex-direction: column;
+    background: #000000;
+    color: #ffffff;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.avatar-crop-screen.active {
+    display: flex;
+}
+
+.avatar-crop-screen .avatar-crop-header {
+    position: relative;
+    z-index: 3;
+    flex-shrink: 0;
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
+}
+
+.avatar-crop-screen .header-capsule {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+.avatar-crop-viewport {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.avatar-crop-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.avatar-crop-image {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    max-width: none;
+    max-height: none;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.avatar-crop-mask {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(
+        circle at center,
+        transparent calc(var(--avatar-crop-radius, 140px) - 0.5px),
+        rgba(0, 0, 0, 0.55) calc(var(--avatar-crop-radius, 140px) + 0.5px)
+    );
+}

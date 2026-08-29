@@ -83,10 +83,15 @@ document.getElementById('overlay_profile').addEventListener('click', () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.onchange = (e) => {
-        if (e.target.files[0]) {
-            selectedAvatarFile = e.target.files[0];
+    fileInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        fileInput.value = '';
+        if (!file) return;
+        try {
+            selectedAvatarFile = await openAvatarCrop(file);
             document.querySelector('.ava').src = URL.createObjectURL(selectedAvatarFile);
+        } catch (err) {
+            if (err && err.message !== 'cancelled') console.error(err);
         }
     };
     fileInput.click();

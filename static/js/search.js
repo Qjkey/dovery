@@ -21,7 +21,7 @@ function searchRenderResults(users) {
                 avatar = `<img src="static/files/avatars/${user.ava}" class="ava">`;
             } else {
                 const letter = user.name ? user.name.charAt(0).toUpperCase() : '?';
-                avatar = `<div class="ava defult subtitle2-medium letter-ava">${letter}</div>`;
+                avatar = `<div class="ava letter-ava1">${letter}</div>`;
             }
 
             div.innerHTML = `

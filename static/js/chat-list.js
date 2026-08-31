@@ -4,26 +4,17 @@ const escapeHtml = (text) => {
     return div.innerHTML;
 };
 
-function cacheImage(src) {
-    if (!src) return;
-    const img = new Image();
-    img.src = src;
-}
-
 function buildChatListAvatar(chat) {
     if (chat.hide_avatar) {
         const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
-        return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+        return `<div class="ava letter-ava1">${firstLetter}</div>`;
     }
     if (chat.avatar && chat.avatar !== 'avatarkins.png' && chat.avatar !== 'null') {
         const avatarSrc = `static/files/avatars/${chat.avatar}`;
-        cacheImage(avatarSrc);
-        return typeof window.photoAvatarHtml === 'function'
-            ? window.photoAvatarHtml(avatarSrc)
-            : `<img src="${avatarSrc}" class="ava avatar-pending" alt="">`;
+        return `<img src="${avatarSrc}" class="ava" alt="">`;
     }
     const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
-    return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+    return `<div class="ava letter-ava1">${firstLetter}</div>`;
 }
 
 function buildChatListSkeleton(separator = false, widths = {}) {
@@ -46,7 +37,7 @@ function buildChatListSkeleton(separator = false, widths = {}) {
     return row;
 }
 
-function showChatListSkeletons(count = 7) {
+function showChatListSkeletons(count = 9) {
     const listContainer = document.getElementById('chats-list');
     if (!listContainer) return;
     listContainer.innerHTML = '';
@@ -118,7 +109,7 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 userId: chat.id,
                 username: chat.username,
                 name: chat.name,
-                avatar: avatarHtml,
+                avatar: '',
                 avatarRaw: chat.avatar,
                 hideAvatar: !!chat.hide_avatar,
                 publicKey: chat.public_key,
@@ -168,9 +159,6 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 await openDirectWindow(chat.chat_id);
             };
             listContainer.appendChild(item);
-            if (typeof window.bindAvatarLoad === 'function') {
-                window.bindAvatarLoad(item);
-            }
             inx++;
         });
         Object.keys(window.unreadCounts || {}).forEach((id) => {

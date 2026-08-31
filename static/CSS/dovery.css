@@ -83,7 +83,7 @@ html, body {
     opacity: 0.85;
 }
 
-.item.loading-skeleton .ava,
+.item.loading-skeleton .ava:not(.letter-ava1),
 .item.loading-skeleton .skeleton-line {
     background: linear-gradient(90deg,
         color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 25%,
@@ -146,6 +146,127 @@ img.avatar-pending {
     opacity: 0;
 }
 
+.skeleton-shimmer {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 25%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-secondary-bg-color)) 50%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite linear;
+    color: transparent;
+    border-radius: 6px;
+}
+
+.avatar.avatar-skeleton-active {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 25%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-secondary-bg-color)) 50%,
+        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s infinite linear;
+}
+
+.avatar.avatar-skeleton-active img {
+    opacity: 0;
+}
+
+.profile-block.profile-skeleton-active .headline6,
+.profile-block.profile-skeleton-active .subname,
+.account-preview-skeleton .headline6,
+.account-preview-skeleton .subname {
+    color: transparent;
+}
+
+.profile-block.profile-skeleton-active .skeleton-line,
+.account-preview-skeleton .skeleton-line,
+#user-header.header-skeleton-active .skeleton-line {
+    display: block;
+    height: 14px;
+    border-radius: 7px;
+    margin: 0 auto;
+}
+
+.profile-block.profile-skeleton-active .headline6 .skeleton-line {
+    width: 120px;
+    height: 18px;
+    margin-bottom: 10px;
+}
+
+.profile-block.profile-skeleton-active .subname .skeleton-line {
+    width: 88px;
+    height: 12px;
+}
+
+.account-preview-skeleton .headline6 .skeleton-line {
+    width: 100px;
+    height: 18px;
+    margin-bottom: 8px;
+}
+
+.account-preview-skeleton .subname .skeleton-line {
+    width: 72px;
+    height: 12px;
+}
+
+#user-header.header-skeleton-active #user-name .skeleton-line {
+    width: 96px;
+    height: 14px;
+    margin-bottom: 6px;
+}
+
+#user-header.header-skeleton-active #user-status .skeleton-line {
+    width: 64px;
+    height: 11px;
+}
+
+#user-header.header-skeleton-active #user-name,
+#user-header.header-skeleton-active #user-status {
+    color: transparent;
+}
+
+#user-header.header-skeleton-active .left .ava {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.profile-info-skeleton .label.body1 .skeleton-line {
+    display: block;
+    width: 140px;
+    height: 14px;
+    margin-bottom: 6px;
+}
+
+.profile-info-skeleton .label.subtitle .skeleton-line {
+    display: block;
+    width: 72px;
+    height: 11px;
+}
+
+.profile-info-skeleton .label.body1,
+.profile-info-skeleton .label.subtitle {
+    color: transparent;
+}
+
+.public-profile-skeleton .headline6 .skeleton-line {
+    display: block;
+    width: 120px;
+    height: 18px;
+    margin: 0 auto 10px;
+}
+
+.public-profile-skeleton .subname .skeleton-line {
+    display: block;
+    width: 96px;
+    height: 12px;
+    margin: 0 auto;
+}
+
+.public-profile-skeleton .headline6,
+.public-profile-skeleton .subname {
+    color: transparent;
+}
+
 .letter-ava {
     display: flex;
     color: white;
@@ -157,17 +278,47 @@ img.avatar-pending {
 }
 
 .letter-ava1 {
-    width: 95px;
-    height: 95px;
-    font-size: 34px;
-    border-radius: 50%; 
-    color: white;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-family: "Roboto", sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 50%;
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(to bottom, #5FC0F0, #0094FE);
     user-select: none;
     text-transform: uppercase;
+    box-sizing: border-box;
+}
+
+.item .ava.letter-ava1,
+.item .left > .letter-ava1 {
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+}
+
+.profile-block .avatar .letter-ava1 {
+    font-size: 34px;
+}
+
+#user-avatar > .letter-ava1,
+.header-center-two #user-avatar .letter-ava1 {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+}
+
+#account-preview-avatar .letter-ava1 {
+    width: 95px;
+    height: 95px;
+    font-size: 34px;
 }
 
 .label-no-chats {

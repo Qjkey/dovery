@@ -105,7 +105,14 @@ async function calc_key_chat(myPrivateKey, opponentPublicKey) {
 let debounceTimer;
 
 function photoAvatarHtml(src) {
-    return `<img src="${src}" class="ava avatar-pending" alt="">`;
+    return `<img src="${src}" class="ava" alt="">`;
+}
+
+function avatarSrcFromRaw(avatarRaw) {
+    if (avatarRaw && avatarRaw !== 'avatarkins.png' && avatarRaw !== 'null') {
+        return `static/files/avatars/${avatarRaw}`;
+    }
+    return '';
 }
 
 function normalizeBlockState(state) {
@@ -119,13 +126,143 @@ function normalizeBlockState(state) {
 
 function letterAvatarHtml(name) {
     const firstLetter = name ? String(name).charAt(0).toUpperCase() : '?';
-    return `<div class="ava defult subtitle2-medium letter-ava">${firstLetter}</div>`;
+    return `<div class="ava letter-ava1">${firstLetter}</div>`;
 }
 
 function getDisplayAvatarHtml(user) {
     if (!user) return '';
     if (user.hideAvatar) return letterAvatarHtml(user.name);
-    return user.avatar || letterAvatarHtml(user.name);
+    const src = avatarSrcFromRaw(user.avatarRaw);
+    if (src) return photoAvatarHtml(src);
+    if (user.avatar && /letter-ava/.test(String(user.avatar))) return user.avatar;
+    return letterAvatarHtml(user.name);
+}
+
+function mountAvatarElement(avatarContainer, avatarNode) {
+    if (!avatarContainer) return;
+    avatarContainer.innerHTML = '';
+    if (!avatarNode) return;
+    avatarContainer.appendChild(avatarNode);
+    bindAvatarLoad(avatarContainer);
+}
+
+function appendAvatarHtml(avatarContainer, html) {
+    if (!avatarContainer || !html) return;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const avatarNode = doc.body.firstChild;
+    if (!avatarNode) return;
+    if (avatarNode.classList && avatarNode.classList.contains('letter-ava')) {
+        avatarNode.classList.replace('letter-ava', 'letter-ava1');
+    }
+    mountAvatarElement(avatarContainer, avatarNode);
+}
+
+function showChatHeaderSkeleton() {
+    const userHeader = document.getElementById('user-header');
+    const headerAvatar = document.getElementById('user-avatar');
+    const headerName = document.getElementById('user-name');
+    const headerStatus = document.getElementById('user-status');
+    const typingEl = document.getElementById('user-typing');
+    if (userHeader) userHeader.classList.add('header-skeleton-active');
+    if (headerAvatar) headerAvatar.innerHTML = '<div class="ava skeleton-shimmer"></div>';
+    if (headerName) headerName.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (headerStatus) {
+        headerStatus.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+        headerStatus.classList.remove('hidden');
+    }
+    if (typingEl) typingEl.classList.add('hidden');
+}
+
+function fillChatHeader(user, partnerId) {
+    const userHeader = document.getElementById('user-header');
+    const headerPanel = document.getElementById('user-header');
+    const headerName = document.getElementById('user-name');
+    const headerStatus = document.getElementById('user-status');
+    const headerAvatar = document.getElementById('user-avatar');
+    const uid = partnerId != null ? String(partnerId) : String(user?.userId || '');
+    if (userHeader) userHeader.classList.remove('header-skeleton-active');
+    if (!user) return;
+    if (headerName) headerName.textContent = user.name || '';
+    if (headerStatus) {
+        setOpenChatPresence(getEffectiveStatus(user));
+    }
+    if (headerAvatar) {
+        headerAvatar.innerHTML = '';
+        appendAvatarHtml(headerAvatar, getDisplayAvatarHtml(user));
+    }
+    if (headerPanel && uid) {
+        headerPanel.onclick = () => openProfile(uid, false, { source: 'header' });
+    }
+}
+
+function showProfileSkeleton() {
+    const block = document.getElementById('profileBlock1');
+    const avatar = document.getElementById('profile-avatar');
+    const nameEl = document.getElementById('profile-name');
+    const statusEl = document.getElementById('profile-status');
+    const usernameEl = document.getElementById('profile-username');
+    const usernameRow = usernameEl?.closest('.item');
+    const actions = document.querySelector('#profile-screen .big-profile-block');
+    const openChatSection = document.getElementById('profile-open-chat-section');
+    const openChatRow = document.getElementById('profile-open-chat-row');
+
+    if (block) block.classList.add('profile-skeleton-active');
+    if (avatar) {
+        avatar.classList.remove('avatar-skeleton-active');
+        avatar.innerHTML = '<div class="ava skeleton-shimmer" style="width:100%;height:100%;border-radius:50%;"></div>';
+    }
+    if (nameEl) nameEl.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (statusEl) statusEl.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (usernameEl) usernameEl.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (usernameRow) usernameRow.classList.add('profile-info-skeleton');
+    if (actions) actions.classList.add('hidden');
+    if (openChatSection) openChatSection.classList.add('hidden');
+}
+
+function fillProfileFromUser(user, userId, isSelf, source = 'other') {
+    const block = document.getElementById('profileBlock1');
+    const usernameRow = document.getElementById('profile-username')?.closest('.item');
+
+    if (block) block.classList.remove('profile-skeleton-active');
+    if (usernameRow) usernameRow.classList.remove('profile-info-skeleton');
+
+    document.getElementById('profile-name').textContent = user.name || '';
+    document.getElementById('profile-id').textContent = userId;
+    document.getElementById('profile-status').textContent = getEffectiveStatus(user);
+    document.getElementById('profile-username').textContent = '@' + (user.username || '');
+
+    const avatar = document.getElementById('profile-avatar');
+    if (avatar) {
+        avatar.classList.remove('avatar-skeleton-active');
+        avatar.innerHTML = '';
+        appendAvatarHtml(avatar, getDisplayAvatarHtml(user));
+    }
+
+    syncProfileActionButtons(userId, isSelf, source);
+}
+
+function showAccountPreviewSkeleton() {
+    const previewBlock = document.querySelector('#account-screen .profile-block.s-img');
+    const previewName = document.getElementById('account-preview-name');
+    const previewStatus = document.getElementById('account-preview-status');
+    const previewAvatar = document.getElementById('account-preview-avatar');
+    const nameInput = document.getElementById('account-name-input');
+    const usernameInput = document.getElementById('account-username-input');
+
+    if (previewBlock) previewBlock.classList.add('account-preview-skeleton');
+    if (previewName) previewName.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (previewStatus) previewStatus.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    if (previewAvatar) {
+        previewAvatar.innerHTML = '<div class="ava skeleton-shimmer" style="width:95px;height:95px;border-radius:50%;"></div>';
+    }
+    if (nameInput) nameInput.value = '';
+    if (usernameInput) usernameInput.value = '';
+}
+
+function hideAccountPreviewSkeleton() {
+    const previewBlock = document.querySelector('#account-screen .profile-block.s-img');
+    if (previewBlock) previewBlock.classList.remove('account-preview-skeleton');
 }
 
 function getEffectiveStatus(user) {
@@ -152,14 +289,17 @@ function bindAvatarLoad(root) {
         const profileBox = img.closest('.avatar');
         const finish = () => {
             img.classList.remove('avatar-pending');
-            if (profileBox) profileBox.classList.remove('avatar-pending');
+            if (profileBox) {
+                profileBox.classList.remove('avatar-pending');
+                profileBox.classList.remove('avatar-skeleton-active');
+            }
         };
         if (img.complete && img.naturalWidth > 0) {
             finish();
             return;
         }
         img.classList.add('avatar-pending');
-        if (profileBox) profileBox.classList.add('avatar-pending');
+        if (profileBox) profileBox.classList.add('avatar-skeleton-active');
         img.addEventListener('load', finish, { once: true });
         img.addEventListener('error', finish, { once: true });
     });
@@ -168,31 +308,35 @@ function bindAvatarLoad(root) {
 window.photoAvatarHtml = photoAvatarHtml;
 window.bindAvatarLoad = bindAvatarLoad;
 
-async function openProfile(userId, is_my_profile = false, url_open = false) {
+async function openProfile(userId, is_my_profile = false, options = {}) {
     if (!userId) {
         userId = window.userId;
         is_my_profile = true;
     }
     userId = userId != null ? String(userId) : '';
 
+    let source = 'other';
+    if (typeof options === 'boolean') {
+        source = options ? 'url' : 'other';
+    } else if (options && typeof options === 'object') {
+        source = options.source || (options.urlOpen ? 'url' : 'other');
+    }
+
+    openScreen('3');
+    const isSelfEarly = !!is_my_profile || String(userId) === String(window.userId);
     let user = chatsData[userId];
-    if (!user) {
+    if (user) {
+        fillProfileFromUser(user, userId, isSelfEarly, source);
+    } else {
+        showProfileSkeleton();
         try {
             const response = await fetch(`/get_use_profile/${userId}`);
             if (response.ok) {
                 const data = await response.json();
-                let avatarHtml = '';
-                if (data.hide_avatar) {
-                    avatarHtml = letterAvatarHtml(data.name);
-                } else if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
-                    avatarHtml = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
-                } else {
-                    avatarHtml = letterAvatarHtml(data.name);
-                }
                 chatsData[userId] = {
                     username: data.username,
                     name: data.name,
-                    avatar: avatarHtml,
+                    avatar: '',
                     avatarRaw: data.avatar,
                     hideAvatar: !!data.hide_avatar,
                     publicKey: data.public_key,
@@ -207,39 +351,13 @@ async function openProfile(userId, is_my_profile = false, url_open = false) {
         } catch (e) {
             console.error("Ошибка загрузки профиля:", e);
         }
-    }
-
-    if (!userId || !user) {
-        d_alert("Ошибка", "Профиль не найден", "ok");
-        return;
-    }
-
-    const isSelf = !!is_my_profile || String(userId) === String(window.userId);
-
-    document.getElementById('profile-name').textContent = user.name || '';
-    document.getElementById('profile-id').textContent = userId;
-    document.getElementById('profile-status').textContent = getEffectiveStatus(user);
-    document.getElementById('profile-username').textContent = '@' + (user.username || '');
-
-    const avatar = document.getElementById('profile-avatar');
-    if (avatar) {
-        avatar.classList.remove('avatar-pending');
-        avatar.innerHTML = '';
-        if (getDisplayAvatarHtml(user)) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(getDisplayAvatarHtml(user), 'text/html');
-            const avatarElement = doc.body.firstChild;
-            if (avatarElement && avatarElement.classList && avatarElement.classList.contains('letter-ava')) {
-                avatarElement.classList.replace('letter-ava', 'letter-ava1');
-            }
-            if (avatarElement) avatar.appendChild(avatarElement);
-            bindAvatarLoad(avatar);
+        if (!userId || !user) {
+            closeProfile();
+            d_alert("Ошибка", "Профиль не найден", "ok");
+            return;
         }
+        fillProfileFromUser(user, userId, isSelfEarly, source);
     }
-
-    syncProfileActionButtons(userId, isSelf);
-
-    openScreen('3');
 }
 
 function openProfileChat(userId) {
@@ -260,21 +378,44 @@ function syncProfileBlockLabel(userId) {
     blockText.textContent = state.blocked_by_me ? 'Разблокировать' : 'Заблокировать';
 }
 
-function syncProfileActionButtons(userId, isSelf = false) {
-    const actions = document.getElementById('profileBlock3');
+function isUserInChatList(userId) {
+    const uid = String(userId);
+    if (document.querySelector(`#chats-list .item[data-user-id="${uid}"]`)) return true;
+    const chatId = chatsData[uid]?.chatId;
+    return chatId != null && String(chatId).trim() !== '';
+}
+
+function syncProfileActionButtons(userId, isSelf = false, source = 'other') {
+    const actions = document.querySelector('#profile-screen .big-profile-block');
     const openChatSection = document.getElementById('profile-open-chat-section');
+    const openChatRow = document.getElementById('profile-open-chat-row');
     const writeBtn = document.getElementById('profile-write-btn');
     const deleteBtn = document.getElementById('profile-delete-btn');
     const blockBtn = document.getElementById('profile-block-btn');
+    const externalSource = ['header', 'username', 'url'].includes(source);
+    const inList = isUserInChatList(userId);
+    const hasChat = getChatIdByUserId(userId) != null;
+    const showActions = !isSelf && externalSource && inList && hasChat;
 
-    if (openChatSection) openChatSection.classList.add('hidden');
+    if (openChatRow) {
+        openChatRow.onclick = (e) => {
+            e.preventDefault();
+            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
+            openProfileChat(uid);
+        };
+    }
 
     if (isSelf) {
         if (actions) actions.classList.add('hidden');
+        if (openChatSection) openChatSection.classList.add('hidden');
         return;
     }
 
-    if (actions) actions.classList.remove('hidden');
+    if (actions) actions.classList.toggle('hidden', !showActions);
+    if (openChatSection) openChatSection.classList.toggle('hidden', showActions || inList);
+
+    if (!showActions) return;
+
     syncProfileBlockLabel(userId);
 
     if (writeBtn) {
@@ -374,7 +515,7 @@ async function openProfileByUsername(username) {
 
     for (const userId in chatsData) {
         if (chatsData[userId].username.toLowerCase() === lowerUsername) {
-            openProfile(userId, false, false);
+            openProfile(userId, false, { source: 'username' });
             return;
         }
     }
@@ -387,27 +528,16 @@ async function openProfileByUsername(username) {
 
     const userId = String(user.id);
 
-    // Если уже есть в chatsData, просто открываем профиль
     if (chatsData[userId]) {
-        openProfile(userId, false, false);
+        openProfile(userId, false, { source: 'username' });
         return;
     }
 
     // Формируем аватар
-    let avatarHtml = '';
-    if (user.hide_avatar) {
-        avatarHtml = letterAvatarHtml(user.name);
-    } else if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
-        avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
-    } else {
-        avatarHtml = letterAvatarHtml(user.name);
-    }
-
-    // Добавляем в кэш
     chatsData[userId] = {
         username: user.username,
         name: user.name,
-        avatar: avatarHtml,
+        avatar: '',
         avatarRaw: user.avatar,
         hideAvatar: !!user.hide_avatar,
         publicKey: user.public_key,
@@ -418,7 +548,7 @@ async function openProfileByUsername(username) {
         blockState: normalizeBlockState(user.block_state)
     };
 
-    openProfile(userId, false, false);
+    openProfile(userId, false, { source: 'username' });
 }
 
 window.getUserByUsername = getUserByUsername;
@@ -737,7 +867,6 @@ async function openDirectWindow(chatId) {
         chatId = chatId != null ? String(chatId) : '';
         let partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
         if (!partnerId && window.chatIdToUserId) {
-            // на случай числового ключа в карте
             for (const [cid, uid] of Object.entries(window.chatIdToUserId)) {
                 if (String(cid) === chatId) {
                     partnerId = uid;
@@ -745,71 +874,83 @@ async function openDirectWindow(chatId) {
                 }
             }
         }
-        if (!partnerId) { 
+        if (!partnerId) {
             return;
         }
         partnerId = String(partnerId);
         rememberChatUserMapping(chatId, partnerId);
-        const user = chatsData[partnerId];
-        if (!user) { 
-            return;
-        }
-        document.querySelectorAll('.open_chat').forEach(elem => {
-            elem.classList.remove('open_chat');
-        });
+
+        document.querySelectorAll('.open_chat').forEach((elem) => elem.classList.remove('open_chat'));
         const currentChatElem = document.querySelector(`[data-user-id="${partnerId}"]`);
         const screenWidth = window.innerWidth;
 
-        if (screenWidth > 751) {
-            if (currentChatElem) {
-                currentChatElem.classList.add('open_chat');
+        if (screenWidth > 751 && currentChatElem) {
+            currentChatElem.classList.add('open_chat');
+        }
+
+        document.getElementById('no-chat-content').classList.add('hidden');
+        document.getElementById('chat-content').classList.remove('hidden');
+        if (screenWidth <= 751) {
+            openScreen(2);
+        }
+
+        showChatHeaderSkeleton();
+        const container = document.getElementById('id_ept');
+        if (container) container.textContent = chatId;
+
+        let user = chatsData[partnerId];
+        if (!user) {
+            try {
+                const response = await fetch(`/get_use_profile/${partnerId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    chatsData[partnerId] = {
+                        userId: partnerId,
+                        username: data.username,
+                        name: data.name,
+                        avatar: '',
+                        avatarRaw: data.avatar,
+                        hideAvatar: !!data.hide_avatar,
+                        publicKey: data.public_key,
+                        signingPublicKey: data.signing_public_key || '',
+                        publicKeySig: data.public_key_sig || '',
+                        status: data.status,
+                        realStatus: data.real_status || data.status,
+                        blockState: normalizeBlockState(data.block_state),
+                        keychat: chatsData[partnerId]?.keychat
+                    };
+                    user = chatsData[partnerId];
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки профиля для шапки чата:', err);
             }
         }
 
-        const headerPanel = document.getElementById('user-header');
-        const headerName = document.getElementById('user-name');
-        const headerStatus = document.getElementById('user-status');
-        const headerAvatar = document.getElementById('user-avatar');
-        const msgInput = document.getElementById('messages-textarea');
-
-        if (headerName) headerName.innerText = user.name;
-        if (headerStatus) {
-            setOpenChatPresence(getEffectiveStatus(user));
+        if (!user) {
+            return;
         }
+
+        fillChatHeader(user, partnerId);
         const typingEl = document.getElementById('user-typing');
         if (typingEl) typingEl.classList.add('hidden');
-        if (headerAvatar) {
-            headerAvatar.innerHTML = getDisplayAvatarHtml(user);
-            bindAvatarLoad(headerAvatar);
-        }
 
-        const container = document.getElementById('id_ept');
-        container.textContent = chatId; 
-
-        if (headerPanel) {
-            headerPanel.onclick = () => openProfile(partnerId, false, false);
-        }
+        const msgInput = document.getElementById('messages-textarea');
         try {
             if (!await assertContactPublicKeyTrusted(user)) {
                 return;
             }
-            const private_key = await get_private_key(); 
+            const private_key = await get_private_key();
             const public_key = await get_public_key(user.publicKey);
             window.keychat = await calc_key_chat(private_key, public_key);
             chatsData[partnerId].keychat = window.keychat;
         } catch (err) {
-            console.error("Ошибка установки защищенного соединения:", err);
+            console.error('Ошибка установки защищенного соединения:', err);
         }
-        msgInput.value = '';
+        if (msgInput) msgInput.value = '';
         updateComposerBlockedState(chatId);
         syncBlockMenuItem();
         loadChat(chatId);
-        document.getElementById('no-chat-content').classList.add('hidden');
-        document.getElementById('chat-content').classList.remove('hidden');
-        // На планшете/ноуте панель сообщений уже видна — openScreen только блокировал скролл списка
-        if (screenWidth <= 751) {
-            openScreen(2);
-        }
+
         if (typeof window.refreshPartnerTypingHeader === 'function') {
             window.refreshPartnerTypingHeader();
         }
@@ -823,7 +964,7 @@ async function openDirectWindow(chatId) {
             window.syncChatViewing();
         }
     } catch (err) {
-        d_alert("Ошибка", "Ошибка в открытии чата", "ok");
+        d_alert('Ошибка', 'Ошибка в открытии чата', 'ok');
         console.log(err);
     }
 }
@@ -1262,48 +1403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Если мы пришли после редиректа
     if (showProfile === 'true' && userId) {
-        // try {
-            // Запрашиваем данные у созданного API роута
-            const response = await fetch(`/get_use_profile/${userId}`);
-            
-            if (response.ok) {
-                const user = await response.json();
-
-                // Инициализируем кэш, если его нет
-                if (typeof chatsData === 'undefined') window.chatsData = {};
-                if (typeof chatHash === 'undefined') window.chatHash = {};
-
-                let avatarHtml = '';
-                if (user.hide_avatar) {
-                    avatarHtml = letterAvatarHtml(user.name);
-                } else if (user.avatar && user.avatar !== 'avatarkins.png' && user.avatar !== 'null') {
-                    avatarHtml = photoAvatarHtml(`static/files/avatars/${user.avatar}`);
-                } else {
-                    avatarHtml = letterAvatarHtml(user.name);
-                }
-
-                chatsData[userId] = {
-                    username: user.username,
-                    name: user.name,
-                    avatar: avatarHtml,
-                    avatarRaw: user.avatar,
-                    hideAvatar: !!user.hide_avatar,
-                    publicKey: user.public_key,
-                    signingPublicKey: user.signing_public_key || '',
-                    publicKeySig: user.public_key_sig || '',
-                    status: user.status,
-                    realStatus: user.real_status || user.status,
-                    blockState: normalizeBlockState(user.block_state)
-                };
-                console.log(chatsData);
-                openProfile(userId, false, true);
-            }
-        // } catch (error) {
-        //     console.error("Ошибка загрузки профиля:", error);
-        // }
-        
-        // МГНОВЕННО УБИРАЕМ ХВОСТ ИЗ ССЫЛКИ
-        // В адресной строке останется строго "/"
+        openProfile(userId, false, { source: 'url' });
         const cleanUrl = window.location.origin + window.location.pathname;
         window.history.replaceState({}, document.title, cleanUrl);
     }
@@ -2634,9 +2734,6 @@ socket.on('block_state_updated', async (data) => {
         user.blockState = state;
         user.hideAvatar = !!state.hide_avatar;
         user.status = state.blocked_me ? 'Вас заблокировали' : (user.realStatus || user.status);
-        if (state.hide_avatar) {
-            user.avatar = letterAvatarHtml(user.name);
-        }
     }
 
     syncBlockMenuItem();
@@ -2655,25 +2752,16 @@ function renderPartnerAvatar(partnerId, chatId) {
     if (String(getActiveChatId()) === String(chatId)) {
         const headerAvatar = document.getElementById('user-avatar');
         if (headerAvatar) {
-            headerAvatar.innerHTML = getDisplayAvatarHtml(user);
-            bindAvatarLoad(headerAvatar);
+            headerAvatar.innerHTML = '';
+            appendAvatarHtml(headerAvatar, getDisplayAvatarHtml(user));
         }
     }
     const profileIdEl = document.getElementById('profile-id');
     const profileAvatar = document.getElementById('profile-avatar');
     if (profileIdEl && profileAvatar && String(profileIdEl.textContent) === String(partnerId)) {
-        profileAvatar.classList.remove('avatar-pending');
+        profileAvatar.classList.remove('avatar-pending', 'avatar-skeleton-active');
         profileAvatar.innerHTML = '';
-        const html = getDisplayAvatarHtml(user);
-        if (!html) return;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const avatarElement = doc.body.firstChild;
-        if (avatarElement && avatarElement.classList && avatarElement.classList.contains('letter-ava')) {
-            avatarElement.classList.replace('letter-ava', 'letter-ava1');
-        }
-        if (avatarElement) profileAvatar.appendChild(avatarElement);
-        bindAvatarLoad(profileAvatar);
+        appendAvatarHtml(profileAvatar, getDisplayAvatarHtml(user));
     }
 }
 
@@ -3230,11 +3318,10 @@ function setAccountPreviewAvatar(srcOrHtml, isHtml = false) {
     }
     if (srcOrHtml.includes('signup_avatarka') || !accountState.avatar || accountState.avatar === 'avatarkins.png') {
         const letter = (document.getElementById('account-name-input')?.value || accountState.name || '?').charAt(0).toUpperCase();
-        preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+        preview.innerHTML = `<div class="ava letter-ava1">${letter || '?'}</div>`;
         return;
     }
-    preview.innerHTML = photoAvatarHtml(srcOrHtml);
-    bindAvatarLoad(preview);
+    appendAvatarHtml(preview, photoAvatarHtml(srcOrHtml));
 }
 
 function syncAccountSaveButton() {
@@ -3249,6 +3336,7 @@ function syncAccountSaveButton() {
 }
 
 function fillAccountForm(data) {
+    hideAccountPreviewSkeleton();
     accountState.name = (data.name || '').trim();
     accountState.username = (data.username || '').trim();
     accountState.avatar = data.avatar || '';
@@ -3281,13 +3369,13 @@ function fillAccountForm(data) {
         setAccountPreviewAvatar(src, false);
         const preview = document.getElementById('account-preview-avatar');
         if (preview) {
-            preview.innerHTML = photoAvatarHtml(src);
-            bindAvatarLoad(preview);
+            preview.innerHTML = '';
+            appendAvatarHtml(preview, photoAvatarHtml(src));
         }
     } else {
         const letter = (accountState.name || '?').charAt(0).toUpperCase();
         const preview = document.getElementById('account-preview-avatar');
-        if (preview) preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+        if (preview) preview.innerHTML = `<div class="ava letter-ava1">${letter || '?'}</div>`;
         if (img) img.src = '/static/img/signup_avatarka.png';
     }
     syncAccountSaveButton();
@@ -3423,7 +3511,7 @@ function bindAccountSettingsUi() {
             && (!accountState.avatar || accountState.avatar === 'avatarkins.png' || accountState.avatar === 'null')) {
             const letter = (nameInput?.value || '?').charAt(0).toUpperCase();
             const preview = document.getElementById('account-preview-avatar');
-            if (preview) preview.innerHTML = `<div class="ava defult subtitle2-medium letter-ava">${letter || '?'}</div>`;
+            if (preview) preview.innerHTML = `<div class="ava letter-ava1">${letter || '?'}</div>`;
         }
         syncAccountSaveButton();
     };
@@ -3454,8 +3542,8 @@ function bindAccountSettingsUi() {
         if (img) img.src = accountState.avatarPreviewUrl;
         const preview = document.getElementById('account-preview-avatar');
         if (preview) {
-            preview.innerHTML = photoAvatarHtml(accountState.avatarPreviewUrl);
-            bindAvatarLoad(preview);
+            preview.innerHTML = '';
+            appendAvatarHtml(preview, photoAvatarHtml(accountState.avatarPreviewUrl));
         }
         syncAccountSaveButton();
     });
@@ -3490,19 +3578,13 @@ function applyAccountDataLocally(data, { isSelf = false } = {}) {
     const uid = String(data.id || data.user_id || '');
     if (!uid) return;
     if (isSelf) window.userId = uid;
-    let avatarHtml = '';
-    if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
-        avatarHtml = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
-    } else {
-        avatarHtml = letterAvatarHtml(data.name);
-    }
     if (!chatsData[uid]) chatsData[uid] = {};
     Object.assign(chatsData[uid], {
         name: data.name,
         username: data.username,
-        avatar: avatarHtml,
+        avatar: '',
         avatarRaw: data.avatar,
-        hideAvatar: false,
+        hideAvatar: !!data.hide_avatar,
     });
 }
 
@@ -3567,6 +3649,7 @@ async function saveAccountSettings() {
 function openAccountScreen() {
     if (typeof window.hideDropdown === 'function') hideDropdown();
     bindAccountSettingsUi();
+    showAccountPreviewSkeleton();
     openScreen('6');
     loadAccountSettings();
 }
@@ -3582,12 +3665,13 @@ socket.on('contact_profile_updated', (data) => {
         if (nameEl) nameEl.textContent = data.name || '';
         const left = listItem.querySelector('.left');
         if (left) {
-            if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
-                left.innerHTML = photoAvatarHtml(`static/files/avatars/${data.avatar}`);
+            if (data.hide_avatar) {
+                left.innerHTML = letterAvatarHtml(data.name);
+            } else if (data.avatar && data.avatar !== 'avatarkins.png' && data.avatar !== 'null') {
+                left.innerHTML = `<img src="static/files/avatars/${data.avatar}" class="ava" alt="">`;
             } else {
                 left.innerHTML = letterAvatarHtml(data.name);
             }
-            bindAvatarLoad(listItem);
         }
     }
     if (String(getActiveChatId()) && window.chatIdToUserId?.[getActiveChatId()] === uid) {
@@ -3595,8 +3679,8 @@ socket.on('contact_profile_updated', (data) => {
         const headerAvatar = document.getElementById('user-avatar');
         if (headerName) headerName.textContent = data.name || '';
         if (headerAvatar) {
-            headerAvatar.innerHTML = getDisplayAvatarHtml(chatsData[uid]);
-            bindAvatarLoad(headerAvatar);
+            headerAvatar.innerHTML = '';
+            appendAvatarHtml(headerAvatar, getDisplayAvatarHtml(chatsData[uid]));
         }
     }
 });

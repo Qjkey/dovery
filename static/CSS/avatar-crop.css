@@ -14,27 +14,36 @@
 }
 
 .avatar-crop-screen.active {
-    display: flex;
+    display: block;
 }
 
 .avatar-crop-screen .avatar-crop-header {
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 3;
-    flex-shrink: 0;
     padding-top: constant(safe-area-inset-top);
     padding-top: env(safe-area-inset-top);
+    background: transparent;
+    pointer-events: none;
+}
+
+.avatar-crop-screen .avatar-crop-header .header-capsule {
+    pointer-events: auto;
 }
 
 .avatar-crop-screen .header-capsule {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.12);
     box-shadow: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .avatar-crop-viewport {
-    position: relative;
-    flex: 1;
-    min-height: 0;
+    position: absolute;
+    inset: 0;
     overflow: hidden;
 }
 

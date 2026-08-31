@@ -36,6 +36,12 @@
         screenEl.id = 'avatar-crop-screen';
         screenEl.className = 'avatar-crop-screen';
         screenEl.innerHTML = `
+            <div class="avatar-crop-viewport" id="avatar-crop-viewport">
+                <div class="avatar-crop-stage">
+                    <img class="avatar-crop-image" id="avatar-crop-image" alt="" draggable="false">
+                </div>
+                <div class="avatar-crop-mask" id="avatar-crop-mask"></div>
+            </div>
             <div class="header-wrapper">
                 <div class="header">
                     <div class="header-left">
@@ -54,12 +60,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="avatar-crop-viewport" id="avatar-crop-viewport">
-                <div class="avatar-crop-stage">
-                    <img class="avatar-crop-image" id="avatar-crop-image" alt="" draggable="false">
-                </div>
-                <div class="avatar-crop-mask" id="avatar-crop-mask"></div>
             </div>
         `;
         document.body.appendChild(screenEl);

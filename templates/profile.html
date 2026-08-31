@@ -18,6 +18,7 @@
     <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
     <link href="/static/CSS/tma-ui-kit-3-0.css" rel="stylesheet" type="text/css">
     <link href="/static/CSS/svg.css" rel="stylesheet" type="text/css">
+    <link href="/static/CSS/dovery.css" rel="stylesheet" type="text/css">
 </head>
 <style>
 .page-two {
@@ -88,24 +89,6 @@
     text-transform: uppercase;
 }
 
-@keyframes skeletonShimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-
-.avatar.avatar-pending {
-    background: linear-gradient(90deg,
-        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 25%,
-        color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-secondary-bg-color)) 50%,
-        color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-secondary-bg-color)) 75%);
-    background-size: 200% 100%;
-    animation: skeletonShimmer 1.4s infinite linear;
-}
-
-.avatar.avatar-pending img {
-    opacity: 0;
-}
-
 @media (min-width: 751px) {
     .page-two > .header-wrapper {
         margin-top: var(--margin);
@@ -143,16 +126,16 @@
         </div>
         <div class="page-two-content">
             <div class="page secondary_bg">
-                <div class="profile-block s-img defult">
-                    <div class="avatar{% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %} avatar-pending{% endif %}">
+                <div class="profile-block s-img defult" id="public-profile-block">
+                    <div class="avatar{% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %} avatar-skeleton-active{% endif %}" id="public-profile-avatar">
                         {% if profile_avatar and profile_avatar not in ('avatarkins.png', 'null') %}
                         <img src="{{ url_for('static', filename='files/avatars/' + profile_avatar) }}" alt="">
                         {% else %}
                         <div class="letter-ava">{{ (profile_name or profile_username or '?')[:1] }}</div>
                         {% endif %}
                     </div>
-                    <div class="headline6">{{ profile_name }}</div>
-                    <div class="subname subtitle1">@{{ profile_username }}</div>
+                    <div class="headline6" id="public-profile-name">{{ profile_name }}</div>
+                    <div class="subname subtitle1" id="public-profile-username">@{{ profile_username }}</div>
                 </div>
                 <section class="top">
                     <a href="/" class="item clicked">
@@ -173,18 +156,29 @@
 <script src="/static/js/tma-ui-kit-3-0.js"></script>
 <script>
 (function () {
-    var avatar = document.querySelector('.page-two-content .profile-block .avatar');
-    if (!avatar) return;
+    var block = document.getElementById('public-profile-block');
+    var avatar = document.getElementById('public-profile-avatar');
+    if (!block || !avatar) return;
+
+    var revealProfile = function () {};
+
     var img = avatar.querySelector('img');
     if (!img) {
-        avatar.classList.remove('avatar-pending');
+        avatar.classList.remove('avatar-skeleton-active');
+        revealProfile();
         return;
     }
-    var done = function () { avatar.classList.remove('avatar-pending'); };
+
+    var done = function () {
+        avatar.classList.remove('avatar-skeleton-active');
+        revealProfile();
+    };
+
     if (img.complete && img.naturalWidth > 0) {
         done();
         return;
     }
+
     img.addEventListener('load', done, { once: true });
     img.addEventListener('error', done, { once: true });
 })();

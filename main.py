@@ -128,7 +128,7 @@ def add_security_headers(response):
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' blob: data: https://kaspersky-labs.com; "
         "connect-src 'self' wss://kaspersky-labs.com; "
-        "upgrade-insecure-requests;" 
+        "upgrade-insecure-requests;"
     )
     response.headers['Content-Security-Policy'] = csp
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'

@@ -53,7 +53,7 @@
                     </div>
                     <div class="header-center"></div>
                     <div class="header-right">
-                        <div class="header-capsule one-btn" id="avatar-crop-accept" title="Принять">
+                        <div class="header-capsule one-btn" id="avatar-crop-accept" title="Принять"> 
                             <div class="element-header">
                                 <svg class="check"><use href="#check"></use></svg>
                             </div>

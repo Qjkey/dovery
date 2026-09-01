@@ -149,6 +149,7 @@ Dovery
 </div>
 <button type="button" class="resizer" id="dragbar" tabindex="-1" aria-label="Изменить ширину списка чатов"></button>
 <div id="messages-host" class="messages-host">
+<div class="chat-main-column" id="chat-main-column">
 <div class="messages screen" id="message-chats" data-screen="2" data-swipe>
     <div id="no-chat-content" class="body1-medium empty-state">
         <p class="label-no-chats">Выберите чат, либо используйте поиск</p>
@@ -180,9 +181,12 @@ Dovery
                     </div>
                 </div>
 
-                <div class="header-right">
-                    <div class="header-capsule one-btn" id="cntxt_menu_btn_02">
-                        <a href="#" class="element-header">
+                <div class="header-right chat-header-actions">
+                    <div class="header-capsule">
+                        <a class="element-header" id="chat-side-panel-toggle">
+                            <svg class="grid"><use href="#grid"></use></svg>
+                        </a>
+                        <a href="#" class="element-header" id="cntxt_menu_btn_02">
                             <svg class="menu"><use href="#menu"></use></svg>
                         </a>
                     </div>
@@ -238,6 +242,26 @@ Dovery
                             <path d="M0.00148348 0.911458C0.00148348 0.607639 0.00148348 1.32681e-05 1.07915 0C2.46473 -1.70589e-05 17.86 7.89931 18.9377 8.81076C19.7998 9.53993 19.398 10.3299 18.9362 10.6337C17.8588 11.5449 2.31749 19.4397 1.07767 19.4444C0 19.4444 0 18.8368 0 18.533L1.07875 11.849C1.20159 11.1198 1.54075 10.9375 1.69498 10.9375L10.9321 10.026C11.0348 10.026 11.24 9.96528 11.24 9.72222C11.24 9.47917 11.0348 9.4184 10.9321 9.4184L1.69498 8.50695C1.54075 8.50695 1.20159 8.32465 1.07875 7.59549C0.718159 5.39227 0.00148348 1.21528 0.00148348 0.911458Z" fill="var(--tg-theme-button-color)"/>
                         </svg>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<div class="chat-side-panel-slot" id="chat-side-panel-slot">
+    <div class="screen hidden chat-side-panel-dovery" id="chat-side-panel-screen" aria-label="Профиль и эмодзи">
+        <div class="header-wrapper stick">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" id="close-chat-side-panel">
+                        <button type="button" class="element-header" aria-label="Закрыть панель">
+                            <svg class="back"><use href="#back"></use></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="header-center">
+                    <div class="label headline6">Профиль и эмодзи</div>
                 </div>
             </div>
         </div>

@@ -963,6 +963,9 @@ async function openDirectWindow(chatId) {
         if (typeof window.syncChatViewing === 'function') {
             window.syncChatViewing();
         }
+        if (typeof syncChatSidePanelUi === 'function') {
+            syncChatSidePanelUi();
+        }
     } catch (err) {
         d_alert('Ошибка', 'Ошибка в открытии чата', 'ok');
         console.log(err);
@@ -1002,6 +1005,7 @@ function applyChatListWidth(widthPx) {
         sidebar.style.maxWidth = '';
         sidebar.style.flexBasis = '';
     }
+    if (typeof syncChatSidePanelUi === 'function') syncChatSidePanelUi();
     return width;
 }
 
@@ -3688,3 +3692,121 @@ socket.on('contact_profile_updated', (data) => {
 window.openAccountScreen = openAccountScreen;
 window.saveAccountSettings = saveAccountSettings;
 window.loadAccountSettings = loadAccountSettings;
+
+const CHAT_SIDE_PANEL_MIN_CHAT_WIDTH = 1000;
+const CHAT_SIDE_PANEL_ANIM_MS = 180;
+
+function getChatPanelWidth() {
+    const col = document.getElementById('chat-main-column');
+    return col ? col.clientWidth : 0;
+}
+
+function isChatSidePanelOpen() {
+    const host = document.getElementById('messages-host');
+    const screen = document.getElementById('chat-side-panel-screen');
+    return !!(host && host.classList.contains('side-panel-open')
+        && screen && screen.classList.contains('active'));
+}
+
+function canShowChatSidePanelButton() {
+    if (window.innerWidth < 751) return false;
+    if (isChatSidePanelOpen()) return true;
+    return getChatPanelWidth() >= CHAT_SIDE_PANEL_MIN_CHAT_WIDTH;
+}
+
+function syncChatSidePanelUi() {
+    const btnWrap = document.getElementById('chat-side-panel-btn');
+    const toggle = document.getElementById('chat-side-panel-toggle');
+    const allowed = canShowChatSidePanelButton();
+    const open = isChatSidePanelOpen();
+    if (btnWrap) btnWrap.classList.toggle('hidden', !allowed);
+    if (btnWrap) btnWrap.classList.toggle('is-active', open);
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!allowed && open) closeChatSidePanel();
+}
+
+function openChatSidePanel() {
+    if (!canShowChatSidePanelButton()) return;
+    const host = document.getElementById('messages-host');
+    const screen = document.getElementById('chat-side-panel-screen');
+    if (!host || !screen) return;
+
+    screen.classList.remove('hidden');
+    host.classList.add('side-panel-open');
+    screen.classList.remove('active');
+    screen.style.transition = 'none';
+    screen.style.transform = 'translateX(100%)';
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            screen.style.transition = `transform ${CHAT_SIDE_PANEL_ANIM_MS}ms ease`;
+            screen.classList.add('active');
+            screen.style.transform = '';
+        });
+    });
+
+    requestAnimationFrame(() => syncChatSidePanelUi());
+}
+
+function closeChatSidePanel() {
+    const host = document.getElementById('messages-host');
+    const screen = document.getElementById('chat-side-panel-screen');
+    if (!host || !screen) return;
+
+    screen.classList.remove('active');
+    screen.style.transition = `transform ${CHAT_SIDE_PANEL_ANIM_MS}ms ease`;
+    screen.style.transform = 'translateX(100%)';
+
+    setTimeout(() => {
+        host.classList.remove('side-panel-open');
+        screen.classList.add('hidden');
+        screen.style.transform = '';
+        screen.style.transition = '';
+        syncChatSidePanelUi();
+    }, CHAT_SIDE_PANEL_ANIM_MS);
+}
+
+function toggleChatSidePanel() {
+    if (isChatSidePanelOpen()) closeChatSidePanel();
+    else openChatSidePanel();
+}
+
+function initChatSidePanel() {
+    const toggle = document.getElementById('chat-side-panel-toggle');
+    const closeBtn = document.getElementById('close-chat-side-panel');
+    const screen = document.getElementById('chat-side-panel-screen');
+    if (!toggle || toggle.dataset.bound === '1') return;
+    toggle.dataset.bound = '1';
+
+    toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleChatSidePanel();
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeChatSidePanel();
+        });
+    }
+
+    if (screen) {
+        screen.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'transform') syncChatSidePanelUi();
+        });
+    }
+
+    window.addEventListener('resize', syncChatSidePanelUi);
+    syncChatSidePanelUi();
+}
+
+window.toggleChatSidePanel = toggleChatSidePanel;
+window.openChatSidePanel = openChatSidePanel;
+window.closeChatSidePanel = closeChatSidePanel;
+window.syncChatSidePanelUi = syncChatSidePanelUi;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChatSidePanel);
+} else {
+    initChatSidePanel();
+}

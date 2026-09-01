@@ -33,6 +33,79 @@ html, body {
     height: 100dvh;
     overflow: hidden;
     z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .chat-main-column {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    position: relative;
+  }
+
+  .chat-side-panel-slot {
+    flex: 0 0 0;
+    width: 0;
+    min-width: 0;
+    max-width: 42%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
+    transition: flex-basis 0.18s ease, width 0.18s ease;
+  }
+
+  #messages-host.side-panel-open .chat-side-panel-slot {
+    flex-basis: calc(var(--chat-side-panel-width, 360px) + var(--margin));
+    width: calc(var(--chat-side-panel-width, 360px) + var(--margin));
+  }
+
+  #chat-side-panel-screen.chat-side-panel-dovery.screen {
+    position: absolute !important;
+    top: var(--margin);
+    right: var(--margin);
+    left: auto;
+    width: var(--chat-side-panel-width, 360px);
+    height: calc(100% - 2 * var(--margin));
+    max-height: calc(100% - 2 * var(--margin));
+    border-radius: var(--radius);
+    transform: translateX(100%);
+    transition: transform 0.18s ease;
+    will-change: transform;
+    z-index: 2;
+    overflow-y: auto;
+    background: var(--tg-theme-secondary-bg-color);
+    box-sizing: border-box;
+  }
+
+  #messages-host.side-panel-open #chat-side-panel-screen.chat-side-panel-dovery.screen.active {
+    transform: translateX(0);
+  }
+
+  .chat-header-actions {
+    gap: 6px;
+  }
+
+  #chat-side-panel-btn.is-active .header-capsule {
+    background: color-mix(in srgb, var(--tg-theme-button-color) 18%, var(--tg-theme-bg-color) 55%);
+  }
+
+  #chat-side-panel-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: inherit;
+  }
+
+  #close-chat-side-panel .element-header {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: inherit;
   }
 
   .resizer.is-active {
@@ -839,6 +912,13 @@ body.is-resizing-chats * {
 
 #messages-textarea {
     -webkit-touch-callout: none;
+}
+
+@media (max-width: 750px) {
+  .chat-side-panel-slot,
+  #chat-side-panel-btn {
+    display: none !important;
+  }
 }
 
 .badge {

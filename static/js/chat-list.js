@@ -4,7 +4,7 @@ const escapeHtml = (text) => {
     return div.innerHTML;
 };
 
-function buildChatListAvatar(chat) {
+function buildChatListAvatarInner(chat) {
     if (chat.hide_avatar) {
         const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
         return `<div class="ava letter-ava1">${firstLetter}</div>`;
@@ -17,20 +17,33 @@ function buildChatListAvatar(chat) {
     return `<div class="ava letter-ava1">${firstLetter}</div>`;
 }
 
+function buildChatListAvatarHtml(chat) {
+    return `
+        <div class="chat-list-avatar-wrap">
+            ${buildChatListAvatarInner(chat)}
+            <span class="chat-list-online-dot" aria-hidden="true"></span>
+        </div>
+    `;
+}
+
 function buildChatListSkeleton(separator = false, widths = {}) {
     const row = document.createElement('div');
     row.className = 'item loading-skeleton';
     const sep = separator ? 'separator' : '';
     const titleW = widths.title || '42%';
-    const subtitleW = widths.subtitle || '28%';
+    const subtitleW = widths.subtitle || '68%';
     row.innerHTML = `
         <div class="left">
-            <div class="ava"></div>
+            <div class="chat-list-avatar-wrap">
+                <div class="ava"></div>
+            </div>
         </div>
         <div class="right ${sep}">
             <div class="text twoline">
                 <div class="label body1"><span class="skeleton-line title" style="width:${titleW}"></span></div>
-                <div class="label subtitle subtitle1"><span class="skeleton-line subtitle" style="width:${subtitleW}"></span></div>
+                <div class="chat-list-preview-wrap">
+                    <span class="skeleton-line subtitle preview-skeleton" style="width:${subtitleW}"></span>
+                </div>
             </div>
         </div>
     `;
@@ -42,13 +55,13 @@ function showChatListSkeletons(count = 9) {
     if (!listContainer) return;
     listContainer.innerHTML = '';
     const widths = [
-        { title: '48%', subtitle: '32%' },
-        { title: '36%', subtitle: '24%' },
-        { title: '54%', subtitle: '40%' },
-        { title: '40%', subtitle: '22%' },
-        { title: '44%', subtitle: '30%' },
-        { title: '52%', subtitle: '26%' },
-        { title: '38%', subtitle: '34%' },
+        { title: '48%', subtitle: '72%' },
+        { title: '36%', subtitle: '58%' },
+        { title: '54%', subtitle: '80%' },
+        { title: '40%', subtitle: '52%' },
+        { title: '44%', subtitle: '64%' },
+        { title: '52%', subtitle: '70%' },
+        { title: '38%', subtitle: '56%' },
     ];
     for (let i = 0; i < count; i++) {
         listContainer.appendChild(buildChatListSkeleton(i < count - 1, widths[i % widths.length]));
@@ -58,6 +71,71 @@ function showChatListSkeletons(count = 9) {
 function shouldShowChatListSkeleton(listContainer) {
     if (!listContainer) return true;
     return listContainer.querySelectorAll('.item[data-user-id]').length === 0;
+}
+
+function getChatListBlockedPreview(blockState) {
+    if (blockState?.blocked_me) return 'Вас заблокировали';
+    if (blockState?.blocked_by_me) return 'Вы заблокировали';
+    return '';
+}
+
+async function hydrateChatListPreviews(chats) {
+    if (!chats || !chats.length) return;
+
+    const tasks = chats.map(async (chat) => {
+        const userId = String(chat.id);
+        if (String(chat.id) === String(window.userId)) return;
+
+        const blockedPreview = getChatListBlockedPreview(chat.block_state);
+        if (blockedPreview) {
+            const item = document.querySelector(`#chats-list .item[data-user-id="${userId}"]`);
+            const el = item?.querySelector('.chat-list-preview');
+            if (el) {
+                el.textContent = blockedPreview;
+                el.classList.remove('is-loading');
+                el.classList.remove('is-empty');
+            }
+            return;
+        }
+
+        if (!chat.last_message_text) {
+            const emptyPreview = window.CHAT_LIST_EMPTY_PREVIEW || 'Чат создан';
+            const item = document.querySelector(`#chats-list .item[data-user-id="${userId}"]`);
+            const el = item?.querySelector('.chat-list-preview');
+            if (el) {
+                el.textContent = emptyPreview;
+                el.classList.remove('is-loading');
+                el.classList.remove('is-empty');
+            }
+            if (chatsData[userId]) {
+                chatsData[userId].lastPreviewText = emptyPreview;
+            }
+            return;
+        }
+
+        if (typeof window.decryptMessageForUser !== 'function') return;
+
+        try {
+            const text = await window.decryptMessageForUser(chat.last_message_text, userId);
+            const isOwn = String(chat.last_message_sender_id) === String(window.userId);
+            if (typeof window.updateChatListLastPreview === 'function') {
+                window.updateChatListLastPreview(chat.chat_id, text, isOwn);
+            }
+        } catch (err) {
+            const item = document.querySelector(`#chats-list .item[data-user-id="${userId}"]`);
+            const el = item?.querySelector('.chat-list-preview');
+            if (el) {
+                el.textContent = '';
+                el.classList.remove('is-loading');
+                el.classList.add('is-empty');
+            }
+        }
+    });
+
+    await Promise.all(tasks);
+    if (typeof window.refreshChatListPreviewFades === 'function') {
+        requestAnimationFrame(() => window.refreshChatListPreviewFades());
+    }
 }
 
 async function loadMyChats({ showSkeleton = null } = {}) {
@@ -77,8 +155,7 @@ async function loadMyChats({ showSkeleton = null } = {}) {
             d_alert("Ошибка", `Ошибка загрузки списка чатов`, "ok");
         }
         const chats = await response.json();
-        let inx = 0;
-        listContainer.innerHTML = ''; 
+        listContainer.innerHTML = '';
 
         if (!chats || chats.length === 0) {
             const big_header = document.createElement('div');
@@ -90,16 +167,16 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 <div class="label body1">Ищите своих собеседников используя поиск чатов выше</div>
             `;
             listContainer.appendChild(big_header);
+            return;
         }
 
         window.chatIdToUserId = {};
         chats.forEach((chat, index) => {
-            const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status) ? chatsData[chat.id].status : chat.status;
-            const shownStatus = typeof window.displayedPresenceText === 'function'
-                ? window.displayedPresenceText(currentStatus, true)
-                : currentStatus;
+            const currentStatus = (chatsData[chat.id] && chatsData[chat.id].status)
+                ? chatsData[chat.id].status
+                : chat.status;
 
-            const avatarHtml = buildChatListAvatar(chat);
+            const avatarHtml = buildChatListAvatarHtml(chat);
             const userKey = String(chat.id);
             const prev = chatsData[userKey] || {};
             const chatId = chat.chat_id != null ? String(chat.chat_id) : '';
@@ -118,21 +195,22 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 status: currentStatus,
                 realStatus: chat.real_status || currentStatus,
                 blockState: chat.block_state || null,
-                keychat: prev.keychat
+                keychat: prev.keychat,
+                lastPreviewText: prev.lastPreviewText || ''
             };
             if (chatId) {
                 window.chatIdToUserId[chatId] = userKey;
             }
             if (String(chat.id) === String(window.userId)) return;
+
             const item = document.createElement('div');
             item.className = 'item clicked';
             item.setAttribute('data-user-id', chat.id);
-            const str_status = typeof window.presenceClass === 'function'
-                ? window.presenceClass(currentStatus, true)
-                : (currentStatus === 'в сети' ? 'active subtitle2' : 'subtitle subtitle1');
-            let sepa = "";
+            item.setAttribute('data-chat-id', chat.chat_id);
+
+            let sepa = '';
             if (index < chats.length - 1) {
-                sepa = "separator";
+                sepa = 'separator';
             }
             const safeName = escapeHtml(chat.name);
             window.unreadCounts = window.unreadCounts || {};
@@ -143,14 +221,28 @@ async function loadMyChats({ showSkeleton = null } = {}) {
             const unreadHtml = unread > 0
                 ? `<div class="element"><div class="badge caption2">${unread}</div></div>`
                 : '';
+
+            const blockedPreview = getChatListBlockedPreview(chat.block_state);
+            const initialPreview = blockedPreview || chatsData[userKey].lastPreviewText || '';
+            const previewClasses = [
+                'label',
+                'subtitle',
+                'subtitle1',
+                'chat-list-preview',
+                initialPreview ? '' : 'is-empty',
+                blockedPreview ? '' : 'is-loading'
+            ].filter(Boolean).join(' ');
+
             item.innerHTML = `
-                <div class="left"> 
+                <div class="left">
                     ${avatarHtml}
                 </div>
                 <div class="right ${sepa}">
-                    <div class="text twoline"> 
-                        <div class="label body1">${safeName}</div> 
-                        <div class="label status_of_user_in_list_chats ${str_status}">${escapeHtml(shownStatus)}</div> 
+                    <div class="text twoline">
+                        <div class="label body1">${safeName}</div>
+                        <div class="chat-list-preview-wrap">
+                            <div class="${previewClasses}">${escapeHtml(initialPreview)}</div>
+                        </div>
                     </div>
                     ${unreadHtml}
                 </div>
@@ -159,11 +251,20 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 await openDirectWindow(chat.chat_id);
             };
             listContainer.appendChild(item);
-            inx++;
+
+            if (typeof window.syncChatListOnlineDot === 'function') {
+                window.syncChatListOnlineDot(chat.id);
+            }
         });
+
         Object.keys(window.unreadCounts || {}).forEach((id) => {
             setChatUnreadBadge(id, window.unreadCounts[id]);
         });
+
+        await hydrateChatListPreviews(chats);
+        if (typeof window.refreshChatListPreviewFades === 'function') {
+            requestAnimationFrame(() => window.refreshChatListPreviewFades());
+        }
     } catch {
         d_alert("Ошибка", `Ошибка загрузки списка чатов`, "ok");
         return;
@@ -177,7 +278,7 @@ window.onload = () => {
 };
 
 socket.on("chat_created", (data) => {
-    loadMyChats({ showSkeleton: false }); 
+    loadMyChats({ showSkeleton: false });
 });
 
 function setChatUnreadBadge(chatId, count) {
@@ -216,6 +317,7 @@ function setChatUnreadBadge(chatId, count) {
 
 window.setChatUnreadBadge = setChatUnreadBadge;
 window.showChatListSkeletons = showChatListSkeletons;
+window.loadMyChats = loadMyChats;
 
 socket.on('unread_update', (data) => {
     if (!data) return;

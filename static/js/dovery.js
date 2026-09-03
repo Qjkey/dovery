@@ -613,11 +613,8 @@ socket.on("user_status_update", (data) => {
 
         const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
         if (currentChatElem) {
-            const statusInList = currentChatElem.querySelector('.status_of_user_in_list_chats');
-            if (statusInList) {
-                const effectiveStatus = getEffectiveStatus(chatsData[userId]);
-                statusInList.className = `label status_of_user_in_list_chats ${presenceClass(effectiveStatus, true)}`;
-                statusInList.textContent = displayedPresenceText(effectiveStatus, true);
+            if (typeof syncChatListOnlineDot === 'function') {
+                syncChatListOnlineDot(userId);
             }
         }
     } catch (err) {
@@ -728,13 +725,11 @@ function refreshAllPresenceDisplays() {
         refreshPartnerTypingHeader();
     }
 
-    document.querySelectorAll('[data-user-id]').forEach((item) => {
-        const el = item.querySelector('.status_of_user_in_list_chats');
-        if (!el) return;
+    document.querySelectorAll('#chats-list .item[data-user-id]').forEach((item) => {
         const uid = item.getAttribute('data-user-id');
-        const st = chatsData[uid] ? getEffectiveStatus(chatsData[uid]) : 'был(а) недавно';
-        el.className = `label status_of_user_in_list_chats ${presenceClass(st, true)}`;
-        el.textContent = displayedPresenceText(st, true);
+        if (typeof syncChatListOnlineDot === 'function') {
+            syncChatListOnlineDot(uid);
+        }
     });
 }
 
@@ -1006,6 +1001,9 @@ function applyChatListWidth(widthPx) {
         sidebar.style.flexBasis = '';
     }
     if (typeof syncChatSidePanelUi === 'function') syncChatSidePanelUi();
+    if (typeof refreshChatListPreviewFades === 'function') {
+        requestAnimationFrame(() => refreshChatListPreviewFades());
+    }
     return width;
 }
 
@@ -1922,6 +1920,117 @@ async function decryptText_new_message(encryptedBase64, userid) {
     return new TextDecoder().decode(decryptedContent);
 }
 
+async function ensureKeychatForUser(userId) {
+    const uid = userId != null ? String(userId) : '';
+    const user = chatsData[uid];
+    if (!user?.publicKey) return null;
+    if (user.keychat) return user.keychat;
+    const private_key = await get_private_key();
+    const public_key = await get_public_key(user.publicKey);
+    user.keychat = await calc_key_chat(private_key, public_key);
+    return user.keychat;
+}
+
+async function decryptMessageForUser(encryptedBase64, userId) {
+    const uid = userId != null ? String(userId) : '';
+    if (!encryptedBase64) return '';
+    await ensureKeychatForUser(uid);
+    return decryptText_new_message(encryptedBase64, uid);
+}
+
+const CHAT_LIST_EMPTY_PREVIEW = 'Чат создан';
+
+function formatChatListPreviewPlain(text, isOwn) {
+    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+    return normalized;
+}
+
+function updateChatListLastPreview(chatId, plainText, isOwn) {
+    const map = window.chatIdToUserId || {};
+    const userId = map[chatId] || map[String(chatId)];
+    if (!userId) return;
+    const uid = String(userId);
+    const formatted = formatChatListPreviewPlain(plainText, isOwn);
+    if (chatsData[uid]) {
+        chatsData[uid].lastPreviewText = formatted;
+    }
+    const item = document.querySelector(`#chats-list .item[data-user-id="${uid}"]`);
+    if (!item) return;
+    const el = item.querySelector('.chat-list-preview');
+    if (!el) return;
+    el.textContent = formatted;
+    el.classList.remove('is-loading');
+    el.classList.toggle('is-empty', !formatted);
+    if (typeof syncChatListPreviewFade === 'function') {
+        requestAnimationFrame(() => syncChatListPreviewFade(el));
+    }
+}
+
+function syncChatListPreviewFade(previewEl) {
+    if (!previewEl) return;
+    if (previewEl.classList.contains('is-loading') || previewEl.classList.contains('is-empty')) {
+        previewEl.classList.remove('is-truncated');
+        return;
+    }
+    const truncated = previewEl.scrollWidth > previewEl.clientWidth + 1;
+    previewEl.classList.toggle('is-truncated', truncated);
+}
+
+function refreshChatListPreviewFades() {
+    document.querySelectorAll('#chats-list .chat-list-preview').forEach((el) => {
+        syncChatListPreviewFade(el);
+    });
+}
+
+function initChatListPreviewFades() {
+    const list = document.getElementById('chats-list');
+    if (!list) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => {
+            refreshChatListPreviewFades();
+        });
+        observer.observe(list);
+    }
+
+    window.addEventListener('resize', () => {
+        requestAnimationFrame(() => refreshChatListPreviewFades());
+    });
+}
+
+function syncChatListOnlineDot(userId) {
+    const uid = userId != null ? String(userId) : '';
+    const item = document.querySelector(`#chats-list .item[data-user-id="${uid}"]`);
+    if (!item) return;
+    const dot = item.querySelector('.chat-list-online-dot');
+    if (!dot) return;
+    const user = chatsData[uid];
+    const online = !!(user && user.realStatus === 'в сети' && !user.blockState?.blocked_me);
+    dot.classList.toggle('is-online', online);
+}
+
+function refreshChatListOnlineDots() {
+    document.querySelectorAll('#chats-list .item[data-user-id]').forEach((item) => {
+        syncChatListOnlineDot(item.getAttribute('data-user-id'));
+    });
+}
+
+window.ensureKeychatForUser = ensureKeychatForUser;
+window.decryptMessageForUser = decryptMessageForUser;
+window.updateChatListLastPreview = updateChatListLastPreview;
+window.syncChatListOnlineDot = syncChatListOnlineDot;
+window.refreshChatListOnlineDots = refreshChatListOnlineDots;
+window.formatChatListPreviewPlain = formatChatListPreviewPlain;
+window.CHAT_LIST_EMPTY_PREVIEW = CHAT_LIST_EMPTY_PREVIEW;
+window.syncChatListPreviewFade = syncChatListPreviewFade;
+window.refreshChatListPreviewFades = refreshChatListPreviewFades;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChatListPreviewFades);
+} else {
+    initChatListPreviewFades();
+}
+
 function getPreciseISOString() {
     const date = new Date();
     const isoString = date.toISOString();
@@ -2154,6 +2263,9 @@ async function sendMessage() {
 
     resetMessageComposer();
     scrollMessagesToLatest();
+    if (typeof updateChatListLastPreview === 'function') {
+        updateChatListLastPreview(chatId, text, true);
+    }
     // keep keyboard / caret — без blur; preventScroll чтобы страница не дёргалась
     msgInput.focus({ preventScroll: true });
 }
@@ -2222,6 +2334,9 @@ socket.on('new_message', async (data) => {
             }
 
             const decryptedText = await decryptText_new_message(data.text, keyOwnerId);
+            if (typeof updateChatListLastPreview === 'function') {
+                updateChatListLastPreview(chatId, decryptedText, isMe);
+            }
 
             const wrapper = document.createElement('div');
             
@@ -2260,6 +2375,15 @@ socket.on('new_message', async (data) => {
                 if (nearBottom) scrollMessagesToLatest();
             } else {
                 scrollMessagesToLatest();
+            }
+        } else if (partnerId && typeof decryptMessageForUser === 'function') {
+            try {
+                const previewText = await decryptMessageForUser(data.text, partnerId);
+                if (typeof updateChatListLastPreview === 'function') {
+                    updateChatListLastPreview(chatId, previewText, isMe);
+                }
+            } catch (previewErr) {
+                console.warn('Не удалось обновить превью в списке чатов:', previewErr);
             }
         }
 

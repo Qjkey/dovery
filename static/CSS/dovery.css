@@ -944,19 +944,141 @@ body.is-resizing-chats * {
   display: none;
 }
 
+#chats-list .item {
+  min-width: 0;
+}
+
 #chats-list .item .right {
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 #chats-list .item .text {
   min-width: 0;
   flex: 1;
   width: auto;
+  overflow: hidden;
 }
 
 #chats-list .item .element {
   flex-shrink: 0;
   margin-left: 8px;
+}
+
+#chats-list .chat-list-avatar-wrap {
+  position: relative;
+  width: 45px;
+  height: 45px;
+  flex-shrink: 0;
+}
+
+#chats-list .chat-list-avatar-wrap .ava {
+  width: 45px;
+  height: 45px;
+}
+
+#chats-list .chat-list-online-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 3px solid var(--tg-theme-bg-color);
+  background: var(--tg-theme-button-color);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  pointer-events: none;
+}
+
+#chats-list .item.open_chat .chat-list-online-dot {
+  border-color: color-mix(in srgb, var(--tg-theme-hint-color) 10%, var(--tg-theme-bg-color));
+}
+
+#chats-list .chat-list-online-dot.is-online {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#chats-list .chat-list-preview-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#chats-list .chat-list-preview {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  color: var(--tg-theme-subtitle-text-color);
+}
+
+#chats-list .chat-list-preview.is-truncated {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - 32px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - 32px),
+    transparent 100%
+  );
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+#chats-list .chat-list-preview.is-empty {
+  opacity: 0;
+}
+
+#chats-list .chat-list-preview.is-loading {
+  color: transparent;
+  height: 12px;
+  border-radius: 6px;
+  margin-top: 1px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 25%,
+    color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 50%,
+    color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 75%);
+  background-size: 200% 100%;
+  animation: chatListSkeletonShimmer 2.4s infinite linear;
+}
+
+#chats-list .item.loading-skeleton .ava:not(.letter-ava1),
+#chats-list .item.loading-skeleton .skeleton-line {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 25%,
+    color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 50%,
+    color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color))) 75%);
+  background-size: 200% 100%;
+  animation: chatListSkeletonShimmer 2.4s infinite linear;
+}
+
+#chats-list .item.loading-skeleton .skeleton-line.preview-skeleton {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+@keyframes chatListSkeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .message-info {

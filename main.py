@@ -1305,7 +1305,19 @@ def get_my_chats():
                 WHERE m.chat_id = c.id
                   AND m.sender_id != ?
                   AND COALESCE(m.is_read, 1) = 0
-            ) AS unread_count
+            ) AS unread_count,
+            (
+                SELECT m.message_text FROM message m
+                WHERE m.chat_id = c.id
+                ORDER BY m.time DESC, m.id DESC
+                LIMIT 1
+            ) AS last_message_text,
+            (
+                SELECT m.sender_id FROM message m
+                WHERE m.chat_id = c.id
+                ORDER BY m.time DESC, m.id DESC
+                LIMIT 1
+            ) AS last_message_sender_id
         FROM chats c
         JOIN users u ON u.id = (CASE WHEN c.user_one_id = ? THEN c.user_two_id ELSE c.user_one_id END)
         WHERE c.user_one_id = ? OR c.user_two_id = ?

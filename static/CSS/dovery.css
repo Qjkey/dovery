@@ -88,16 +88,16 @@ html, body {
     gap: 6px;
   }
 
-  #chat-side-panel-btn.is-active .header-capsule {
-    background: color-mix(in srgb, var(--tg-theme-button-color) 18%, var(--tg-theme-bg-color) 55%);
-  }
-
   #chat-side-panel-toggle {
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
     color: inherit;
+  }
+
+  #chat-side-panel-toggle.hidden {
+    display: none !important;
   }
 
   #close-chat-side-panel .element-header {
@@ -916,7 +916,7 @@ body.is-resizing-chats * {
 
 @media (max-width: 750px) {
   .chat-side-panel-slot,
-  #chat-side-panel-btn {
+  #chat-side-panel-toggle {
     display: none !important;
   }
 }

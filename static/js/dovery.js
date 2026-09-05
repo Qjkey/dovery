@@ -3819,8 +3819,13 @@ window.loadAccountSettings = loadAccountSettings;
 
 const CHAT_SIDE_PANEL_MIN_CHAT_WIDTH = 1000;
 const CHAT_SIDE_PANEL_ANIM_MS = 180;
+const DOVERY_DESKTOP_MIN_WIDTH = 751;
 
 function getChatPanelWidth() {
+    // Ширина всей области чата (без учёта открытой третьей колонки),
+    // иначе после открытия колонки кнопка сразу пропадала бы.
+    const host = document.getElementById('messages-host');
+    if (host) return host.clientWidth;
     const col = document.getElementById('chat-main-column');
     return col ? col.clientWidth : 0;
 }
@@ -3833,20 +3838,46 @@ function isChatSidePanelOpen() {
 }
 
 function canShowChatSidePanelButton() {
-    if (window.innerWidth < 751) return false;
-    if (isChatSidePanelOpen()) return true;
+    if (window.innerWidth < DOVERY_DESKTOP_MIN_WIDTH) return false;
     return getChatPanelWidth() >= CHAT_SIDE_PANEL_MIN_CHAT_WIDTH;
 }
 
+function syncChatSidePanelToggleIcon(open) {
+    const toggle = document.getElementById('chat-side-panel-toggle');
+    if (!toggle) return;
+    const svg = toggle.querySelector('svg');
+    const use = svg ? svg.querySelector('use') : null;
+    if (!svg || !use) return;
+
+    if (open) {
+        svg.setAttribute('class', 'close');
+        use.setAttribute('href', '#close');
+        if (use.hasAttribute('xlink:href')) use.setAttribute('xlink:href', '#close');
+        toggle.setAttribute('aria-label', 'Закрыть панель профиля');
+    } else {
+        svg.setAttribute('class', 'grid');
+        use.setAttribute('href', '#grid');
+        if (use.hasAttribute('xlink:href')) use.setAttribute('xlink:href', '#grid');
+        toggle.setAttribute('aria-label', 'Открыть панель профиля');
+    }
+}
+
 function syncChatSidePanelUi() {
-    const btnWrap = document.getElementById('chat-side-panel-btn');
     const toggle = document.getElementById('chat-side-panel-toggle');
     const allowed = canShowChatSidePanelButton();
     const open = isChatSidePanelOpen();
-    if (btnWrap) btnWrap.classList.toggle('hidden', !allowed);
-    if (btnWrap) btnWrap.classList.toggle('is-active', open);
-    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!allowed && open) closeChatSidePanel();
+
+    if (!allowed && open) {
+        closeChatSidePanel();
+        return;
+    }
+
+    if (toggle) {
+        toggle.classList.toggle('hidden', !allowed);
+        toggle.classList.toggle('is-active', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        syncChatSidePanelToggleIcon(open);
+    }
 }
 
 function openChatSidePanel() {
@@ -3866,20 +3897,24 @@ function openChatSidePanel() {
             screen.style.transition = `transform ${CHAT_SIDE_PANEL_ANIM_MS}ms ease`;
             screen.classList.add('active');
             screen.style.transform = '';
+            syncChatSidePanelUi();
         });
     });
-
-    requestAnimationFrame(() => syncChatSidePanelUi());
 }
 
 function closeChatSidePanel() {
     const host = document.getElementById('messages-host');
     const screen = document.getElementById('chat-side-panel-screen');
     if (!host || !screen) return;
+    if (!host.classList.contains('side-panel-open') && screen.classList.contains('hidden')) {
+        syncChatSidePanelUi();
+        return;
+    }
 
     screen.classList.remove('active');
     screen.style.transition = `transform ${CHAT_SIDE_PANEL_ANIM_MS}ms ease`;
     screen.style.transform = 'translateX(100%)';
+    syncChatSidePanelUi();
 
     setTimeout(() => {
         host.classList.remove('side-panel-open');
@@ -3895,10 +3930,46 @@ function toggleChatSidePanel() {
     else openChatSidePanel();
 }
 
+function syncViewportWidthDependentUi() {
+    try {
+        if (typeof closeBtnChatUpdate === 'function') closeBtnChatUpdate();
+    } catch (_) { /* ignore */ }
+
+    try {
+        if (typeof syncResizeMenuItem === 'function') syncResizeMenuItem();
+    } catch (_) { /* ignore */ }
+
+    try {
+        if (typeof canResizeChatList === 'function' && typeof applyChatListWidth === 'function') {
+            if (canResizeChatList()) {
+                const current = parseInt(
+                    getComputedStyle(document.documentElement).getPropertyValue('--width-chat-list'),
+                    10
+                );
+                if (Number.isFinite(current)) applyChatListWidth(current);
+            } else {
+                applyChatListWidth(CHAT_LIST_MIN_WIDTH);
+                if (typeof hideChatListResizer === 'function') hideChatListResizer();
+            }
+        }
+    } catch (_) { /* ignore */ }
+
+    try {
+        syncChatSidePanelUi();
+    } catch (_) { /* ignore */ }
+
+    try {
+        if (typeof refreshChatListPreviewFades === 'function') {
+            requestAnimationFrame(() => refreshChatListPreviewFades());
+        }
+    } catch (_) { /* ignore */ }
+}
+
 function initChatSidePanel() {
     const toggle = document.getElementById('chat-side-panel-toggle');
     const closeBtn = document.getElementById('close-chat-side-panel');
     const screen = document.getElementById('chat-side-panel-screen');
+    const host = document.getElementById('messages-host');
     if (!toggle || toggle.dataset.bound === '1') return;
     toggle.dataset.bound = '1';
 
@@ -3920,14 +3991,32 @@ function initChatSidePanel() {
         });
     }
 
-    window.addEventListener('resize', syncChatSidePanelUi);
-    syncChatSidePanelUi();
+    let resizeRaf = 0;
+    const scheduleViewportSync = () => {
+        if (resizeRaf) cancelAnimationFrame(resizeRaf);
+        resizeRaf = requestAnimationFrame(() => {
+            resizeRaf = 0;
+            syncViewportWidthDependentUi();
+        });
+    };
+
+    window.addEventListener('resize', scheduleViewportSync);
+    window.addEventListener('orientationchange', scheduleViewportSync);
+
+    if (typeof ResizeObserver !== 'undefined' && host) {
+        const ro = new ResizeObserver(scheduleViewportSync);
+        ro.observe(host);
+    }
+
+    syncViewportWidthDependentUi();
 }
 
 window.toggleChatSidePanel = toggleChatSidePanel;
 window.openChatSidePanel = openChatSidePanel;
 window.closeChatSidePanel = closeChatSidePanel;
 window.syncChatSidePanelUi = syncChatSidePanelUi;
+window.syncViewportWidthDependentUi = syncViewportWidthDependentUi;
+window.canShowChatSidePanelButton = canShowChatSidePanelButton;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initChatSidePanel);

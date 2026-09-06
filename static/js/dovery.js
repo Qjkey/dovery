@@ -13,19 +13,12 @@ function closeBtnChatUpdate() {
 
         if (screenWidth > 751) {
             button.onclick = function() {
-                document.getElementById('no-chat-content').classList.remove('hidden');
-                document.getElementById('chat-content').classList.add('hidden');
-                document.querySelectorAll('.open_chat').forEach(elem => {
-                    elem.classList.remove('open_chat');
-                });
+                leaveOpenChatView();
             };
             screen.removeAttribute('data-swipe');
         } else {
             button.onclick = function() {
-                closeActiveScreen(2);
-                document.querySelectorAll('.open_chat').forEach(elem => {
-                    elem.classList.remove('open_chat');
-                });
+                leaveOpenChatView({ mobile: true });
             };
             screen.setAttribute('data-swipe', "true");
         }
@@ -33,6 +26,22 @@ function closeBtnChatUpdate() {
         d_alert("Ошибка", `Ошибка в closeBtnChatUpdate: ${error}`, "ok")
     }
 }
+
+function leaveOpenChatView({ mobile = false } = {}) {
+    if (typeof closeChatSidePanel === 'function') {
+        closeChatSidePanel();
+    }
+    document.querySelectorAll('.open_chat').forEach(elem => {
+        elem.classList.remove('open_chat');
+    });
+    if (mobile) {
+        closeActiveScreen(2);
+    } else {
+        document.getElementById('no-chat-content')?.classList.remove('hidden');
+        document.getElementById('chat-content')?.classList.add('hidden');
+    }
+}
+window.leaveOpenChatView = leaveOpenChatView;
 
 document.addEventListener('DOMContentLoaded', closeBtnChatUpdate);
 document.addEventListener('DOMContentLoaded', () => {closeBtnChatUpdate(); resizeObserver.observe(document.body);});
@@ -205,7 +214,6 @@ function showProfileSkeleton() {
     const usernameRow = usernameEl?.closest('.item');
     const actions = document.querySelector('#profile-screen .big-profile-block');
     const openChatSection = document.getElementById('profile-open-chat-section');
-    const openChatRow = document.getElementById('profile-open-chat-row');
 
     if (block) block.classList.add('profile-skeleton-active');
     if (avatar) {
@@ -227,10 +235,14 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
     if (block) block.classList.remove('profile-skeleton-active');
     if (usernameRow) usernameRow.classList.remove('profile-info-skeleton');
 
-    document.getElementById('profile-name').textContent = user.name || '';
-    document.getElementById('profile-id').textContent = userId;
-    document.getElementById('profile-status').textContent = getEffectiveStatus(user);
-    document.getElementById('profile-username').textContent = '@' + (user.username || '');
+    const nameEl = document.getElementById('profile-name');
+    const idEl = document.getElementById('profile-id');
+    const statusEl = document.getElementById('profile-status');
+    const usernameEl = document.getElementById('profile-username');
+    if (nameEl) nameEl.textContent = user.name || '';
+    if (idEl) idEl.textContent = userId;
+    if (statusEl) statusEl.textContent = getEffectiveStatus(user);
+    if (usernameEl) usernameEl.textContent = '@' + (user.username || '');
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) {
@@ -239,7 +251,162 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
         appendAvatarHtml(avatar, getDisplayAvatarHtml(user));
     }
 
-    syncProfileActionButtons(userId, isSelf, source);
+    syncProfileActionButtons(userId, isSelf, source, 'main');
+}
+
+function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
+    const block = document.getElementById('side-profileBlock1');
+    const usernameRow = document.getElementById('side-profile-username')?.closest('.item');
+    if (block) block.classList.remove('profile-skeleton-active');
+    if (usernameRow) usernameRow.classList.remove('profile-info-skeleton');
+
+    const nameEl = document.getElementById('side-profile-name');
+    const idEl = document.getElementById('side-profile-id');
+    const statusEl = document.getElementById('side-profile-status');
+    const usernameEl = document.getElementById('side-profile-username');
+    if (nameEl) nameEl.textContent = user?.name || '';
+    if (idEl) idEl.textContent = userId || '';
+    if (statusEl) statusEl.textContent = user ? getEffectiveStatus(user) : '';
+    if (usernameEl) usernameEl.textContent = user?.username ? ('@' + user.username) : '';
+
+    const avatar = document.getElementById('side-profile-avatar');
+    if (avatar) {
+        avatar.classList.remove('avatar-skeleton-active');
+        avatar.innerHTML = '';
+        if (user) appendAvatarHtml(avatar, getDisplayAvatarHtml(user));
+    }
+
+    syncProfileActionButtons(userId, isSelf, 'header', 'side');
+}
+
+function getOpenChatPartnerId() {
+    const chatId = document.getElementById('id_ept')?.textContent?.trim();
+    if (!chatId) return '';
+    const map = window.chatIdToUserId || {};
+    const uid = map[chatId] || map[String(chatId)];
+    return uid != null ? String(uid) : '';
+}
+
+async function syncSidePanelProfile(userId) {
+    const uid = userId != null ? String(userId) : getOpenChatPartnerId();
+    const root = document.getElementById('side-panel-profile');
+    if (!root) return;
+
+    if (!uid) {
+        fillSidePanelProfileFromUser(null, '', false);
+        return;
+    }
+
+    let user = chatsData[uid];
+    if (!user) {
+        const block = document.getElementById('side-profileBlock1');
+        if (block) block.classList.add('profile-skeleton-active');
+        try {
+            const response = await fetch(`/get_use_profile/${uid}`);
+            if (response.ok) {
+                const data = await response.json();
+                chatsData[uid] = {
+                    username: data.username,
+                    name: data.name,
+                    avatar: '',
+                    avatarRaw: data.avatar,
+                    hideAvatar: !!data.hide_avatar,
+                    publicKey: data.public_key,
+                    signingPublicKey: data.signing_public_key || '',
+                    publicKeySig: data.public_key_sig || '',
+                    status: data.status,
+                    realStatus: data.real_status || data.status,
+                    blockState: normalizeBlockState(data.block_state),
+                    chatId: chatsData[uid]?.chatId || getChatIdByUserId(uid)
+                };
+                user = chatsData[uid];
+            }
+        } catch (e) {
+            console.error('Ошибка загрузки профиля в боковой панели:', e);
+        }
+    }
+
+    if (!user) {
+        fillSidePanelProfileFromUser(null, uid, false);
+        return;
+    }
+    const isSelf = String(uid) === String(window.userId);
+    fillSidePanelProfileFromUser(user, uid, isSelf);
+}
+
+function syncProfileBlockLabel(userId, scope = 'main') {
+    const blockText = document.getElementById(scope === 'side' ? 'side-profile-block-text' : 'profile-block-text');
+    if (!blockText) return;
+    const chatId = getChatIdByUserId(userId);
+    const state = getChatBlockState(chatId);
+    blockText.textContent = state.blocked_by_me ? 'Разблокировать' : 'Заблокировать';
+}
+
+function isUserInChatList(userId) {
+    const uid = String(userId);
+    if (document.querySelector(`#chats-list .item[data-user-id="${uid}"]`)) return true;
+    const chatId = chatsData[uid]?.chatId;
+    return chatId != null && String(chatId).trim() !== '';
+}
+
+function syncProfileActionButtons(userId, isSelf = false, source = 'other', scope = 'main') {
+    const isSide = scope === 'side';
+    const actions = document.querySelector(isSide
+        ? '#side-panel-profile .big-profile-block'
+        : '#profile-screen .big-profile-block');
+    const openChatSection = document.getElementById(isSide ? 'side-profile-open-chat-section' : 'profile-open-chat-section');
+    const openChatRow = document.getElementById(isSide ? 'side-profile-open-chat-row' : 'profile-open-chat-row');
+    const writeBtn = document.getElementById(isSide ? 'side-profile-write-btn' : 'profile-write-btn');
+    const deleteBtn = document.getElementById(isSide ? 'side-profile-delete-btn' : 'profile-delete-btn');
+    const blockBtn = document.getElementById(isSide ? 'side-profile-block-btn' : 'profile-block-btn');
+    const idElId = isSide ? 'side-profile-id' : 'profile-id';
+    const externalSource = ['header', 'username', 'url', 'side'].includes(source);
+    const inList = isUserInChatList(userId);
+    const hasChat = getChatIdByUserId(userId) != null;
+    const showActions = !isSelf && externalSource && inList && hasChat;
+
+    if (openChatRow) {
+        openChatRow.onclick = (e) => {
+            e.preventDefault();
+            const uid = document.getElementById(idElId)?.textContent?.trim() || userId;
+            openProfileChat(uid);
+        };
+    }
+
+    if (isSelf) {
+        if (actions) actions.classList.add('hidden');
+        if (openChatSection) openChatSection.classList.add('hidden');
+        return;
+    }
+
+    if (actions) actions.classList.toggle('hidden', !showActions);
+    if (openChatSection) openChatSection.classList.toggle('hidden', showActions || inList);
+
+    if (!showActions) return;
+
+    syncProfileBlockLabel(userId, scope);
+
+    if (writeBtn) {
+        writeBtn.onclick = (e) => {
+            e.preventDefault();
+            const uid = document.getElementById(idElId)?.textContent?.trim() || userId;
+            openProfileChat(uid);
+        };
+    }
+    if (deleteBtn) {
+        deleteBtn.onclick = async (e) => {
+            e.preventDefault();
+            const uid = document.getElementById(idElId)?.textContent?.trim() || userId;
+            await delete_chat(getChatIdByUserId(uid));
+        };
+    }
+    if (blockBtn) {
+        blockBtn.onclick = async (e) => {
+            e.preventDefault();
+            const uid = document.getElementById(idElId)?.textContent?.trim() || userId;
+            await toggle_chat_block(getChatIdByUserId(uid));
+        };
+    }
 }
 
 function showAccountPreviewSkeleton() {
@@ -367,77 +534,6 @@ function openProfileChat(userId) {
         openDirectWindow(chatId);
     } else {
         startChat(userId);
-    }
-}
-
-function syncProfileBlockLabel(userId) {
-    const blockText = document.getElementById('profile-block-text');
-    if (!blockText) return;
-    const chatId = getChatIdByUserId(userId);
-    const state = getChatBlockState(chatId);
-    blockText.textContent = state.blocked_by_me ? 'Разблокировать' : 'Заблокировать';
-}
-
-function isUserInChatList(userId) {
-    const uid = String(userId);
-    if (document.querySelector(`#chats-list .item[data-user-id="${uid}"]`)) return true;
-    const chatId = chatsData[uid]?.chatId;
-    return chatId != null && String(chatId).trim() !== '';
-}
-
-function syncProfileActionButtons(userId, isSelf = false, source = 'other') {
-    const actions = document.querySelector('#profile-screen .big-profile-block');
-    const openChatSection = document.getElementById('profile-open-chat-section');
-    const openChatRow = document.getElementById('profile-open-chat-row');
-    const writeBtn = document.getElementById('profile-write-btn');
-    const deleteBtn = document.getElementById('profile-delete-btn');
-    const blockBtn = document.getElementById('profile-block-btn');
-    const externalSource = ['header', 'username', 'url'].includes(source);
-    const inList = isUserInChatList(userId);
-    const hasChat = getChatIdByUserId(userId) != null;
-    const showActions = !isSelf && externalSource && inList && hasChat;
-
-    if (openChatRow) {
-        openChatRow.onclick = (e) => {
-            e.preventDefault();
-            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
-            openProfileChat(uid);
-        };
-    }
-
-    if (isSelf) {
-        if (actions) actions.classList.add('hidden');
-        if (openChatSection) openChatSection.classList.add('hidden');
-        return;
-    }
-
-    if (actions) actions.classList.toggle('hidden', !showActions);
-    if (openChatSection) openChatSection.classList.toggle('hidden', showActions || inList);
-
-    if (!showActions) return;
-
-    syncProfileBlockLabel(userId);
-
-    if (writeBtn) {
-        writeBtn.onclick = (e) => {
-            e.preventDefault();
-            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
-            openProfileChat(uid);
-        };
-    }
-    if (deleteBtn) {
-        deleteBtn.onclick = async (e) => {
-            e.preventDefault();
-            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
-            await delete_chat(getChatIdByUserId(uid));
-        };
-    }
-    if (blockBtn) {
-        blockBtn.onclick = async (e) => {
-            e.preventDefault();
-            const uid = document.getElementById('profile-id')?.textContent?.trim() || userId;
-            await toggle_chat_block(getChatIdByUserId(uid));
-        };
     }
 }
 
@@ -611,6 +707,12 @@ socket.on("user_status_update", (data) => {
             document.getElementById('profile-status').textContent = getEffectiveStatus(chatsData[userId]);
         }
 
+        const sideProfileId = document.getElementById('side-profile-id');
+        if (sideProfileId && sideProfileId.textContent === userId) {
+            const sideStatus = document.getElementById('side-profile-status');
+            if (sideStatus) sideStatus.textContent = getEffectiveStatus(chatsData[userId]);
+        }
+
         const currentChatElem = document.querySelector(`[data-user-id="${userId}"]`);
         if (currentChatElem) {
             if (typeof syncChatListOnlineDot === 'function') {
@@ -694,7 +796,9 @@ function syncBlockMenuItem() {
     else window.list_items_icon_02.splice(1, 0, item);
 
     const profileId = document.getElementById('profile-id')?.textContent?.trim();
-    if (profileId) syncProfileBlockLabel(profileId);
+    if (profileId) syncProfileBlockLabel(profileId, 'main');
+    const sideProfileId = document.getElementById('side-profile-id')?.textContent?.trim();
+    if (sideProfileId) syncProfileBlockLabel(sideProfileId, 'side');
 }
 
 function updateComposerBlockedState(chatId) {
@@ -960,6 +1064,9 @@ async function openDirectWindow(chatId) {
         }
         if (typeof syncChatSidePanelUi === 'function') {
             syncChatSidePanelUi();
+        }
+        if (typeof syncSidePanelProfile === 'function') {
+            syncSidePanelProfile(partnerId);
         }
     } catch (err) {
         d_alert('Ошибка', 'Ошибка в открытии чата', 'ok');
@@ -1380,8 +1487,12 @@ function copy_message(id) {
 window.copy_message = copy_message;
 
 function copy_who(who) {
-    const username = document.getElementById('profile-username').innerText;
-    const u_username = username.slice(1);
+    const sideUsername = document.getElementById('side-profile-username')?.innerText?.trim() || '';
+    const mainUsername = document.getElementById('profile-username')?.innerText?.trim() || '';
+    const username = (typeof isChatSidePanelOpen === 'function' && isChatSidePanelOpen() && sideUsername)
+        ? sideUsername
+        : (mainUsername || sideUsername);
+    const u_username = username.startsWith('@') ? username.slice(1) : username;
     navigator.clipboard.writeText(who + u_username).then(() => {
         hideDropdown();
     }).catch(err => {
@@ -2828,13 +2939,7 @@ socket.on('chat_deleted', async (data) => {
             delete chatHash[deletedChatId];
         }
         if (typeof teardownHistoryLoader === 'function') teardownHistoryLoader();
-        const screenWidth = window.innerWidth;
-        if (screenWidth > 751) {
-            document.getElementById('no-chat-content').classList.remove('hidden');
-            document.getElementById('chat-content').classList.add('hidden');
-        } else {
-            closeActiveScreen(2);
-        }
+        leaveOpenChatView({ mobile: window.innerWidth <= 751 });
         await loadMyChats();
     } catch (error) {
         console.error('Ошибка при обработке удаления чата на клиенте:', error);
@@ -3892,6 +3997,10 @@ function openChatSidePanel() {
     screen.style.transition = 'none';
     screen.style.transform = 'translateX(100%)';
 
+    if (typeof syncSidePanelProfile === 'function') {
+        syncSidePanelProfile();
+    }
+
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             screen.style.transition = `transform ${CHAT_SIDE_PANEL_ANIM_MS}ms ease`;
@@ -4017,6 +4126,7 @@ window.closeChatSidePanel = closeChatSidePanel;
 window.syncChatSidePanelUi = syncChatSidePanelUi;
 window.syncViewportWidthDependentUi = syncViewportWidthDependentUi;
 window.canShowChatSidePanelButton = canShowChatSidePanelButton;
+window.syncSidePanelProfile = syncSidePanelProfile;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initChatSidePanel);

@@ -75,9 +75,31 @@ html, body {
     transition: transform 0.18s ease;
     will-change: transform;
     z-index: 2;
-    overflow-y: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     background: var(--tg-theme-secondary-bg-color);
     box-sizing: border-box;
+  }
+
+  #chat-side-panel-screen .tab-container-slider {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+
+  #chat-side-panel-screen .tab-slide {
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  #chat-side-panel-screen .side-panel-profile .profile-block {
+    border-radius: 0;
+  }
+
+  #chat-side-panel-screen .side-panel-profile .big-profile-block {
+    margin-top: -8px;
   }
 
   #messages-host.side-panel-open #chat-side-panel-screen.chat-side-panel-dovery.screen.active {
@@ -644,8 +666,12 @@ body.is-resizing-chats * {
 }
 
 [data-screen="3"] .profile-block .defult.headline6,
-[data-screen="3"] .profile-block .subname {
-    color: #fff;
+[data-screen="3"] .profile-block .subname,
+#chat-side-panel-screen .profile-block .defult.headline6,
+#chat-side-panel-screen .profile-block .subname,
+#account-screen .profile-block .defult.headline6,
+#account-screen .profile-block .subname {
+    color: var(--tg-theme-text-color);
     z-index: 1;
 }
 

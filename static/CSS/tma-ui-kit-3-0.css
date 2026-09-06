@@ -14,8 +14,8 @@
     --tg-theme-destructive-text-color: #cc2929;
     --tg-theme-section-separator-color: #d9d9d9;
     --tg-theme-bottom-bar-bg-color: #f1f1f3;
-    --tg-theme-profile-block-bg-color: var(--tg-theme-section-header-text-color);
-    --tg-theme-button-profile-color: rgba(0, 0, 0, 0.15);
+    --tg-theme-profile-block-bg-color: var(--tg-theme-secondary-bg-color);
+    --tg-theme-button-profile-color: rgba(0, 0, 0, 0.08);
 
     --bg-one: #99BF8D;
     --bg-two: #BDC985;
@@ -1353,7 +1353,7 @@ td .img_s {
 }
 .profile-block .text {
     cursor: default;
-    color: white;
+    color: var(--tg-theme-text-color);
     z-index: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -1364,6 +1364,16 @@ td .img_s {
     box-sizing: border-box;
     -webkit-mask-image: none;
     mask-image: none;
+}
+.profile-block .headline6,
+.profile-block .defult.headline6 {
+    color: var(--tg-theme-text-color);
+    background: none;
+    z-index: 1;
+}
+.profile-block .subname {
+    color: var(--tg-theme-text-color);
+    z-index: 1;
 }
 .profile-block .avatar {
     width: 95px;
@@ -1424,7 +1434,7 @@ td .img_s {
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    color: white;
+    color: var(--tg-theme-text-color);
     background-color: var(--tg-theme-button-profile-color);
     border-radius: var(--radius);
     padding: 3px 15px 8px 15px;

@@ -250,19 +250,73 @@ Dovery
 </div>
 
 <div class="chat-side-panel-slot" id="chat-side-panel-slot">
-    <div class="screen hidden chat-side-panel-dovery" id="chat-side-panel-screen" aria-label="Профиль и эмодзи">
-        <div class="header-wrapper stick">
-            <div class="header">
-                <div class="header-left">
-                    <div class="header-capsule one-btn" id="close-chat-side-panel">
-                        <button type="button" class="element-header" aria-label="Закрыть панель">
-                            <svg class="back"><use href="#back"></use></svg>
-                        </button>
+    <div class="screen hidden chat-side-panel-dovery" id="chat-side-panel-screen">
+        <div class="header-wrapper">
+            <div class="tab-header header-capsule usual">
+                <div class="tab subtitle1-medium actives" data-tab="1"><span>Профиль</span></div>
+                <div class="tab subtitle1-medium" data-tab="2"><span>Эмодзи</span></div>
+            </div>
+        </div>
+        <div class="tab-container-slider">
+            <div class="tab-slide" id="1">
+                <div id="side-panel-profile" class="side-panel-profile">
+                    <div style="position: relative;">
+                        <div id="side-profileBlock1" class="profile-block s-img defult">
+                            <div class="avatar" id="side-profile-avatar"></div>
+                            <div class="defult headline6" id="side-profile-name"></div>
+                            <div class="subname subtitle1" id="side-profile-status"></div>
+                            <div class="hidden" id="side-profile-id"></div>
+                        </div>
+                        <div id="side-profileBlock3" class="big-profile-block defult hidden">
+                            <div class="buttons">
+                                <a class="button-link caption2-medium" id="side-profile-write-btn" href="javascript:void(0)">
+                                    <span class="button-icon"><svg class="settings"><use href="#chat_profile"></use></svg></span>
+                                    <span class="button-text">Написать</span>
+                                </a>
+                                <a class="button-link caption2-medium" id="side-profile-delete-btn" href="javascript:void(0)">
+                                    <span class="button-icon"><svg class="settings"><use href="#delete_profile"></use></svg></span>
+                                    <span class="button-text">Удалить чат</span>
+                                </a>
+                                <a class="button-link caption2-medium" id="side-profile-block-btn" href="javascript:void(0)">
+                                    <span class="button-icon"><svg class="settings"><use href="#block_profile"></use></svg></span>
+                                    <span class="button-text" id="side-profile-block-text">Заблокировать</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
+                    <section class="bottom">
+                        <div class="item">
+                            <div class="right">
+                                <div class="title oneline second-title">
+                                    <div class="button1-medium">Информация</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="item clicked" id="cntxt_menu_btn_15">
+                            <div class="right">
+                                <div class="text twoline">
+                                    <div class="label body1" id="side-profile-username"></div>
+                                    <div class="label subtitle subtitle1">Username</div>
+                                </div>
+                                <div class="element">
+                                    <svg class="copy"><use href="#copy"></use></svg>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="bottom hidden" id="side-profile-open-chat-section">
+                        <div class="item clicked" id="side-profile-open-chat-row">
+                            <div class="right">
+                                <div class="text oneline">
+                                    <div class="label body1">Открыть чат</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-                <div class="header-center">
-                    <div class="label headline6">Профиль и эмодзи</div>
-                </div>
+            </div>
+            <div class="tab-slide" id="2">
+                
             </div>
         </div>
     </div>
@@ -395,7 +449,7 @@ Dovery
 
         <div id="profileBlock3" class="profile-block s-img defult">
             <div class="avatar" id="account-preview-avatar"></div>
-            <div class="defult headline6" style="color: #fff;" id="account-preview-name"></div>
+            <div class="defult headline6" id="account-preview-name"></div>
             <div class="subname subtitle1" id="account-preview-status"></div>
         </div>
 
@@ -568,6 +622,7 @@ var list_items_icon_05 = [
     { label: "Ссылку", onclick:"copy_link_username();", icon: 'copy_username' },
     { label: "Username", onclick:"copy_username();", icon: 'copy_username_link' }
 ];
+var list_items_icon_15 = list_items_icon_05;
 
 var list_items_icon_06 = [ 
     { label: "Выход", danger: true, onclick:"logoutAccount();", icon: 'leave' },

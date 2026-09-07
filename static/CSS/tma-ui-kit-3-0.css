@@ -1445,6 +1445,12 @@ td .img_s {
     -webkit-backdrop-filter: blur(10px);
     transition: scale 1s linear(0, 0.038 1.6%, 0.154 3.4%, 1.026 12.6%, 1.166 15.2%, 1.234 18%, 1.221 21.6%, 1.005 31.2%, 0.944 37%, 1.013 56%, 1);
 }
+.button-link.profile-action-btn {
+    background-color: var(--tg-theme-section-bg-color);
+    color: var(--tg-theme-text-color);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
 .button-link:active {
     scale: .90;
     transition-timing-function: ease-out;

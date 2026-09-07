@@ -122,6 +122,30 @@ async function decryptPrivateKeyRaw(encryptedBase64, password, saltOrLegacyUsern
     );
 }
 
+/** Пробует расшифровать PKCS8 с несколькими кандидатами соли (key_salt / username). */
+async function decryptPrivateKeyRawWithSalts(encryptedBase64, password, saltCandidates) {
+    const salts = [];
+    for (const raw of saltCandidates || []) {
+        const s = raw != null ? String(raw).trim() : '';
+        if (!s) continue;
+        if (!salts.includes(s)) salts.push(s);
+    }
+    if (!salts.length) {
+        throw new Error('no_salt');
+    }
+
+    let lastError = null;
+    for (const salt of salts) {
+        try {
+            const raw = await decryptPrivateKeyRaw(encryptedBase64, password, salt);
+            return { raw, salt };
+        } catch (err) {
+            lastError = err;
+        }
+    }
+    throw lastError || new Error('decrypt_failed');
+}
+
 async function encryptPrivateKeyRaw(privExport, password, saltOrLegacyUsername) {
     const encryptionKey = await deriveEncryptionKey(password, saltOrLegacyUsername);
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -147,6 +171,18 @@ async function decryptAndImportEcdhKey(encryptedBase64, password, saltOrLegacyUs
     );
 }
 
+async function decryptAndImportEcdhKeyWithSalts(encryptedBase64, password, saltCandidates) {
+    const { raw, salt } = await decryptPrivateKeyRawWithSalts(encryptedBase64, password, saltCandidates);
+    const key = await window.crypto.subtle.importKey(
+        'pkcs8',
+        raw,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveKey', 'deriveBits']
+    );
+    return { key, salt };
+}
+
 async function decryptAndImportSigningKey(encryptedBase64, password, saltOrLegacyUsername) {
     const decryptedRaw = await decryptPrivateKeyRaw(encryptedBase64, password, saltOrLegacyUsername);
     return window.crypto.subtle.importKey(
@@ -156,6 +192,18 @@ async function decryptAndImportSigningKey(encryptedBase64, password, saltOrLegac
         true,
         ['sign']
     );
+}
+
+async function decryptAndImportSigningKeyWithSalts(encryptedBase64, password, saltCandidates) {
+    const { raw, salt } = await decryptPrivateKeyRawWithSalts(encryptedBase64, password, saltCandidates);
+    const key = await window.crypto.subtle.importKey(
+        'pkcs8',
+        raw,
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        true,
+        ['sign']
+    );
+    return { key, salt };
 }
 
 async function hashPassword(password) {

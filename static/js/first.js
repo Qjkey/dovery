@@ -125,19 +125,54 @@ async function saveUserData(userData, privateKey, signingPrivateKey = null) {
 
 async function loginWithKeyBundle(data, passwordValue, passwordInput) {
     const legacyUsername = data.user_data.username;
-    const salt = data.key_salt || legacyUsername;
+    const typedUsername = (passwordInput?.form?.querySelector('input[name="username"]')?.value || '').trim();
+    const saltCandidates = [
+        data.key_salt,
+        legacyUsername,
+        typedUsername,
+        legacyUsername ? String(legacyUsername).toLowerCase() : null,
+        typedUsername ? typedUsername.toLowerCase() : null,
+    ];
 
-    let ecdhKey = await decryptAndImportEcdhKey(data.priv_key, passwordValue, salt);
-    let signingKey = null;
-    if (data.signing_priv_key) {
-        signingKey = await decryptAndImportSigningKey(data.signing_priv_key, passwordValue, salt);
+    let ecdhKey;
+    let usedSalt;
+    try {
+        const decrypted = await decryptAndImportEcdhKeyWithSalts(
+            data.priv_key,
+            passwordValue,
+            saltCandidates
+        );
+        ecdhKey = decrypted.key;
+        usedSalt = decrypted.salt;
+    } catch (err) {
+        // Сессия уже создана на /login — сбрасываем, иначе «полузалогиненное» состояние.
+        try {
+            await fetch('/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (_) { /* ignore */ }
+        throw err;
     }
 
-  if (!data.key_salt) {
+    let signingKey = null;
+    if (data.signing_priv_key) {
+        try {
+            const signing = await decryptAndImportSigningKeyWithSalts(
+                data.signing_priv_key,
+                passwordValue,
+                [usedSalt, ...saltCandidates]
+            );
+            signingKey = signing.key;
+        } catch (err) {
+            console.warn('Не удалось расшифровать signing key, будет создан новый:', err);
+            signingKey = null;
+        }
+    }
+
+    const needsMigrate = !data.key_salt || usedSalt !== data.key_salt;
+    if (needsMigrate) {
         const hadSigning = !!signingKey;
         const migrated = await migrateLegacyKeysToRandomSalt({
             password: passwordValue,
-            legacyUsername: legacyUsername,
+            legacyUsername: usedSalt || legacyUsername,
             encryptedPrivateKey: data.priv_key,
             encryptedSigningPrivateKey: data.signing_priv_key,
             ecdhPrivateKey: ecdhKey,
@@ -171,6 +206,9 @@ async function loginWithKeyBundle(data, passwordValue, passwordInput) {
 
         const migrateRes = await fetch('/api/me/key_migrate', { method: 'POST', body: migrateForm });
         if (!migrateRes.ok) {
+            try {
+                await fetch('/logout', { method: 'POST', credentials: 'same-origin' });
+            } catch (_) { /* ignore */ }
             throw new Error('key_migrate_failed');
         }
     }
@@ -233,8 +271,16 @@ async function validateAndSubmit_login(el) {
         }
     } catch (err) {
         console.error(err);
-        if (err && err.name === "OperationError") {
-            d_alert("Ошибка", "Не удалось расшифровать ключ. Проверьте пароль.", "ok");
+        if (err && (err.name === "OperationError" || err.message === "decrypt_failed")) {
+            d_alert(
+                "Ошибка",
+                "Не удалось расшифровать ключ. Проверьте пароль. Если недавно меняли username до обновления — напишите в поддержку.",
+                "ok"
+            );
+            return;
+        }
+        if (err && err.message === "key_migrate_failed") {
+            d_alert("Ошибка", "Не удалось обновить ключи аккаунта. Попробуйте войти ещё раз.", "ok");
             return;
         }
         d_alert("Ошибка", `Ошибка сервера ${err}`, "ok");

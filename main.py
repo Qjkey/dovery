@@ -1251,31 +1251,36 @@ def search_users():
     except Exception as e:
         return jsonify([]), 500
 
-# Добавить чат
+# Добавить чат (в т.ч. «Избранное» — чат с самим собой)
 @app.route('/add', methods=['POST'])
 def add_to_chats():
     current_user_id = int(get_current_user_id())
     if not current_user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    target_id = int(request.json.get('user_id'))
-    if current_user_id == target_id:
-        return jsonify({"error": "Нельзя добавить самого себя"}), 400
+    try:
+        target_id = int(request.json.get('user_id'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid"}), 400
 
     conn = get_db_connection()
     try:
-        u1, u2 = sorted([int(current_user_id), int(target_id)])
+        if current_user_id == target_id:
+            u1 = u2 = current_user_id
+        else:
+            u1, u2 = sorted([int(current_user_id), int(target_id)])
         cursor = conn.cursor()
         cursor.execute('''INSERT OR IGNORE INTO chats (user_one_id, user_two_id) VALUES (?, ?)''', (u1, u2,))
         conn.commit()
-        
+
         cursor.execute('SELECT id FROM chats WHERE user_one_id = ? AND user_two_id = ?', (u1, u2))
         chat_row = cursor.fetchone()
         chat_id = chat_row['id'] if chat_row else None
-        
-        socketio.emit('chat_created', to=f"user_{target_id}")
-        
-        return jsonify({"status": "ok", "chat_id": chat_id})
+
+        if current_user_id != target_id:
+            socketio.emit('chat_created', to=f"user_{target_id}")
+
+        return jsonify({"status": "ok", "chat_id": chat_id, "is_favorites": current_user_id == target_id})
     except Exception as e:
         print(f"Ошибка сохранения чата: {e}")
         return jsonify({"status": "error"}), 500
@@ -1330,6 +1335,22 @@ def get_my_chats():
 
     for chat in chats:
         user_id_str = int(chat['id'])
+        is_favorites = str(chat['id']) == str(current_user_id)
+        chat['is_favorites'] = is_favorites
+        if is_favorites:
+            # Реальные name/avatar/username оставляем — для «Мой профиль».
+            # Подпись «Избранное» рисует только клиент в списке/шапке чата.
+            chat['hide_avatar'] = False
+            chat['block_state'] = {
+                'blocked_by_me': False,
+                'blocked_me': False,
+                'can_send': True,
+                'hide_avatar': False,
+            }
+            real_status = 'в сети' if user_id_str in online_users else 'был(а) недавно'
+            chat['real_status'] = real_status
+            chat['status'] = real_status
+            continue
         real_status = 'в сети' if user_id_str in online_users else 'был(а) недавно'
         block_state = get_block_state(chat['chat_id'], current_user_id, conn=conn)
         chat['real_status'] = real_status
@@ -1338,6 +1359,9 @@ def get_my_chats():
         chat['block_state'] = block_state
         if chat['hide_avatar']:
             chat['avatar'] = ''
+
+    # Избранное — всегда сверху списка
+    chats.sort(key=lambda c: (0 if c.get('is_favorites') else 1, -(c.get('chat_id') or 0)))
 
     conn.close()
 
@@ -1367,6 +1391,8 @@ def handle_message(data):
         emit('message_error', {'code': 'rate_limit', 'msg_id': msg_id})
         return
 
+    is_favorites = False
+    receiver_id = None
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -1382,8 +1408,9 @@ def handle_message(data):
             return
 
         receiver_id = user_two_id if str(sender_id) == str(user_one_id) else user_one_id
+        is_favorites = str(user_one_id) == str(user_two_id)
         block_state = get_block_state(chat_id, sender_id, conn=conn)
-        if not block_state.get('can_send', True):
+        if not is_favorites and not block_state.get('can_send', True):
             emit(
                 'message_error',
                 {
@@ -1398,7 +1425,12 @@ def handle_message(data):
     finally:
         conn.close()
 
-    is_read = 1 if is_viewing_chat(receiver_id, chat_id) else 0
+    if receiver_id is None:
+        emit('message_error', {'code': 'invalid_chat', 'msg_id': msg_id})
+        return
+
+    # Избранное: всегда прочитано (двойные галочки); обычный чат — если собеседник смотрит
+    is_read = 1 if is_favorites or is_viewing_chat(receiver_id, chat_id) else 0
     time_iso = save_message(chat_id, sender_id, encrypted_text, msg_id, is_read)
     if not time_iso:
         emit('message_error', {'code': 'save_failed', 'msg_id': msg_id})
@@ -1413,9 +1445,12 @@ def handle_message(data):
         'is_read': is_read,
     }
 
-    emit('new_message', data_mess, to=f"user_{receiver_id}")
-    emit('new_message', data_mess, to=f"user_{sender_id}")
-    emit_unread_update(receiver_id, chat_id)
+    if is_favorites or str(receiver_id) == str(sender_id):
+        emit('new_message', data_mess, to=f"user_{sender_id}")
+    else:
+        emit('new_message', data_mess, to=f"user_{receiver_id}")
+        emit('new_message', data_mess, to=f"user_{sender_id}")
+        emit_unread_update(receiver_id, chat_id)
 
 
 @socketio.on('typing')

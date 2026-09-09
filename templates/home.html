@@ -336,13 +336,13 @@ Dovery
         </div>
 
         <div style="position: relative;">
-            <div id="profileBlock1" class="profile-block s-img defult">
+            <div id="profileBlock1" class="profile-block s-img">
                 <div class="avatar" id="profile-avatar"></div>
                 <div class="defult headline6" id="profile-name"></div>
                 <div class="subname subtitle1" id="profile-status"></div>
                 <div class="hidden" id="profile-id"></div>
             </div>
-            <div id="profileBlock3" class="big-profile-block defult hidden">
+            <div id="profileBlock3" class="big-profile-block hidden">
                 <div class="buttons">
                     <a class="button-link profile-action-btn caption2-medium" id="profile-write-btn" href="javascript:void(0)">
                         <span class="button-icon"><svg class="settings"><use href="#chat_profile"></use></svg></span>
@@ -359,7 +359,7 @@ Dovery
                 </div>
             </div>
         </div>
-        <section class="bottom top">
+        <section class="bottom">
             <div class="item">
                 <div class="right">
                     <div class="title oneline second-title">
@@ -447,7 +447,7 @@ Dovery
             </div>
         </div>
 
-        <div id="profileBlock3" class="profile-block s-img defult">
+        <div id="profileBlock3" class="profile-block s-img">
             <div class="avatar" id="account-preview-avatar"></div>
             <div class="defult headline6" id="account-preview-name"></div>
             <div class="subname subtitle1" id="account-preview-status"></div>
@@ -599,7 +599,8 @@ Dovery
 <script>
 var list_items_icon_01 = [    
     { id: "theme", label: "Настройки", onclick:"toggleDoveryTheme();", icon:'settings3'}, 
-    { separator: true },       
+    { separator: true },
+    { label: "Избранное", onclick:"openOrCreateFavoritesChat();", icon:'saved'},
     { label: "Мой профиль", onclick:"openProfile(); hideDropdown();", icon:'my_profile'},
     { label: "Настройки", onclick:"openScreen(4); hideDropdown();", icon:'settings3'}
 ];

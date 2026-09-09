@@ -79,13 +79,20 @@
 .page-two-content .profile-block .avatar .letter-ava {
     width: 100%;
     height: 100%;
+    font-family: "Roboto", sans-serif;
+    font-weight: 500;
     font-size: 34px;
+    line-height: 1;
     border-radius: 50%;
-    color: white;
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--tg-theme-button-color) 70%, #fff),
+        var(--tg-theme-button-color)
+    );
     user-select: none;
     text-transform: uppercase;
 }

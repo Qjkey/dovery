@@ -367,7 +367,13 @@ img.avatar-pending {
     color: white;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    font-family: "Roboto", sans-serif;
+    font-weight: 500;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--tg-theme-button-color) 70%, #fff),
+      var(--tg-theme-button-color)
+    );
     user-select: none;
     text-transform: uppercase;
 }
@@ -386,10 +392,27 @@ img.avatar-pending {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(to bottom, #5FC0F0, #0094FE);
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--tg-theme-button-color) 70%, #fff),
+      var(--tg-theme-button-color)
+    );
     user-select: none;
     text-transform: uppercase;
     box-sizing: border-box;
+}
+
+.saved-ava {
+    text-transform: none;
+}
+
+.saved-ava .saved-ava-icon,
+.saved-ava svg.saved1 {
+    width: 52%;
+    height: 52%;
+    color: #ffffff;
+    display: block;
+    flex-shrink: 0;
 }
 
 .item .ava.letter-ava1,

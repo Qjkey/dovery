@@ -5,6 +5,10 @@ const escapeHtml = (text) => {
 };
 
 function buildChatListAvatarInner(chat) {
+    if (chat.is_favorites || (typeof window.isFavoritesUserId === 'function' && window.isFavoritesUserId(chat.id))) {
+        if (typeof window.savedAvatarHtml === 'function') return window.savedAvatarHtml();
+        return `<div class="ava letter-ava1 saved-ava" aria-hidden="true"><svg class="saved1 saved-ava-icon"><use href="#saved1"></use></svg></div>`;
+    }
     if (chat.hide_avatar) {
         const firstLetter = chat.name ? chat.name.charAt(0).toUpperCase() : '?';
         return `<div class="ava letter-ava1">${firstLetter}</div>`;
@@ -84,7 +88,6 @@ async function hydrateChatListPreviews(chats) {
 
     const tasks = chats.map(async (chat) => {
         const userId = String(chat.id);
-        if (String(chat.id) === String(window.userId)) return;
 
         const blockedPreview = getChatListBlockedPreview(chat.block_state);
         if (blockedPreview) {
@@ -196,15 +199,16 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 realStatus: chat.real_status || currentStatus,
                 blockState: chat.block_state || null,
                 keychat: prev.keychat,
-                lastPreviewText: prev.lastPreviewText || ''
+                lastPreviewText: prev.lastPreviewText || '',
+                isFavorites: !!chat.is_favorites
             };
             if (chatId) {
                 window.chatIdToUserId[chatId] = userKey;
             }
-            if (String(chat.id) === String(window.userId)) return;
 
             const item = document.createElement('div');
             item.className = 'item clicked';
+            if (chat.is_favorites) item.classList.add('favorites-chat');
             item.setAttribute('data-user-id', chat.id);
             item.setAttribute('data-chat-id', chat.chat_id);
 
@@ -212,7 +216,8 @@ async function loadMyChats({ showSkeleton = null } = {}) {
             if (index < chats.length - 1) {
                 sepa = 'separator';
             }
-            const safeName = escapeHtml(chat.name);
+            const displayName = chat.is_favorites ? 'Избранное' : chat.name;
+            const safeName = escapeHtml(displayName);
             window.unreadCounts = window.unreadCounts || {};
             const chatKey = String(chat.chat_id);
             const liveUnread = window.unreadCounts[chatKey];
@@ -254,6 +259,18 @@ async function loadMyChats({ showSkeleton = null } = {}) {
 
             if (typeof window.syncChatListOnlineDot === 'function') {
                 window.syncChatListOnlineDot(chat.id);
+            }
+        });
+
+        // Сбрасываем chatId у записей, которых больше нет в списке (напр. удалённое Избранное)
+        Object.keys(chatsData).forEach((uid) => {
+            const entry = chatsData[uid];
+            if (!entry?.chatId) return;
+            const mapped = window.chatIdToUserId[entry.chatId]
+                || window.chatIdToUserId[String(entry.chatId)];
+            if (String(mapped) !== String(uid)) {
+                entry.chatId = null;
+                entry.isFavorites = false;
             }
         });
 

@@ -251,7 +251,34 @@ function fillChatHeader(user, partnerId) {
     if (headerPanel && uid) {
         headerPanel.classList.add('clicked');
         headerPanel.style.cursor = '';
-        headerPanel.onclick = () => openProfile(uid, false, { source: 'header' });
+        headerPanel.onclick = () => openChatHeaderProfile(uid);
+    }
+}
+
+function openChatHeaderProfile(userId) {
+    const uid = userId != null ? String(userId) : '';
+    if (!uid) return;
+    if (typeof canShowChatSidePanelButton === 'function' && canShowChatSidePanelButton()) {
+        if (typeof syncSidePanelProfile === 'function') {
+            syncSidePanelProfile(uid);
+        }
+        if (typeof isChatSidePanelOpen === 'function' && !isChatSidePanelOpen()) {
+            if (typeof openChatSidePanel === 'function') {
+                openChatSidePanel();
+            }
+        }
+        activateChatSidePanelProfileTab();
+        return;
+    }
+    openProfile(uid, false, { source: 'header' });
+}
+
+function activateChatSidePanelProfileTab() {
+    const screen = document.getElementById('chat-side-panel-screen');
+    if (!screen) return;
+    const tab = screen.querySelector('.tab-header .tab[data-tab="1"]');
+    if (tab && typeof tab.click === 'function' && !tab.classList.contains('actives')) {
+        tab.click();
     }
 }
 

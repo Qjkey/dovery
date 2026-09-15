@@ -1031,11 +1031,11 @@ body.is-resizing-chats * {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   box-sizing: border-box;
-  border: 3px solid var(--tg-theme-bg-color);
+  border: 2.5px solid var(--tg-theme-bg-color);
   background: var(--tg-theme-button-color);
   opacity: 0;
   transform: scale(0.6);

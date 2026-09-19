@@ -737,6 +737,23 @@ body.is-resizing-chats * {
     left: var(--margin);
     border-radius: var(--radius);
   }
+
+  /* Header на всю ширину; контент по центру ≤ 500px */
+  #profile-screen > *:not(.header-wrapper),
+  #devices-screen > *:not(.header-wrapper),
+  #account-screen > *:not(.header-wrapper) {
+    max-width: 500px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+
+  #profile-screen > section,
+  #devices-screen > section,
+  #account-screen > section {
+    width: min(calc(100% - 2 * var(--margin)), calc(500px - 2 * var(--margin)));
+  }
 }
 
 /* Отключение разделителя на мобильных устройствах */

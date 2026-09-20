@@ -30,7 +30,11 @@ function searchRenderResults(users) {
                 </div>
                 <div class="right ${separator}">
                     <div class="text twoline"> 
-                        <div class="label body1">${user.name}</div> 
+                        <div class="label body1 name-with-badge-host">${
+                            (typeof window.nameWithBadgeHtml === 'function')
+                                ? window.nameWithBadgeHtml(user.name || '', !!user.is_verified)
+                                : (user.name || '')
+                        }</div> 
                         <div class="label subtitle subtitle1">@${user.username}</div> 
                     </div>
                 </div>

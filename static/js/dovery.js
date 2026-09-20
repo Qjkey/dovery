@@ -151,6 +151,136 @@ function isFavoritesChat(chatOrUser) {
     return !!(chatOrUser.isFavorites || chatOrUser.is_favorites);
 }
 
+function isUserVerified(userOrFlag) {
+    if (userOrFlag == null) return false;
+    if (typeof userOrFlag === 'boolean') return userOrFlag;
+    if (typeof userOrFlag === 'number') return userOrFlag === 1;
+    return !!(userOrFlag.isVerified || userOrFlag.is_verified);
+}
+
+function verifiedBadgeHtml(extraClass = '') {
+    const cls = ['verified-badge', extraClass].filter(Boolean).join(' ');
+    return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#verified"></use></svg>`;
+}
+
+function nameWithBadgeHtml(name, verified, nameClass = '') {
+    const safe = escapeHtmlName(name || '');
+    const nameCls = ['name-with-badge__text', nameClass].filter(Boolean).join(' ');
+    const badge = isUserVerified(verified) ? verifiedBadgeHtml() : '';
+    return `<span class="name-with-badge"><span class="${nameCls}">${safe}</span>${badge}</span>`;
+}
+
+function escapeHtmlName(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+}
+
+function setNameWithBadge(el, name, verified) {
+    if (!el) return;
+    el.classList.add('name-with-badge-host');
+    el.innerHTML = nameWithBadgeHtml(name, verified);
+}
+
+function applyUserVerifiedFlag(userId, isVerified) {
+    const uid = userId != null ? String(userId) : '';
+    if (!uid) return;
+    if (chatsData[uid]) {
+        chatsData[uid].isVerified = !!isVerified;
+        chatsData[uid].is_verified = !!isVerified;
+    }
+    syncUserVerifiedUi(uid);
+}
+
+function syncUserVerifiedUi(userId) {
+    const uid = userId != null ? String(userId) : '';
+    if (!uid) return;
+    const user = chatsData[uid];
+    const verified = isUserVerified(user);
+    const favorites = isFavoritesUserId(uid) || isFavoritesChat(user);
+
+    const listName = document.querySelector(`#chats-list .item[data-user-id="${uid}"] .chat-list-name`);
+    if (listName) {
+        const displayName = favorites ? 'Избранное' : (user?.name || listName.textContent || '');
+        setNameWithBadge(listName, displayName, !favorites && verified);
+    }
+
+    const openPartner = getOpenChatPartnerId();
+    if (openPartner && String(openPartner) === uid) {
+        const headerName = document.getElementById('user-name');
+        if (headerName && !favorites) {
+            setNameWithBadge(headerName, user?.name || '', verified);
+        }
+    }
+
+    const profileId = document.getElementById('profile-id')?.textContent?.trim();
+    if (profileId && String(profileId) === uid) {
+        const nameEl = document.getElementById('profile-name');
+        if (nameEl) setNameWithBadge(nameEl, user?.name || '', verified);
+    }
+
+    const sideId = document.getElementById('side-profile-id')?.textContent?.trim();
+    if (sideId && String(sideId) === uid) {
+        const nameEl = document.getElementById('side-profile-name');
+        if (nameEl && !favorites) setNameWithBadge(nameEl, user?.name || '', verified);
+    }
+
+    if (typeof syncBlockMenuItem === 'function') syncBlockMenuItem();
+}
+
+async function refreshMyVerifyCapabilities() {
+    try {
+        const res = await fetch('/api/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || data.status === 'error') return;
+        window.canVerify = !!data.can_verify;
+        window.isVerified = !!data.is_verified;
+        if (data.id != null) {
+            window.userId = String(data.id);
+            applyUserVerifiedFlag(data.id, data.is_verified);
+        }
+    } catch (e) {
+        /* ignore */
+    }
+}
+
+async function toggle_user_verify() {
+    if (typeof hideDropdown === 'function') hideDropdown();
+    if (!window.canVerify) return;
+    const chatId = getActiveChatId();
+    const partnerId = chatId && window.chatIdToUserId
+        ? (window.chatIdToUserId[chatId] || window.chatIdToUserId[String(chatId)])
+        : null;
+    if (!partnerId || isFavoritesUserId(partnerId)) return;
+
+    const currently = isUserVerified(chatsData[partnerId]);
+    try {
+        const res = await fetch(`/api/users/${encodeURIComponent(partnerId)}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ verified: !currently }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status === 'error') {
+            d_alert('Ошибка', 'Не удалось изменить верификацию', 'ok');
+            return;
+        }
+        applyUserVerifiedFlag(partnerId, data.is_verified);
+    } catch (e) {
+        console.error(e);
+        d_alert('Ошибка', 'Не удалось изменить верификацию', 'ok');
+    }
+}
+
+window.toggle_user_verify = toggle_user_verify;
+window.isUserVerified = isUserVerified;
+window.setNameWithBadge = setNameWithBadge;
+window.nameWithBadgeHtml = nameWithBadgeHtml;
+window.verifiedBadgeHtml = verifiedBadgeHtml;
+window.refreshMyVerifyCapabilities = refreshMyVerifyCapabilities;
+window.applyUserVerifiedFlag = applyUserVerifiedFlag;
+
 function getDisplayAvatarHtml(user) {
     if (!user) return '';
     if (user.hideAvatar) return letterAvatarHtml(user.name);
@@ -216,7 +346,7 @@ function fillChatHeader(user, partnerId) {
 
     if (favorites) {
         if (headerName) {
-            headerName.className = 'label headline5';
+            headerName.className = 'label headline5 name-with-badge-host';
             headerName.textContent = 'Избранное';
         }
         if (headerStatus) {
@@ -241,8 +371,8 @@ function fillChatHeader(user, partnerId) {
         textWrap.classList.remove('oneline');
     }
     if (headerName) {
-        headerName.className = 'label body1';
-        headerName.textContent = user.name || '';
+        headerName.className = 'label body1 name-with-badge-host';
+        setNameWithBadge(headerName, user.name || '', isUserVerified(user));
     }
     if (headerStatus) {
         headerStatus.classList.remove('hidden');
@@ -316,10 +446,17 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
     const idEl = document.getElementById('profile-id');
     const statusEl = document.getElementById('profile-status');
     const usernameEl = document.getElementById('profile-username');
-    if (nameEl) nameEl.textContent = user.name || '';
+    const userIdEl = document.getElementById('profile-userid');
+    const userIdRow = document.getElementById('profile-userid-row');
+    if (nameEl) {
+        nameEl.classList.add('name-with-badge-host');
+        setNameWithBadge(nameEl, user.name || '', isUserVerified(user));
+    }
     if (idEl) idEl.textContent = userId;
     if (statusEl) statusEl.textContent = getEffectiveStatus(user);
     if (usernameEl) usernameEl.textContent = '@' + (user.username || '');
+    if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
+    if (userIdRow) userIdRow.classList.toggle('hidden', !userId);
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) {
@@ -353,7 +490,15 @@ function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
     const idEl = document.getElementById('side-profile-id');
     const statusEl = document.getElementById('side-profile-status');
     const usernameEl = document.getElementById('side-profile-username');
-    if (nameEl) nameEl.textContent = favorites ? 'Избранное' : (user?.name || '');
+    const userIdEl = document.getElementById('side-profile-userid');
+    const userIdRow = document.getElementById('side-profile-userid-row');
+    if (nameEl) {
+        if (favorites) {
+            nameEl.textContent = 'Избранное';
+        } else {
+            setNameWithBadge(nameEl, user?.name || '', isUserVerified(user));
+        }
+    }
     if (idEl) idEl.textContent = userId || '';
     if (statusEl) {
         if (favorites) {
@@ -365,6 +510,8 @@ function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
         }
     }
     if (usernameEl) usernameEl.textContent = user?.username ? ('@' + user.username) : '';
+    if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
+    if (userIdRow) userIdRow.classList.toggle('hidden', favorites || !userId);
 
     if (usernameSection) usernameSection.classList.toggle('hidden', favorites);
     if (infoTitleSection) infoTitleSection.classList.toggle('hidden', favorites);
@@ -426,6 +573,7 @@ async function syncSidePanelProfile(userId) {
                     status: data.status,
                     realStatus: data.real_status || data.status,
                     blockState: normalizeBlockState(data.block_state),
+                    isVerified: !!data.is_verified,
                     chatId: chatsData[uid]?.chatId || getChatIdByUserId(uid)
                 };
                 user = chatsData[uid];
@@ -632,6 +780,7 @@ async function openProfile(userId, is_my_profile = false, options = {}) {
                     status: data.status,
                     realStatus: data.real_status || data.status,
                     blockState: normalizeBlockState(data.block_state),
+                    isVerified: !!data.is_verified,
                     // профиль не должен наследовать UI-флаг избранного
                     isFavorites: isSelfEarly ? !!prev.isFavorites && !!prev.chatId : !!prev.isFavorites,
                     chatId: prev.chatId || null,
@@ -765,7 +914,8 @@ async function openProfileByUsername(username) {
         publicKeySig: user.public_key_sig || '',
         status: user.status,
         realStatus: user.real_status || user.status,
-        blockState: normalizeBlockState(user.block_state)
+        blockState: normalizeBlockState(user.block_state),
+        isVerified: !!user.is_verified
     };
 
     openProfile(userId, false, { source: 'username' });
@@ -972,8 +1122,19 @@ function syncBlockMenuItem() {
         ];
     } else {
         const state = getChatBlockState(chatId);
-        window.list_items_icon_02 = [
+        const verified = isUserVerified(chatsData[partnerId]);
+        const items = [
             { label: "E2EE шифрование", onclick: "openE2eeOverlay();", icon: 'lock' },
+        ];
+        if (window.canVerify && partnerId && String(partnerId) !== String(window.userId)) {
+            items.push({
+                id: 'toggle-verify',
+                label: 'Верификация',
+                onclick: 'toggle_user_verify();',
+                icon: 'copy'
+            });
+        }
+        items.push(
             {
                 id: 'toggle-block',
                 label: state.blocked_by_me ? 'Разблокировать' : 'Заблокировать',
@@ -981,7 +1142,8 @@ function syncBlockMenuItem() {
                 icon: 'block'
             },
             { label: "Удалить чат", danger: true, onclick: "delete_chat();", icon: 'delete' }
-        ];
+        );
+        window.list_items_icon_02 = items;
     }
 
     const profileId = document.getElementById('profile-id')?.textContent?.trim();
@@ -1217,6 +1379,7 @@ async function openDirectWindow(chatId) {
                         status: data.status,
                         realStatus: data.real_status || data.status,
                         blockState: normalizeBlockState(data.block_state),
+                        isVerified: !!data.is_verified,
                         keychat: chatsData[partnerId]?.keychat
                     };
                     user = chatsData[partnerId];
@@ -1762,6 +1925,10 @@ socket.on('message_deleted', async (data) => {
             }
         }
 
+        if (typeof refreshChatListPreviewAfterDelete === 'function') {
+            await refreshChatListPreviewAfterDelete(chatId, data);
+        }
+
         const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
         if (messageElement) {
             const wrapper = messageElement.closest('.message-wrapper');
@@ -2286,6 +2453,39 @@ function updateChatListLastPreview(chatId, plainText, isOwn) {
         requestAnimationFrame(() => syncChatListPreviewFade(el));
     }
 }
+
+async function refreshChatListPreviewAfterDelete(chatId, data = {}) {
+    if (chatId == null) return;
+    const emptyPreview = window.CHAT_LIST_EMPTY_PREVIEW || CHAT_LIST_EMPTY_PREVIEW;
+    const encrypted = data.last_message_text;
+    const senderId = data.last_message_sender_id;
+
+    if (!encrypted) {
+        updateChatListLastPreview(chatId, emptyPreview, false);
+        const map = window.chatIdToUserId || {};
+        const uid = map[chatId] || map[String(chatId)];
+        if (uid && chatsData[uid]) {
+            chatsData[uid].lastPreviewText = emptyPreview;
+        }
+        return;
+    }
+
+    const map = window.chatIdToUserId || {};
+    const partnerId = map[chatId] || map[String(chatId)];
+    const keyOwnerId = partnerId || senderId;
+    try {
+        const text = typeof decryptMessageForUser === 'function'
+            ? await decryptMessageForUser(encrypted, keyOwnerId)
+            : '';
+        const isOwn = String(senderId) === String(window.userId);
+        updateChatListLastPreview(chatId, text || emptyPreview, isOwn);
+    } catch (e) {
+        console.warn('Не удалось обновить превью после удаления:', e);
+        updateChatListLastPreview(chatId, emptyPreview, false);
+    }
+}
+
+window.refreshChatListPreviewAfterDelete = refreshChatListPreviewAfterDelete;
 
 function syncChatListPreviewFade(previewEl) {
     if (!previewEl) return;

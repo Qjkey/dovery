@@ -46,7 +46,7 @@ svg.close2 {
     fill: var(--tg-theme-hint-color);
 }
 
-svg.lock, svg.copy, svg.settings3, svg.diamond, svg.delete, svg.settings, svg.pop, svg.chat, svg.paste, svg.sun, svg.moon, svg.device, svg.my_profile, svg.check, svg.saved, svg.saved1 {
+svg.lock, svg.copy, svg.settings3, svg.diamond, svg.delete, svg.settings, svg.pop, svg.chat, svg.paste, svg.sun, svg.moon, svg.device, svg.my_profile, svg.check, svg.saved, svg.saved1, svg.verified, svg.block {
     width: 30px;
     height: 30px;
     fill: none;
@@ -56,4 +56,11 @@ svg.check {
     width: 24px;
     height: 24px;
     fill: var(--tg-theme-text-color);
+}
+
+svg.verified {
+    width: 18px;
+    height: 18px;
+    fill: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-color);
 }

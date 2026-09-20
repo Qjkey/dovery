@@ -1773,7 +1773,8 @@ input[type="range"]::-moz-range-thumb {
     margin: 0px var(--margin);
 }
 .header-wrapper:not(:has(.nav-bar)) .tab-header {
-    margin: 10px var(--margin);
+    margin: 0px var(--margin);
+    margin-top: 10px;
 }
 .tab-header::-webkit-scrollbar { display: none; }
 

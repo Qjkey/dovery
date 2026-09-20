@@ -249,7 +249,24 @@ def migrate_schema():
                 cursor.execute('ALTER TABLE users ADD COLUMN signing_private_key TEXT')
             if 'public_key_sig' not in user_columns:
                 cursor.execute('ALTER TABLE users ADD COLUMN public_key_sig TEXT')
-            
+            if 'is_verified' not in user_columns:
+                cursor.execute(
+                    'ALTER TABLE users ADD COLUMN is_verified INTEGER NOT NULL DEFAULT 0'
+                )
+            if 'can_verify' not in user_columns:
+                cursor.execute(
+                    'ALTER TABLE users ADD COLUMN can_verify INTEGER NOT NULL DEFAULT 0'
+                )
+
+            verifier_ids = (os.getenv('DOVERY_VERIFIER_IDS') or '').strip()
+            for raw_id in verifier_ids.split(','):
+                raw_id = raw_id.strip()
+                if raw_id.isdigit():
+                    cursor.execute(
+                        'UPDATE users SET can_verify = 1 WHERE id = ?',
+                        (int(raw_id),),
+                    )
+
             conn.commit()
     except Exception as e:
         print(f"Ошибка миграции схемы БД: {e}")
@@ -370,6 +387,47 @@ def is_viewing_chat(user_id, chat_id):
         if str(info['chat_id']) == str(chat_id):
             return True
     return False
+
+def user_has_can_verify(user_id, conn=None):
+    if user_id is None:
+        return False
+    own = conn is None
+    if own:
+        conn = get_db_connection()
+    try:
+        row = conn.execute(
+            'SELECT can_verify FROM users WHERE id = ? OR CAST(id AS TEXT) = ?',
+            (user_id, str(user_id)),
+        ).fetchone()
+        return bool(row and row['can_verify'])
+    except Exception:
+        return False
+    finally:
+        if own:
+            conn.close()
+
+
+def get_user_verified_flag(user_row_or_id, conn=None):
+    """Принимает sqlite Row с полем is_verified или user id."""
+    if user_row_or_id is None:
+        return False
+    if hasattr(user_row_or_id, 'keys') and 'is_verified' in user_row_or_id.keys():
+        return bool(user_row_or_id['is_verified'])
+    own = conn is None
+    if own:
+        conn = get_db_connection()
+    try:
+        row = conn.execute(
+            'SELECT is_verified FROM users WHERE id = ? OR CAST(id AS TEXT) = ?',
+            (user_row_or_id, str(user_row_or_id)),
+        ).fetchone()
+        return bool(row and row['is_verified'])
+    except Exception:
+        return False
+    finally:
+        if own:
+            conn.close()
+
 
 # Получение id текущего пользователя
 def get_current_user_id():
@@ -556,7 +614,19 @@ def delete_message(msg_id, requester_id):
 
             cursor.execute("DELETE FROM message WHERE id = ?", (msg_id,))
             conn.commit()
-            return chat_id, sender_id, other_user_id
+
+            cursor.execute(
+                '''SELECT message_text, sender_id FROM message
+                   WHERE chat_id = ?
+                   ORDER BY time DESC, id DESC
+                   LIMIT 1''',
+                (chat_id,),
+            )
+            last_row = cursor.fetchone()
+            last_message_text = last_row[0] if last_row else None
+            last_message_sender_id = last_row[1] if last_row else None
+
+            return chat_id, sender_id, other_user_id, last_message_text, last_message_sender_id
     except Exception as e:
         print(e)
         return False
@@ -789,7 +859,7 @@ def api_me():
         try:
             uid_str = str(user_id)
             user = conn.execute(
-                "SELECT id, name, username, avatar FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
+                "SELECT id, name, username, avatar, is_verified, can_verify FROM users WHERE id = ? OR CAST(id AS TEXT) = ?",
                 (user_id, uid_str),
             ).fetchone()
             if not user:
@@ -808,6 +878,8 @@ def api_me():
                 "username": user['username'] or '',
                 "avatar": user['avatar'] or '',
                 "real_status": 'в сети' if online else 'был(а) недавно',
+                "is_verified": bool(user['is_verified']),
+                "can_verify": bool(user['can_verify']),
             })
         except Exception as e:
             print(f"Ошибка /api/me GET: {e}")
@@ -1230,7 +1302,7 @@ def search_users():
     try:
         conn = get_db_connection()
         users = conn.execute(
-            'SELECT id, name, avatar, username FROM users WHERE username LIKE ? LIMIT 15',
+            'SELECT id, name, avatar, username, COALESCE(is_verified, 0) AS is_verified FROM users WHERE username LIKE ? LIMIT 15',
             ('%' + query + '%',)
         ).fetchall()
         conn.close()
@@ -1243,7 +1315,8 @@ def search_users():
                     'id': user['id'],
                     'name': user['name'],
                     'ava': user['avatar'],
-                    'username': user['username']
+                    'username': user['username'],
+                    'is_verified': bool(user['is_verified']),
                 })
             
         return jsonify(results)
@@ -1305,6 +1378,7 @@ def get_my_chats():
             u.public_key,
             u.signing_public_key,
             u.public_key_sig,
+            COALESCE(u.is_verified, 0) AS is_verified,
             (
                 SELECT COUNT(*) FROM message m
                 WHERE m.chat_id = c.id
@@ -1337,6 +1411,7 @@ def get_my_chats():
         user_id_str = int(chat['id'])
         is_favorites = str(chat['id']) == str(current_user_id)
         chat['is_favorites'] = is_favorites
+        chat['is_verified'] = bool(chat.get('is_verified'))
         if is_favorites:
             # Реальные name/avatar/username оставляем — для «Мой профиль».
             # Подпись «Избранное» рисует только клиент в списке/шапке чата.
@@ -1577,9 +1652,15 @@ def handle_delete(data):
 
     result = delete_message(msg_id, user_id)
     if result:
-        chat_id, sender_id, other_user_id = result
-        emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{other_user_id}")
-        emit('message_deleted', {'msg_id': msg_id, 'chat_id': chat_id}, to=f"user_{sender_id}")
+        chat_id, sender_id, other_user_id, last_message_text, last_message_sender_id = result
+        payload = {
+            'msg_id': msg_id,
+            'chat_id': chat_id,
+            'last_message_text': last_message_text,
+            'last_message_sender_id': last_message_sender_id,
+        }
+        emit('message_deleted', payload, to=f"user_{other_user_id}")
+        emit('message_deleted', payload, to=f"user_{sender_id}")
         emit_unread_update(other_user_id, chat_id)
 
 # Получить историю чата
@@ -1673,7 +1754,7 @@ def get_user_profile(username):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, name, username, avatar FROM users WHERE LOWER(username) = LOWER(?)",
+        "SELECT id, name, username, avatar, COALESCE(is_verified, 0) AS is_verified FROM users WHERE LOWER(username) = LOWER(?)",
         (username,),
     )
     user = cursor.fetchone()
@@ -1687,9 +1768,11 @@ def get_user_profile(username):
 
     return render_template(
         'profile.html',
+        profile_id=user['id'],
         profile_name=user['name'] or '',
         profile_username=user['username'] or '',
         profile_avatar=user['avatar'] or '',
+        profile_verified=bool(user['is_verified']),
     )
 
 @app.route('/get_use_profile/<int:user_id>')
@@ -1737,7 +1820,8 @@ def get_user_data_api(user_id):
         "status": status,
         "real_status": real_status,
         "hide_avatar": block_state['hide_avatar'],
-        "block_state": block_state
+        "block_state": block_state,
+        "is_verified": bool(user['is_verified']) if 'is_verified' in user.keys() else False,
     })
 
 @app.route('/get_user_by_username/<username>')
@@ -1770,8 +1854,55 @@ def get_user_by_username_api(username):
         "public_key": user['public_key'],
         "signing_public_key": user['signing_public_key'] or '',
         "public_key_sig": user['public_key_sig'] or '',
-        "status": status
+        "status": status,
+        "is_verified": bool(user['is_verified']) if 'is_verified' in user.keys() else False,
     })
+
+
+@app.route('/api/users/<int:user_id>/verify', methods=['POST'])
+def api_toggle_user_verify(user_id):
+    actor_id = get_current_user_id()
+    if not actor_id:
+        return jsonify({"status": "error", "message": "unauthorized"}), 401
+
+    conn = get_db_connection()
+    try:
+        if not user_has_can_verify(actor_id, conn=conn):
+            return jsonify({"status": "error", "message": "forbidden"}), 403
+
+        target = conn.execute(
+            'SELECT id, is_verified FROM users WHERE id = ?',
+            (user_id,),
+        ).fetchone()
+        if not target:
+            return jsonify({"status": "error", "message": "not_found"}), 404
+
+        body = request.get_json(silent=True) or {}
+        if 'verified' in body:
+            next_flag = 1 if body.get('verified') else 0
+        else:
+            next_flag = 0 if target['is_verified'] else 1
+
+        conn.execute(
+            'UPDATE users SET is_verified = ? WHERE id = ?',
+            (next_flag, user_id),
+        )
+        conn.commit()
+
+        payload = {
+            'user_id': int(user_id),
+            'is_verified': bool(next_flag),
+        }
+        socketio.emit('user_verification_updated', payload, to=f'user_{user_id}')
+        socketio.emit('user_verification_updated', payload, to=f'user_{actor_id}')
+
+        return jsonify({"status": "ok", **payload})
+    except Exception as e:
+        print(f"Ошибка /api/users/.../verify: {e}")
+        return jsonify({"status": "error"}), 500
+    finally:
+        conn.close()
+
 
 # Удалить чат
 @socketio.on('delete_chat')

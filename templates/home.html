@@ -38,9 +38,18 @@ Dovery
             </svg>
             <input type="text" class="search-input" placeholder="Поиск чатов" spellcheck="false" style="pointer-events: none;">
         </div>
+        <div class="tab-header header-capsule adaptive">
+            <div class="tab subtitle1-medium actives" data-tab="1"><span>Чаты</span></div>
+            <div class="tab subtitle1-medium" data-tab="2"><span>Новое</span></div>
+            <div class="tab subtitle1-medium" data-tab="3"><span>Вкладка 3</span></div>
+            <div class="tab subtitle1-medium" data-tab="4"><span>Вкладка 4</span></div>
+            <div class="tab subtitle1-medium" data-tab="5"><span>Вкладка 5</span></div>
+            <div class="tab subtitle1-medium" data-tab="6"><span>Вкладка 6</span></div>
+            <div class="tab subtitle1-medium" data-tab="7"><span>Вкладка 7</span></div>
+        </div>
     </div>
 
-    <div id="chats-list"></div>
+    <div class="tab-container-slider"><div class="tab-slide" id="1"><div id="chats-list"></div></div></div>
 
     <div data-screen="1" data-swipe class="screen hidden">
         <div class="header-wrapper header-bg">
@@ -58,7 +67,7 @@ Dovery
                 </div>
             </div>
             <div class="header-capsule search-container search-panel">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
@@ -303,6 +312,13 @@ Dovery
                                 </div>
                             </div>
                         </div>
+                        <div class="item" id="side-profile-userid-row">
+                            <div class="right">
+                                <div class="text oneline">
+                                    <div class="label body1" id="side-profile-userid"></div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                     <section class="bottom hidden" id="side-profile-open-chat-section">
                         <div class="item clicked" id="side-profile-open-chat-row">
@@ -375,6 +391,13 @@ Dovery
                     </div>
                     <div class="element">
                         <svg class="copy"><use href="#copy"></use></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="item" id="profile-userid-row">
+                <div class="right">
+                    <div class="text oneline">
+                        <div class="label body1" id="profile-userid"></div>
                     </div>
                 </div>
             </div>

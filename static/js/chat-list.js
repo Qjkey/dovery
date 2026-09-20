@@ -200,7 +200,8 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 blockState: chat.block_state || null,
                 keychat: prev.keychat,
                 lastPreviewText: prev.lastPreviewText || '',
-                isFavorites: !!chat.is_favorites
+                isFavorites: !!chat.is_favorites,
+                isVerified: !!chat.is_verified
             };
             if (chatId) {
                 window.chatIdToUserId[chatId] = userKey;
@@ -217,7 +218,10 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 sepa = 'separator';
             }
             const displayName = chat.is_favorites ? 'Избранное' : chat.name;
-            const safeName = escapeHtml(displayName);
+            const verified = !chat.is_favorites && !!chat.is_verified;
+            const nameInner = (typeof window.nameWithBadgeHtml === 'function')
+                ? window.nameWithBadgeHtml(displayName, verified)
+                : escapeHtml(displayName);
             window.unreadCounts = window.unreadCounts || {};
             const chatKey = String(chat.chat_id);
             const liveUnread = window.unreadCounts[chatKey];
@@ -244,7 +248,7 @@ async function loadMyChats({ showSkeleton = null } = {}) {
                 </div>
                 <div class="right ${sepa}">
                     <div class="text twoline">
-                        <div class="label body1">${safeName}</div>
+                        <div class="label body1 chat-list-name name-with-badge-host">${nameInner}</div>
                         <div class="chat-list-preview-wrap">
                             <div class="${previewClasses}">${escapeHtml(initialPreview)}</div>
                         </div>
@@ -291,12 +295,24 @@ async function loadMyChats({ showSkeleton = null } = {}) {
 showChatListSkeletons();
 
 window.onload = () => {
+    if (typeof window.refreshMyVerifyCapabilities === 'function') {
+        window.refreshMyVerifyCapabilities();
+    }
     loadMyChats({ showSkeleton: false });
 };
 
 socket.on("chat_created", (data) => {
     loadMyChats({ showSkeleton: false });
 });
+
+if (typeof socket !== 'undefined' && socket && typeof socket.on === 'function') {
+    socket.on('user_verification_updated', (data) => {
+        if (!data || data.user_id == null) return;
+        if (typeof window.applyUserVerifiedFlag === 'function') {
+            window.applyUserVerifiedFlag(data.user_id, data.is_verified);
+        }
+    });
+}
 
 function setChatUnreadBadge(chatId, count) {
     const n = Math.max(0, Number(count) || 0);

@@ -738,10 +738,10 @@ body.is-resizing-chats * {
     border-radius: var(--radius);
   }
 
-  /* Header на всю ширину; контент по центру ≤ 500px */
-  #profile-screen > *:not(.header-wrapper),
-  #devices-screen > *:not(.header-wrapper),
-  #account-screen > *:not(.header-wrapper) {
+  /* Как в «Настройках»: header без боковых отступов; section — через --margin */
+  #profile-screen > *:not(.header-wrapper):not(section),
+  #devices-screen > *:not(.header-wrapper):not(section),
+  #account-screen > *:not(.header-wrapper):not(section) {
     max-width: 500px;
     width: 100%;
     margin-left: auto;
@@ -753,6 +753,9 @@ body.is-resizing-chats * {
   #devices-screen > section,
   #account-screen > section {
     width: min(calc(100% - 2 * var(--margin)), calc(500px - 2 * var(--margin)));
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
   }
 }
 
@@ -1195,4 +1198,65 @@ body.is-resizing-chats * {
 #sendBtn.is-disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+/* Верификация: галочка как «буква» в имени — сдвигает имя левее при центрировании */
+.name-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22em;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.name-with-badge__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verified-badge {
+  width: 0.8em;
+  height: 0.8em;
+  min-width: 0.8em;
+  flex-shrink: 0;
+  color: var(--tg-theme-text-color);
+  fill: currentColor;
+  display: inline-block;
+  vertical-align: -0.12em;
+  margin-left: 2px;
+}
+
+#chats-list .chat-list-name.name-with-badge-host,
+#chats-list .chat-list-name .name-with-badge {
+  max-width: 100%;
+}
+
+#chats-list .chat-list-name .verified-badge {
+  width: 0.9em;
+  height: 0.9em;
+  min-width: 0.9em;
+}
+
+.profile-block .name-with-badge-host,
+.profile-block .headline6.name-with-badge-host,
+.profile-block .defult.headline6.name-with-badge-host {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-block .name-with-badge {
+  justify-content: center;
+}
+
+#user-name.name-with-badge-host .name-with-badge {
+  max-width: 100%;
+}
+
+#user-name .verified-badge {
+  width: 0.9em;
+  height: 0.9em;
 }

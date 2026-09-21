@@ -95,7 +95,7 @@ async function get_private_key() {
             const getRequest = store.get('private_key');
             getRequest.onsuccess = () => resolve(getRequest.result);
             getRequest.onerror = () => reject(getRequest.error || new Error('Ошибка извлечения ключа'));
-        });
+    });
     } finally {
         db.close();
     }
@@ -791,23 +791,23 @@ async function openProfile(userId, is_my_profile = false, options = {}) {
         } catch (e) {
             console.error("Ошибка загрузки профиля:", e);
         }
-        if (!userId || !user) {
+    if (!userId || !user) {
             closeProfile();
-            d_alert("Ошибка", "Профиль не найден", "ok");
-            return;
-        }
+        d_alert("Ошибка", "Профиль не найден", "ok");
+        return;
+    }
         fillProfileFromUser(user, userId, isSelfEarly, source);
     }
 }
 
 function openProfileChat(userId) {
-    closeProfile();
-    const chatId = getChatIdByUserId(userId);
-    if (chatId) {
-        openDirectWindow(chatId);
-    } else {
-        startChat(userId);
-    }
+                closeProfile();
+                const chatId = getChatIdByUserId(userId);
+                if (chatId) {
+                    openDirectWindow(chatId);
+                } else {
+                    startChat(userId);
+                }
 }
 
 function closeProfile() {
@@ -1014,7 +1014,7 @@ socket.on("user_status_update", (data) => {
                 if (headerStatus) headerStatus.classList.add('hidden');
                 if (typingEl) typingEl.classList.add('hidden');
             } else {
-                const currentStatus = document.getElementById('user-status');
+            const currentStatus = document.getElementById('user-status');
                 if (currentStatus) {
                     const keepHidden = currentStatus.classList.contains('hidden') && !getConnectionStatusLabel();
                     setOpenChatPresence(getEffectiveStatus(chatsData[userId]));
@@ -1336,7 +1336,7 @@ async function openDirectWindow(chatId) {
                 }
             }
         }
-        if (!partnerId) {
+        if (!partnerId) { 
             return;
         }
         partnerId = String(partnerId);
@@ -1347,7 +1347,7 @@ async function openDirectWindow(chatId) {
         const screenWidth = window.innerWidth;
 
         if (screenWidth > 751 && currentChatElem) {
-            currentChatElem.classList.add('open_chat');
+                currentChatElem.classList.add('open_chat');
         }
 
         document.getElementById('no-chat-content').classList.add('hidden');
@@ -1402,7 +1402,7 @@ async function openDirectWindow(chatId) {
             if (!await assertContactPublicKeyTrusted(user)) {
                 return;
             }
-            const private_key = await get_private_key();
+            const private_key = await get_private_key(); 
             const public_key = await get_public_key(user.publicKey);
             window.keychat = await calc_key_chat(private_key, public_key);
             chatsData[partnerId].keychat = window.keychat;
@@ -1483,7 +1483,7 @@ function canResizeChatList() {
 }
 
 function hideChatListResizer() {
-    const resizer = document.getElementById('dragbar');
+  const resizer = document.getElementById('dragbar');
     if (!resizer) return;
     resizer.classList.remove('is-active', 'dragging');
     document.body.classList.remove('is-resizing-chats');
@@ -1530,7 +1530,7 @@ window.syncResizeMenuItem = syncResizeMenuItem;
 function initChatListResizer() {
     const resizer = document.getElementById('dragbar');
     const sidebar = document.getElementById('app');
-    if (!resizer || !sidebar) return;
+  if (!resizer || !sidebar) return;
 
     const saved = parseInt(localStorage.getItem(CHAT_LIST_WIDTH_KEY), 10);
     if (Number.isFinite(saved)) applyChatListWidth(saved);
@@ -1576,14 +1576,14 @@ function initChatListResizer() {
     resizer.addEventListener('pointerdown', (e) => {
         if (!canResizeChatList() || !resizer.classList.contains('is-active')) return;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        e.preventDefault();
+    e.preventDefault();
         e.stopPropagation();
         dragging = true;
         pointerId = e.pointerId;
         const rect = sidebar.getBoundingClientRect();
         startLeft = rect.left;
         grabOffset = e.clientX - rect.right;
-        resizer.classList.add('dragging');
+    resizer.classList.add('dragging');
         document.body.classList.add('is-resizing-chats');
         veil = document.createElement('div');
         veil.className = 'chat-list-resize-veil';
@@ -2032,7 +2032,7 @@ socket.on('message_deleted', async (data) => {
     }
 });
 
-window.userId = null;
+window.userId = null; 
 openDoveryDB().then((db) => {
   const transaction = db.transaction(DOVERY_STORE_NAME, 'readonly');
   const store = transaction.objectStore(DOVERY_STORE_NAME);
@@ -2173,14 +2173,14 @@ function createSkeletonMessage(type, textLines = 1) {
 }
 
 const HISTORY_SKELETON_PATTERNS = [
-    { type: 'sent', lines: 2 },
-    { type: 'received', lines: 1 },
-    { type: 'sent', lines: 3 },
-    { type: 'received', lines: 2 },
-    { type: 'sent', lines: 1 },
-    { type: 'received', lines: 2 }
-];
-
+        { type: 'sent', lines: 2 },
+        { type: 'received', lines: 1 },
+        { type: 'sent', lines: 3 },
+        { type: 'received', lines: 2 },
+        { type: 'sent', lines: 1 },
+        { type: 'received', lines: 2 }
+    ];
+    
 function showLoadingSkeletons(container) {
     container.innerHTML = '';
     const fragment = document.createDocumentFragment();
@@ -2781,15 +2781,15 @@ async function sendMessage() {
 
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
-        if (chatHash[chatId]) {
-            chatHash[chatId].messages.push({
-                id: msgId,
-                message_text: encryptedText,
-                sender_id: userId,
+    if (chatHash[chatId]) {
+        chatHash[chatId].messages.push({
+            id: msgId,
+            message_text: encryptedText,
+            sender_id: userId,
                 time: time,
                 is_read: favorites ? 1 : 0
-            });
-        }
+        });
+    }
 
     resetMessageComposer();
     scrollMessagesToLatest();
@@ -3557,7 +3557,7 @@ function copy_text() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(selectedText).then(done).catch(() => {
             try {
-                inputField.focus();
+            inputField.focus();
                 document.execCommand('copy');
             } catch (err) {
                 console.error('Ошибка копирования:', err);
@@ -3601,8 +3601,8 @@ async function paste_text() {
             console.warn('Доступ к буферу отклонен пользователем', err);
         }
     }
-
-    hideDropdown();
+        
+        hideDropdown();
     inputField.focus({ preventScroll: true });
 }
 
@@ -4189,7 +4189,7 @@ function bindAccountSettingsUi() {
     usernameInput?.addEventListener('input', syncAccountSaveButton);
 
     pickBtn?.addEventListener('click', (e) => {
-        e.preventDefault();
+    e.preventDefault();
         fileInput?.click();
     });
 

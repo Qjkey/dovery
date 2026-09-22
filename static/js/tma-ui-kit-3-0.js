@@ -353,7 +353,7 @@ function showDropdown(buttonElement, items, type, anchor) {
                 } else {
                     width_size = 200;
                     itemHtml = `
-                            <a href="#" onclick="${item.onclick}; return false;" class="dropdown-item clicked">
+                            <a href="javascript:void(0)" onclick="${item.onclick}; return false;" class="dropdown-item clicked">
                                 ${iconHtml}
                                 <span class="item-text ${dangerClass}">${item.label}</span>
                             </a>

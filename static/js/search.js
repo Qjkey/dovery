@@ -40,7 +40,9 @@ function searchRenderResults(users) {
                 </div>
             `;
             div.addEventListener('click', () => {
-                startChat(user.id);
+                if (typeof window.openDraftChat === 'function') {
+                    window.openDraftChat(user.id, user);
+                }
             });
             container.appendChild(div);
             inx++;

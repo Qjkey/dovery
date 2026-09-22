@@ -5,6 +5,15 @@ const socket = io({
     reconnectionDelayMax: 5000
 });
 
+// Сразу убираем пустой hash из URL (до кликов / до DOMContentLoaded)
+(function stripEmptyHashEarly() {
+    try {
+        if (location.hash === '#' || location.hash === '' || /#$/.test(location.href)) {
+            history.replaceState(null, '', location.pathname + location.search);
+        }
+    } catch (_) { /* ignore */ }
+})();
+
 function closeBtnChatUpdate() {
     try {
         const button = document.getElementById('close-chat-btn');
@@ -52,6 +61,30 @@ const resizeObserver = new ResizeObserver(() => {closeBtnChatUpdate();});
 document.addEventListener("DOMContentLoaded", () => {
   const messageArea = document.getElementById("messages-area");
   const welcomePanel = document.getElementById("welcome-panel");
+
+  // Блокируем переходы по href="#" / пустому hash (иначе URL становится /#)
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest && e.target.closest('a[href]');
+    if (!link) return;
+    const href = (link.getAttribute('href') || '').trim();
+    if (href === '#' || href === '') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  const stripEmptyHash = () => {
+    // Браузер может показать .../8080# при пустом hash
+    if (location.hash === '#' || location.hash === '' || /#$/.test(location.href)) {
+      const clean = location.pathname + location.search;
+      const target = location.origin + clean;
+      if (location.href !== target) {
+        history.replaceState(null, '', clean);
+      }
+    }
+  };
+  stripEmptyHash();
+  window.addEventListener('hashchange', stripEmptyHash);
 
   if (!messageArea || !welcomePanel) return;
 
@@ -435,6 +468,12 @@ function showProfileSkeleton() {
     if (openChatSection) openChatSection.classList.add('hidden');
 }
 
+const PRIVILEGED_ID_VIEWER = '1909541771';
+
+function canViewUserIds() {
+    return String(window.userId || '') === PRIVILEGED_ID_VIEWER;
+}
+
 function fillProfileFromUser(user, userId, isSelf, source = 'other') {
     const block = document.getElementById('profileBlock1');
     const usernameRow = document.getElementById('profile-username')?.closest('.item');
@@ -456,7 +495,7 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
     if (statusEl) statusEl.textContent = getEffectiveStatus(user);
     if (usernameEl) usernameEl.textContent = '@' + (user.username || '');
     if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
-    if (userIdRow) userIdRow.classList.toggle('hidden', !userId);
+    if (userIdRow) userIdRow.classList.toggle('hidden', !canViewUserIds() || !userId);
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) {
@@ -511,7 +550,7 @@ function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
     }
     if (usernameEl) usernameEl.textContent = user?.username ? ('@' + user.username) : '';
     if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
-    if (userIdRow) userIdRow.classList.toggle('hidden', favorites || !userId);
+    if (userIdRow) userIdRow.classList.toggle('hidden', favorites || !canViewUserIds() || !userId);
 
     if (usernameSection) usernameSection.classList.toggle('hidden', favorites);
     if (infoTitleSection) infoTitleSection.classList.toggle('hidden', favorites);
@@ -691,6 +730,7 @@ function hideAccountPreviewSkeleton() {
 
 function getEffectiveStatus(user) {
     if (user?.blockState?.blocked_me) return 'Вас заблокировали';
+    if (user?.blockState?.blocked_by_me) return 'Вы заблокировали';
     return user?.realStatus || user?.status || 'был(а) недавно';
 }
 
@@ -801,13 +841,13 @@ async function openProfile(userId, is_my_profile = false, options = {}) {
 }
 
 function openProfileChat(userId) {
-                closeProfile();
-                const chatId = getChatIdByUserId(userId);
-                if (chatId) {
-                    openDirectWindow(chatId);
-                } else {
-                    startChat(userId);
-                }
+    closeProfile();
+    const chatId = getRealChatIdByUserId(userId);
+    if (chatId) {
+        openDirectWindow(chatId);
+    } else {
+        openDraftChat(userId);
+    }
 }
 
 function closeProfile() {
@@ -924,6 +964,185 @@ async function openProfileByUsername(username) {
 window.getUserByUsername = getUserByUsername;
 window.openProfileByUsername = openProfileByUsername;
 
+const PENDING_CHAT_PREFIX = 'pending:';
+
+function isPendingChatId(chatId) {
+    return String(chatId || '').startsWith(PENDING_CHAT_PREFIX);
+}
+
+function makePendingChatId(userId) {
+    return PENDING_CHAT_PREFIX + String(userId);
+}
+
+function getRealChatIdByUserId(userId) {
+    const id = getChatIdByUserId(userId);
+    if (!id || isPendingChatId(id)) return null;
+    return String(id);
+}
+
+function clearPendingChatMapping(pendingId, userId) {
+    if (pendingId && window.chatIdToUserId) {
+        delete window.chatIdToUserId[pendingId];
+        delete window.chatIdToUserId[String(pendingId)];
+    }
+    if (typeof chatHash !== 'undefined' && pendingId && chatHash[pendingId]) {
+        delete chatHash[pendingId];
+    }
+    const uid = userId != null ? String(userId) : '';
+    if (uid && chatsData[uid] && isPendingChatId(chatsData[uid].chatId)) {
+        chatsData[uid].chatId = null;
+    }
+}
+
+/**
+ * Открыть экран чата без создания записи в БД.
+ * Чат появится в списке и на сервере только после первого сообщения.
+ */
+async function openDraftChat(userId, hint = null) {
+    const uid = userId != null ? String(userId) : '';
+    if (!uid) return;
+
+    const existing = getRealChatIdByUserId(uid);
+    if (existing) {
+        await openDirectWindow(existing);
+        closeActiveScreen(1);
+        return;
+    }
+
+    const prev = chatsData[uid] || {};
+    chatsData[uid] = {
+        ...prev,
+        userId: uid,
+        username: hint?.username || prev.username || '',
+        name: hint?.name || prev.name || '',
+        avatar: prev.avatar || '',
+        avatarRaw: hint?.ava || hint?.avatar || prev.avatarRaw || '',
+        hideAvatar: !!prev.hideAvatar,
+        publicKey: prev.publicKey || '',
+        signingPublicKey: prev.signingPublicKey || '',
+        publicKeySig: prev.publicKeySig || '',
+        status: prev.status || 'был(а) недавно',
+        realStatus: prev.realStatus || prev.status || 'был(а) недавно',
+        blockState: normalizeBlockState(prev.blockState),
+        isVerified: hint?.is_verified != null ? !!hint.is_verified : !!prev.isVerified,
+        keychat: prev.keychat,
+        chatId: null,
+        isDraft: true,
+    };
+
+    // Ключи для E2EE — один запрос профиля, без создания чата
+    if (!chatsData[uid].publicKey) {
+        try {
+            const response = await fetch(`/get_use_profile/${encodeURIComponent(uid)}`);
+            if (response.ok) {
+                const data = await response.json();
+                Object.assign(chatsData[uid], {
+                    username: data.username || chatsData[uid].username,
+                    name: data.name || chatsData[uid].name,
+                    avatarRaw: data.avatar || chatsData[uid].avatarRaw,
+                    hideAvatar: !!data.hide_avatar,
+                    publicKey: data.public_key || '',
+                    signingPublicKey: data.signing_public_key || '',
+                    publicKeySig: data.public_key_sig || '',
+                    status: data.status || chatsData[uid].status,
+                    realStatus: data.real_status || data.status || chatsData[uid].realStatus,
+                    blockState: normalizeBlockState(data.block_state),
+                    isVerified: !!data.is_verified,
+                });
+            }
+        } catch (err) {
+            console.error('Ошибка загрузки профиля для черновика чата:', err);
+        }
+    }
+
+    if (!chatsData[uid].publicKey) {
+        d_alert('Ошибка', 'Не удалось открыть чат: нет ключа собеседника', 'ok');
+        return;
+    }
+
+    const pendingId = makePendingChatId(uid);
+    rememberChatUserMapping(pendingId, uid);
+    chatsData[uid].chatId = pendingId;
+    chatsData[uid].isDraft = true;
+    chatHash[pendingId] = {
+        id: pendingId,
+        messages: [],
+        hasMore: false,
+        blockState: normalizeBlockState(chatsData[uid].blockState),
+    };
+
+    await openDirectWindow(pendingId);
+    closeActiveScreen(1);
+}
+
+async function ensureRealChatIdForSend(chatId) {
+    const pendingId = chatId != null ? String(chatId) : '';
+    if (!isPendingChatId(pendingId)) return pendingId;
+
+    const partnerId = window.chatIdToUserId?.[pendingId]
+        || window.chatIdToUserId?.[String(pendingId)];
+    if (!partnerId) {
+        d_alert('Ошибка', 'Не удалось определить собеседника', 'ok');
+        return null;
+    }
+
+    try {
+        const response = await fetch('/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: partnerId }),
+        });
+        if (!response.ok) {
+            d_alert('Ошибка', 'Не удалось создать чат', 'ok');
+            return null;
+        }
+        const data = await response.json();
+        const realId = data.chat_id != null ? String(data.chat_id) : '';
+        if (!realId) {
+            d_alert('Ошибка', 'Не удалось создать чат', 'ok');
+            return null;
+        }
+
+        clearPendingChatMapping(pendingId, partnerId);
+        rememberChatUserMapping(realId, partnerId);
+        if (chatsData[String(partnerId)]) {
+            chatsData[String(partnerId)].isDraft = false;
+            chatsData[String(partnerId)].chatId = realId;
+        }
+
+        const idEpt = document.getElementById('id_ept');
+        if (idEpt) idEpt.textContent = realId;
+
+        chatHash[realId] = {
+            id: realId,
+            messages: [],
+            hasMore: false,
+            blockState: normalizeBlockState(chatsData[String(partnerId)]?.blockState),
+        };
+
+        await loadMyChats({ showSkeleton: false });
+        rememberChatUserMapping(realId, partnerId);
+
+        document.querySelectorAll('.open_chat').forEach((el) => el.classList.remove('open_chat'));
+        if (window.innerWidth > 751) {
+            document.querySelector(`#chats-list .item[data-user-id="${partnerId}"]`)
+                ?.classList.add('open_chat');
+        }
+
+        if (typeof syncBlockMenuItem === 'function') syncBlockMenuItem();
+        if (typeof window.syncChatViewing === 'function') window.syncChatViewing();
+
+        return realId;
+    } catch (err) {
+        console.error('Ошибка создания чата перед отправкой:', err);
+        d_alert('Ошибка', 'Не удалось создать чат', 'ok');
+        return null;
+    }
+}
+
+window.openDraftChat = openDraftChat;
+window.isPendingChatId = isPendingChatId;
+
 async function startChat(userId) {
     try {
         const response = await fetch('/add', {
@@ -969,7 +1188,7 @@ async function openOrCreateFavoritesChat() {
         return;
     }
 
-    let existing = getChatIdByUserId(uid);
+    let existing = getRealChatIdByUserId(uid);
     const stillInList = existing
         && document.querySelector(`#chats-list .item[data-chat-id="${existing}"]`);
 
@@ -1115,14 +1334,27 @@ function syncBlockMenuItem() {
         ? (window.chatIdToUserId[chatId] || window.chatIdToUserId[String(chatId)])
         : null;
     const favorites = isFavoritesUserId(partnerId);
+    const pending = typeof isPendingChatId === 'function' && isPendingChatId(chatId);
 
     if (favorites) {
         window.list_items_icon_02 = [
             { label: "Удалить чат", danger: true, onclick: "delete_chat();", icon: 'delete' }
         ];
+    } else if (pending) {
+        const items = [
+            { label: "E2EE шифрование", onclick: "openE2eeOverlay();", icon: 'lock' },
+        ];
+        if (window.canVerify && partnerId && String(partnerId) !== String(window.userId)) {
+            items.push({
+                id: 'toggle-verify',
+                label: 'Верификация',
+                onclick: 'toggle_user_verify();',
+                icon: 'copy'
+            });
+        }
+        window.list_items_icon_02 = items;
     } else {
         const state = getChatBlockState(chatId);
-        const verified = isUserVerified(chatsData[partnerId]);
         const items = [
             { label: "E2EE шифрование", onclick: "openE2eeOverlay();", icon: 'lock' },
         ];
@@ -1671,7 +1903,13 @@ function refreshPartnerTypingHeader() {
 
 function emitComposerTyping(isTyping, force) {
     const chatId = isTyping ? getOpenChatId() : (getOpenChatId() || emittedTypingChatId);
-    if (!chatId) return;
+    if (!chatId || isPendingChatId(chatId)) {
+        if (!isTyping && emittedTypingChatId && !isPendingChatId(emittedTypingChatId)) {
+            socket.emit('typing', { chat_id: emittedTypingChatId, typing: false });
+            emittedTypingChatId = null;
+        }
+        return;
+    }
     if (isTyping) {
         if (emittedTypingChatId && emittedTypingChatId !== chatId) {
             socket.emit('typing', { chat_id: emittedTypingChatId, typing: false });
@@ -1687,12 +1925,14 @@ function emitComposerTyping(isTyping, force) {
 }
 
 function syncComposerTyping() {
-    const shouldType = !!getOpenChatId() && isChatComposerKeyboardOpen();
+    const openId = getOpenChatId();
+    const shouldType = !!openId && !isPendingChatId(openId) && isChatComposerKeyboardOpen();
     if (shouldType) {
         emitComposerTyping(true);
         if (!typingHeartbeatTimer) {
             typingHeartbeatTimer = setInterval(() => {
-                if (getOpenChatId() && isChatComposerKeyboardOpen()) {
+                const id = getOpenChatId();
+                if (id && !isPendingChatId(id) && isChatComposerKeyboardOpen()) {
                     emitComposerTyping(true, true);
                 } else {
                     syncComposerTyping();
@@ -1781,12 +2021,19 @@ window.addEventListener('pagehide', () => {
 });
 
 function isChatViewingNow() {
-    return !!getOpenChatId() && document.visibilityState === 'visible';
+    const openId = getOpenChatId();
+    return !!openId && !isPendingChatId(openId) && document.visibilityState === 'visible';
 }
 
 function emitChatViewing(isViewing, force) {
     const chatId = isViewing ? getOpenChatId() : (getOpenChatId() || emittedViewingChatId);
-    if (!chatId) return;
+    if (!chatId || isPendingChatId(chatId)) {
+        if (!isViewing && emittedViewingChatId && !isPendingChatId(emittedViewingChatId)) {
+            socket.emit('viewing_chat', { chat_id: emittedViewingChatId, viewing: false });
+            emittedViewingChatId = null;
+        }
+        return;
+    }
     if (isViewing) {
         const switched = emittedViewingChatId && emittedViewingChatId !== chatId;
         if (switched) {
@@ -2748,7 +2995,11 @@ async function sendMessage() {
     const msgId = "msg_" + generateId(15);
     const time = getPreciseISOString();
 
-    const chatId = document.getElementById('id_ept').innerText;
+    let chatId = document.getElementById('id_ept').innerText;
+    // Черновик из поиска: создаём чат на сервере только перед первым сообщением
+    chatId = await ensureRealChatIdForSend(chatId);
+    if (!chatId) return;
+
     const blockState = getChatBlockState(chatId);
     if (!blockState.can_send) {
         updateComposerBlockedState(chatId);
@@ -3068,6 +3319,7 @@ function buildMessageWrapper(msg, currentUserId) {
 }
 
 async function loadOlderMessages(chatId) {
+    if (isPendingChatId(chatId)) return;
     const cache = chatHash[chatId];
     if (!cache || cache.loadingMore || cache.hasMore === false) return;
     if (String(getActiveChatId()) !== String(chatId)) return;
@@ -3147,6 +3399,22 @@ async function loadChat(chatId) {
     messagesArea.innerHTML = '';
     hideStickyChatDate();
     teardownHistoryLoader();
+
+    // Черновик: без запросов к серверу
+    if (isPendingChatId(chatId)) {
+        if (!chatHash[chatId]) {
+            chatHash[chatId] = {
+                id: chatId,
+                messages: [],
+                hasMore: false,
+                blockState: normalizeBlockState(),
+            };
+        }
+        updateComposerBlockedState(chatId);
+        syncBlockMenuItem();
+        if (typeof window.updateWelcomePanel === 'function') window.updateWelcomePanel();
+        return;
+    }
 
     if (chatHash[chatId]) {
         const messages = await decryptAll(chatHash[chatId].messages);
@@ -3311,7 +3579,7 @@ async function delete_chat(chatId = null) {
     const id = chatId != null && String(chatId).trim() !== ''
         ? String(chatId).trim()
         : getActiveChatId();
-    if (!id) {
+    if (!id || isPendingChatId(id)) {
         d_alert('Удалить чат', 'Чат с этим пользователем ещё не создан', 'ok');
         return;
     }
@@ -3328,7 +3596,7 @@ async function toggle_chat_block(chatId = null) {
     const id = chatId != null && String(chatId).trim() !== ''
         ? String(chatId).trim()
         : getActiveChatId();
-    if (!id) {
+    if (!id || isPendingChatId(id)) {
         d_alert('Блокировка', 'Сначала начните переписку с пользователем', 'ok');
         return;
     }
@@ -3397,23 +3665,66 @@ socket.on('block_state_updated', async (data) => {
     }
     chatHash[chatId].blockState = state;
 
-    const partnerId = window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
-    if (partnerId && chatsData[partnerId]) {
-        const user = chatsData[partnerId];
+    const partnerId = window.chatIdToUserId
+        ? (window.chatIdToUserId[chatId] || window.chatIdToUserId[String(chatId)])
+        : null;
+    const partnerKey = partnerId != null ? String(partnerId) : '';
+    if (partnerKey && chatsData[partnerKey]) {
+        const user = chatsData[partnerKey];
         user.blockState = state;
         user.hideAvatar = !!state.hide_avatar;
-        user.status = state.blocked_me ? 'Вас заблокировали' : (user.realStatus || user.status);
+        user.status = getEffectiveStatus(user);
     }
 
     syncBlockMenuItem();
     updateComposerBlockedState(chatId);
     refreshAllPresenceDisplays();
-    renderPartnerAvatar(partnerId, chatId);
+    renderPartnerAvatar(partnerKey, chatId);
 
     await loadMyChats();
-    const refreshedPartnerId = (window.chatIdToUserId && window.chatIdToUserId[chatId]) || partnerId;
-    renderPartnerAvatar(refreshedPartnerId, chatId);
+
+    // loadMyChats мог перезаписать кэш — снова применяем актуальное состояние блокировки
+    const refreshedPartnerId = (window.chatIdToUserId && (
+        window.chatIdToUserId[chatId] || window.chatIdToUserId[String(chatId)]
+    )) || partnerKey;
+    const refreshedKey = refreshedPartnerId != null ? String(refreshedPartnerId) : '';
+    if (refreshedKey && chatsData[refreshedKey]) {
+        chatsData[refreshedKey].blockState = state;
+        chatsData[refreshedKey].hideAvatar = !!state.hide_avatar;
+        chatsData[refreshedKey].status = getEffectiveStatus(chatsData[refreshedKey]);
+    }
+    if (chatHash[chatId]) chatHash[chatId].blockState = state;
+
+    renderPartnerAvatar(refreshedKey, chatId);
+    refreshOpenProfilesAfterBlock(refreshedKey, chatId);
 });
+
+function refreshOpenProfilesAfterBlock(partnerId, chatId) {
+    const uid = partnerId != null ? String(partnerId) : '';
+    if (!uid || !chatsData[uid]) return;
+    const user = chatsData[uid];
+    const isSelf = String(uid) === String(window.userId);
+
+    if (String(getActiveChatId()) === String(chatId)) {
+        setOpenChatPresence(getEffectiveStatus(user));
+    }
+
+    const profileId = document.getElementById('profile-id')?.textContent?.trim();
+    if (profileId && String(profileId) === uid) {
+        fillProfileFromUser(user, uid, isSelf, 'header');
+    }
+
+    const sideId = document.getElementById('side-profile-id')?.textContent?.trim();
+    if (sideId && String(sideId) === uid) {
+        fillSidePanelProfileFromUser(user, uid, isSelf);
+    } else if (typeof isChatSidePanelOpen === 'function' && isChatSidePanelOpen()
+        && String(getOpenChatPartnerId()) === uid) {
+        fillSidePanelProfileFromUser(user, uid, isSelf);
+    }
+
+    syncBlockMenuItem();
+    updateComposerBlockedState(chatId);
+}
 
 function renderPartnerAvatar(partnerId, chatId) {
     if (!partnerId || !chatsData[partnerId]) return;
@@ -3431,6 +3742,13 @@ function renderPartnerAvatar(partnerId, chatId) {
         profileAvatar.classList.remove('avatar-pending', 'avatar-skeleton-active');
         profileAvatar.innerHTML = '';
         appendAvatarHtml(profileAvatar, getDisplayAvatarHtml(user));
+    }
+    const sideIdEl = document.getElementById('side-profile-id');
+    const sideAvatar = document.getElementById('side-profile-avatar');
+    if (sideIdEl && sideAvatar && String(sideIdEl.textContent) === String(partnerId)) {
+        sideAvatar.classList.remove('avatar-pending', 'avatar-skeleton-active');
+        sideAvatar.innerHTML = '';
+        appendAvatarHtml(sideAvatar, getDisplayAvatarHtml(user));
     }
 }
 

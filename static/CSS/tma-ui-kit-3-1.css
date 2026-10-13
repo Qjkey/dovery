@@ -78,6 +78,7 @@
         --blend-mode: exclusion, normal;
         color-scheme: dark;
 }
+
 .label {
     color: var(--tg-theme-text-color);
     cursor: default;
@@ -242,7 +243,9 @@
     font-family: "Roboto";
     font-weight: 400;
     position: absolute;
-    background-color: var(--tg-theme-bg-color);
+    background: color-mix(in srgb, var(--tg-theme-bg-color) 80%, transparent);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     box-shadow: 0px 0px 3px 0px var(--tg-theme-section-separator-color);
     border-radius: 12px;
     min-width: 200px;
@@ -254,7 +257,98 @@
     text-decoration: none;
     transform-origin: top right;
     animation: bounceShow 0.2s cubic-bezier(0.34, 1.26, 0.64, 1) forwards;
+    box-sizing: border-box;
 }
+/* Горизонтальное (compact / «vertical») меню: пункты в ряд */
+.tag-dropdown.is-vertical {
+    display: none;
+    flex-direction: row;
+    align-items: stretch;
+    min-width: 0;
+    max-width: min(92vw, 360px);
+    width: max-content;
+    overflow: hidden;
+    border-radius: 18px;
+    padding: 4px;
+    transform-origin: center top;
+}
+.tag-dropdown.is-vertical.is-centered {
+    left: 50% !important;
+    right: auto !important;
+    transform-origin: center center;
+    animation: bounceShowCenteredX 0.2s cubic-bezier(0.34, 1.26, 0.64, 1) forwards;
+}
+.tag-dropdown.is-vertical.is-centered.closing {
+    animation: bounceHideCenteredX 0.2s ease-in forwards !important;
+}
+.tag-dropdown.is-vertical.is-open {
+    display: flex;
+}
+.tag-dropdown.is-vertical .dropdown-item-v {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    min-width: 0;
+    text-decoration: none;
+    color: var(--tg-theme-text-color);
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    border-radius: 14px;
+    white-space: nowrap;
+}
+.tag-dropdown.is-vertical .dropdown-item-v .icon-wrapper {
+    margin-right: 0;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.tag-dropdown.is-vertical .dropdown-item-v .icon-wrapper svg {
+    width: 18px;
+    height: 18px;
+}
+.tag-dropdown.is-vertical .dropdown-item-v .item-text {
+    font-family: "Roboto", sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.2;
+    color: inherit;
+}
+.tag-dropdown.is-vertical .dropdown-item-v.is-danger .item-text,
+.tag-dropdown.is-vertical .dropdown-item-v.is-danger {
+    color: var(--tg-theme-destructive-text-color);
+}
+.tag-dropdown.is-vertical .dropdown-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: var(--tg-theme-hint-color);
+    cursor: pointer;
+    border-radius: 14px;
+    -webkit-tap-highlight-color: transparent;
+}
+.tag-dropdown.is-vertical .dropdown-more svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+}
+/* Ripple как у обычных .clicked — без отдельного :active */
+.tag-dropdown.is-vertical .dropdown-item-v.clicked,
+.tag-dropdown.is-vertical .dropdown-more.clicked {
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0);
+}
+
 .item-text.is-danger {
     color: var(--tg-theme-destructive-text-color);
 }
@@ -264,8 +358,36 @@
     background-color: var(--tg-theme-secondary-bg-color);
 }
 .tag-dropdown.closing {
-    animation: bounceHide 0.2s ease-in forwards;
+    animation: bounceHide 0.2s ease-in forwards !important;
     pointer-events: none;
+}
+/* Трансформация меню: смена контента + размера; без bounceShow */
+.tag-dropdown.morphing,
+.tag-dropdown.no-entrance:not(.closing) {
+    animation: none !important;
+}
+.tag-dropdown.is-vertical.is-centered.morphing,
+.tag-dropdown.is-vertical.is-centered.no-entrance:not(.closing) {
+    transform: translate(-50%, 0);
+}
+.tag-dropdown.morphing {
+    overflow: hidden;
+    pointer-events: none;
+}
+.tag-dropdown.morphing .tag-dropdown-inner {
+    transition: opacity 0.16s ease;
+}
+.tag-dropdown.morphing.is-fading .tag-dropdown-inner {
+    opacity: 0;
+}
+.tag-dropdown-inner {
+    width: 100%;
+}
+.tag-dropdown.is-vertical .tag-dropdown-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    width: max-content;
 }
 @keyframes bounceShow {
     from {
@@ -280,6 +402,26 @@
 @keyframes bounceHide {
     from { opacity: 1; transform: scale(1) translate(0, 0); }
     to { opacity: 0; transform: scale(0.8) translate(10px, -10px); }
+}
+@keyframes bounceShowCenteredX {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 0) scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+@keyframes bounceHideCenteredX {
+    from {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, 0) scale(0.8);
+    }
 }
 .dropdown-item {
     display: flex;
@@ -334,6 +476,11 @@
     height: 28px;
     margin-right: 13px;
     stroke: var(--tg-theme-text-color);
+}
+.icon-wrapper svg.more,
+.icon-wrapper svg.menu1,
+.icon-wrapper svg.back1 {
+    stroke: none;
 }
 .checkmark-icon {
     display: none;
@@ -458,7 +605,7 @@ input:checked + .slider:before {
 
 @font-face {
     font-family: "Roboto";
-    src: url("font/Roboto.ttf") format("truetype");
+    src: url("fonts/Roboto.ttf") format("truetype");
     font-display: block;
 }
 .headline-sf {
@@ -562,9 +709,29 @@ textarea::placeholder {
     flex-shrink: 0;
     width: 100%;
     z-index: 80;
-    padding: var(--margin) 0;
+    /* edge-to-edge: контент header ниже статус-бара, blur/gradient заходят под него */
+    padding: calc(var(--margin) + env(safe-area-inset-top, 0px)) 0 var(--margin);
     flex-shrink: 0;
 }
+.header-wrapper .gradient-blur,
+.header-wrapper.header-bg:has(.gradient-blur)::after {
+    top: 0;
+    bottom: 0;
+    /* растягиваем визуал на всю высоту wrapper, включая safe-area padding */
+    height: auto;
+}
+
+/* Страницы / экраны без header — тот же верхний inset, что у header-wrapper */
+.screen:not(:has(.header-wrapper)) {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+.navbar-slider > .tab-slide:not(:has(.header-wrapper)) {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+.page:not(.has-navbar):not(:has(.header-wrapper)) {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
 .header-wrapper.header-chat:not(.bottom-bar) {
     position: absolute;
 }
@@ -585,6 +752,206 @@ textarea::placeholder {
 .header-wrapper.header-bg {
     background: linear-gradient(to bottom, color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%, color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%);
 }
+.header-wrapper.header-bg:has(.gradient-blur) {
+    background: none;
+    overflow: visible;
+}
+/* Цветовой tint поверх blur (под контентом header) */
+.header-wrapper.header-bg:has(.gradient-blur)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--tg-theme-bg-color) 62%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 38%, transparent) 45%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+html[data-opt-mode="medium"] .header-wrapper.header-bg:has(.gradient-blur)::after,
+html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur)::after {
+    content: none;
+    display: none;
+}
+/* stick: blur скрыт — tint тоже не нужен */
+.header-wrapper.stick.header-bg::after {
+    content: none;
+    display: none;
+}
+/* stick прилипает к блоку ниже — без градиентного размытия */
+.header-wrapper.stick .gradient-blur {
+    display: none !important;
+}
+.header-wrapper.stick.header-bg {
+    background: none;
+}
+.header-wrapper .gradient-blur {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    pointer-events: none;
+}
+.header-wrapper .gradient-blur > div,
+.header-wrapper .gradient-blur::before,
+.header-wrapper .gradient-blur::after {
+    position: absolute;
+    inset: 0;
+}
+.header-wrapper .gradient-blur::before {
+    content: "";
+    z-index: 1;
+    backdrop-filter: blur(0.5px);
+    -webkit-backdrop-filter: blur(0.5px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 1) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 0) 37.5%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 1) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 0) 37.5%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(1) {
+    z-index: 2;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 0) 50%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 0) 50%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(2) {
+    z-index: 3;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 0) 62.5%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 0) 62.5%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(3) {
+    z-index: 4;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 0) 75%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 0) 75%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(4) {
+    z-index: 5;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 0) 87.5%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 0) 87.5%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(5) {
+    z-index: 6;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 0) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+.header-wrapper .gradient-blur > div:nth-of-type(6) {
+    z-index: 7;
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+}
+.header-wrapper .gradient-blur::after {
+    content: "";
+    z-index: 8;
+    backdrop-filter: blur(64px);
+    -webkit-backdrop-filter: blur(64px);
+    mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+}
+
+.header-wrapper .header {
+    position: relative;
+    z-index: 1;
+}
 .header-left, .header-right {
     display: flex;
     z-index: 2;
@@ -602,6 +969,12 @@ textarea::placeholder {
     transform: translate(-50%, -50%);
     z-index: 1;
     pointer-events: none;
+}
+.header-wrapper:has(.gradient-blur) .header-center {
+    top: 50%;
+}
+.header-wrapper.stick:has(.gradient-blur) .header-center {
+    top: 38.5px;
 }
 .element-header {
     display: flex;
@@ -629,6 +1002,71 @@ textarea::placeholder {
     height: 47px; 
     padding-left: 12px;
     box-sizing: border-box;
+}
+/* Центральная капсула по ширине контента (не растягивается между left/right) */
+.header-center-fit {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: max-content;
+    max-width: min(70vw, calc(100% - 118px));
+    min-height: 45px;
+    padding: 0px 16px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    text-align: center;
+    transition: max-width 0.25s ease;
+}
+.header-wrapper:not(:has(.gradient-blur)) .header-center-fit {
+    top: 38.5px;
+}
+.header-wrapper.stick:has(.gradient-blur) .header-center-fit {
+    top: 38.5px;
+}
+.header-center-fit .header-fit-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    gap: 1px;
+}
+.header-center-fit .header-fit-text .label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.header-center-fit.has-subtitle {
+    padding-left: 18px;
+    padding-right: 18px;
+}
+.header-center-fit .header-fit-subtitle {
+    color: var(--tg-theme-subtitle-text-color);
+}
+/* Аватар в круглой капсуле справа */
+.header-capsule.one-btn:has(.header-ava) {
+    overflow: hidden;
+    padding: 0;
+}
+.header-capsule.one-btn:has(.header-ava) .element-header {
+    width: 45px;
+    height: 45px;
+    padding: 0;
+}
+.header-ava {
+    display: block;
+    width: 41px;
+    height: 41px;
+    border-radius: 50%;
+    object-fit: cover;
 }
 .header-center-two.msg {
     height: auto;
@@ -1019,7 +1457,9 @@ input:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow-y: auto;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
 }
 .page, .chats {
     width: 100%;
@@ -1091,21 +1531,121 @@ input:focus {
 /* --- Само выпадающее окно --- */
 .profile-modal {
     width: 100%;
-    max-width: 450px; 
+    max-width: 450px;
     background-color: var(--tg-theme-secondary-bg-color);
-    border-radius: 27px;
-    margin: 6px;
     transform: translateY(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease-out;
+    /* border-radius не анимируем — только transform/top из JS */
+    transition-property: transform;
     position: relative;
-    padding-bottom: constant(safe-area-inset-bottom);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: 0;
     cursor: grab;
+    /* overflow всегда hidden на оболочке — иначе при overflow-y:auto
+       WebView сбрасывает клип border-radius (выглядит как radius: 0) */
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    will-change: transform;
+    border-radius: 27px 27px 0 0;
+}
+
+/* Внутренний скролл: прокрутка только здесь, радиус клипается оболочкой */
+.profile-modal-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    box-sizing: border-box;
+}
+.profile-modal.profile-modal--fullscreen > .profile-modal-scroll {
+    overflow-y: auto;
+}
+
+/* sheet: без отступов, можно stretch */
+.profile-modal[data-modal="sheet"],
+.profile-modal:not([data-modal]) {
+    margin: 0;
+    max-width: none;
+    border-radius: 27px 27px 0 0;
+    max-height: 100%;
+}
+
+/* card: с отступами — одинаковый радиус со всех сторон; снизу место под nav bar */
+.profile-modal[data-modal="card"] {
+    margin: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)) 6px;
+    max-width: 450px;
+    border-radius: 27px;
+    max-height: calc(100% - 12px - env(safe-area-inset-bottom, 0px));
+}
+.profile-modal[data-modal="card"] > .profile-modal-scroll {
+    overflow-y: hidden;
 }
 
 .overlay-container.active .profile-modal {
     transform: translateY(0);
+}
+
+.profile-modal.profile-modal--dragging {
+    transition: none !important;
+}
+
+.profile-modal.profile-modal--fullscreen {
+    max-width: none;
+    border-radius: 27px 27px 0 0;
+    overflow: hidden;
+}
+
+.modal-plain-label {
+    padding: 8px 20px 16px;
+    text-align: center;
+    color: var(--tg-theme-text-color);
+}
+
+/* Кнопка снизу внутри card-модалки */
+.modal-bottom-action {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: center;
+    padding: 10px 15px;
+    box-sizing: border-box;
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--tg-theme-secondary-bg-color) 100%, transparent) 55%,
+        color-mix(in srgb, var(--tg-theme-secondary-bg-color) 0%, transparent) 100%
+    );
+}
+.modal-bottom-action .bottom-action-btn {
+    width: 100%;
+    max-width: none;
+}
+
+@media (min-width: 751px) {
+    /* На широких: у всех модалок есть отступы — радиус одинаковый со всех сторон */
+    .profile-modal[data-modal="sheet"],
+    .profile-modal:not([data-modal]) {
+        margin: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)) 6px;
+        max-width: 450px;
+        border-radius: 27px;
+        max-height: calc(100% - 12px - env(safe-area-inset-bottom, 0px));
+    }
+}
+
+.profile-modal .header-wrapper {
+    padding: var(--margin) 0;
+    cursor: grab;
+    touch-action: none;
+}
+.profile-modal .header-wrapper:active {
+    cursor: grabbing;
 }
 
 td .img_s {
@@ -1375,6 +1915,80 @@ td .img_s {
     color: var(--tg-theme-text-color);
     z-index: 1;
 }
+/* Обычный (не цветной) блок профиля — ник и поднадпись text-color */
+.profile-block.defult .text,
+.profile-block.defult .subname,
+.big-profile-block:not(.yellow):not(.red):not(.blue):not(.green):not(.purple):not(.cyan):not(.pink):not(.grey) .profile-block .text,
+.big-profile-block:not(.yellow):not(.red):not(.blue):not(.green):not(.purple):not(.cyan):not(.pink):not(.grey) .profile-block .subname {
+    color: var(--tg-theme-text-color);
+}
+/* Цветные блоки профилей — имя, поднадпись и текст кнопок белые */
+.big-profile-block.yellow .profile-block .text,
+.big-profile-block.yellow .profile-block .headline6,
+.big-profile-block.yellow .profile-block .subname,
+.big-profile-block.yellow .button-link,
+.big-profile-block.yellow .button-text,
+.big-profile-block.red .profile-block .text,
+.big-profile-block.red .profile-block .headline6,
+.big-profile-block.red .profile-block .subname,
+.big-profile-block.red .button-link,
+.big-profile-block.red .button-text,
+.big-profile-block.blue .profile-block .text,
+.big-profile-block.blue .profile-block .headline6,
+.big-profile-block.blue .profile-block .subname,
+.big-profile-block.blue .button-link,
+.big-profile-block.blue .button-text,
+.big-profile-block.green .profile-block .text,
+.big-profile-block.green .profile-block .headline6,
+.big-profile-block.green .profile-block .subname,
+.big-profile-block.green .button-link,
+.big-profile-block.green .button-text,
+.big-profile-block.purple .profile-block .text,
+.big-profile-block.purple .profile-block .headline6,
+.big-profile-block.purple .profile-block .subname,
+.big-profile-block.purple .button-link,
+.big-profile-block.purple .button-text,
+.big-profile-block.cyan .profile-block .text,
+.big-profile-block.cyan .profile-block .headline6,
+.big-profile-block.cyan .profile-block .subname,
+.big-profile-block.cyan .button-link,
+.big-profile-block.cyan .button-text,
+.big-profile-block.pink .profile-block .text,
+.big-profile-block.pink .profile-block .headline6,
+.big-profile-block.pink .profile-block .subname,
+.big-profile-block.pink .button-link,
+.big-profile-block.pink .button-text,
+.big-profile-block.grey .profile-block .text,
+.big-profile-block.grey .profile-block .headline6,
+.big-profile-block.grey .profile-block .subname,
+.big-profile-block.grey .button-link,
+.big-profile-block.grey .button-text,
+.profile-block.yellow .text,
+.profile-block.yellow .headline6,
+.profile-block.yellow .subname,
+.profile-block.red .text,
+.profile-block.red .headline6,
+.profile-block.red .subname,
+.profile-block.blue .text,
+.profile-block.blue .headline6,
+.profile-block.blue .subname,
+.profile-block.green .text,
+.profile-block.green .headline6,
+.profile-block.green .subname,
+.profile-block.purple .text,
+.profile-block.purple .headline6,
+.profile-block.purple .subname,
+.profile-block.cyan .text,
+.profile-block.cyan .headline6,
+.profile-block.cyan .subname,
+.profile-block.pink .text,
+.profile-block.pink .headline6,
+.profile-block.pink .subname,
+.profile-block.grey .text,
+.profile-block.grey .headline6,
+.profile-block.grey .subname {
+    color: #ffffff;
+}
 .profile-block .avatar {
     width: 95px;
     height: 95px;
@@ -1480,8 +2094,9 @@ td .img_s {
   height: 100dvh;
   box-sizing: border-box;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch; 
-  scroll-behavior: smooth;       
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
 }
 body.screens-active {
   overscroll-behavior: none;
@@ -1504,6 +2119,8 @@ body.screens-active {
   /* flex-direction: column-reverse;   */
   overflow-y: auto;          
   overflow-x: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
   background-color: transparent;
 }
 @media (max-width: 750px) {
@@ -1656,12 +2273,17 @@ html {
     margin: 0;
     overflow: hidden;
     position: fixed;
+    overscroll-behavior: none;
 }
 body {
-    overflow-y: auto; 
+    font-family: "Roboto", sans-serif;
+    overflow: hidden;
     height: 100%;
     width: 100%;
     margin: 0;
+    overscroll-behavior: none;
+    position: fixed;
+    inset: 0;
     background-color: var(--bg-one);
     background-position: center, center;
     background-image: var(--first-gradient), 
@@ -1802,7 +2424,7 @@ input[type="range"]::-moz-range-thumb {
     flex-shrink: 1; 
     flex-basis: 0;
     max-width: 200px;
-    padding: 4.5px 12px;
+    padding: 3.5px 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1821,7 +2443,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .tab-header.adaptive .tab {
     flex-shrink: 0;
-    padding: 4.5px 20px; 
+    padding: 3.5px 20px; 
 }
 
 /* Элемент вкладки */
@@ -1830,7 +2452,7 @@ input[type="range"]::-moz-range-thumb {
     justify-content: center;
     align-items: center;
     position: relative;
-    padding: 4.5px 0;
+    padding: 3.5px 0;
     cursor: pointer;
     user-select: none;
     color: var(--tg-theme-subtitle-text-color);
@@ -1871,6 +2493,7 @@ input[type="range"]::-moz-range-thumb {
 /* Контейнер-слайдер */
 .tab-container-slider {
     display: flex;
+    align-items: flex-start;
     width: 100%;
     overflow: hidden;
     position: relative;
@@ -1883,6 +2506,23 @@ input[type="range"]::-moz-range-thumb {
     width: 100%;
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
+    box-sizing: border-box;
+}
+
+/* Неактивные вкладки не растягивают высоту — только после ухода из кадра */
+.tab-container-slider:not(.is-swiping):not(.is-sliding) .tab-slide:not(.is-active) {
+    height: 0 !important;
+    min-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.tab-container-slider .tab-slide.is-active {
+    height: auto;
+    overflow: visible;
+    pointer-events: auto;
+    visibility: visible;
 }
 
 /* Ваши секции внутри слайдов чувствуют себя отлично */
@@ -2027,4 +2667,123 @@ textarea::placeholder {
 
 #scroll-to-bottom {
     pointer-events: auto;
+}
+
+/* ========== Режимы оптимизации ========== */
+/* shared: на medium — капсула у заголовка в модалках; на minimal капсулу у title не делаем */
+html[data-opt-mode="medium"] .profile-modal .header-center:has(.label) {
+    pointer-events: auto;
+    width: max-content;
+    max-width: min(70vw, calc(100% - 118px));
+    min-height: 45px;
+    height: auto;
+    padding: 8px 16px;
+    box-sizing: border-box;
+    border-radius: 22.5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, var(--tg-theme-bg-color) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tg-theme-bg-color) 40%, transparent);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* «С элементами» (overlay 2): без капсулы заголовка на любом режиме сглаживания */
+html[data-opt-mode="medium"] [data-overlay="2"] .profile-modal .header-center:has(.label),
+html[data-opt-mode="minimal"] [data-overlay="2"] .profile-modal .header-center:has(.label),
+[data-overlay="2"] .profile-modal .header-center:has(.label) {
+    pointer-events: none;
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent !important;
+    border: none;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    display: block;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* --- Средний: всё gradient-blur → обычный градиент --- */
+html[data-opt-mode="medium"] .gradient-blur {
+    display: none !important;
+}
+html[data-opt-mode="medium"] .header-wrapper.header-bg:has(.gradient-blur),
+html[data-opt-mode="medium"] .header-wrapper:has(.gradient-blur),
+html[data-opt-mode="medium"] .profile-modal .header-wrapper.header-bg:has(.gradient-blur),
+html[data-opt-mode="medium"] .profile-modal .header-wrapper:has(.gradient-blur) {
+    background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+
+/* --- Минимальный: без анимаций, без blur / gradient-blur --- */
+html[data-opt-mode="minimal"] *,
+html[data-opt-mode="minimal"] *::before,
+html[data-opt-mode="minimal"] *::after {
+    animation: none !important;
+    animation-duration: 0s !important;
+    transition: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html[data-opt-mode="minimal"] .gradient-blur {
+    display: none !important;
+}
+html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur) {
+    background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+/* Закрытие меню: правило .closing !important иначе перебивает общий animation:none */
+html[data-opt-mode="minimal"] .tag-dropdown,
+html[data-opt-mode="minimal"] .tag-dropdown.closing,
+html[data-opt-mode="minimal"] .tag-dropdown.is-vertical.is-centered.closing {
+    animation: none !important;
+}
+/* Непрозрачный фон у элементов, которые на full/medium «стеклянные» */
+html[data-opt-mode="minimal"] .header-capsule,
+html[data-opt-mode="minimal"] .header-center-fit.header-capsule,
+html[data-opt-mode="minimal"] .tag-dropdown,
+html[data-opt-mode="minimal"] .d-alert-box,
+html[data-opt-mode="minimal"] .navbar-capsule,
+html[data-opt-mode="minimal"] .navbar-capsule.header-capsule {
+    background: var(--tg-theme-bg-color) !important;
+    border-color: color-mix(in srgb, var(--tg-theme-hint-color) 25%, transparent);
+}
+/* Minimal: заголовок без капсулы (как обычный header-center) */
+html[data-opt-mode="minimal"] .header-wrapper .header-center:has(.label),
+html[data-opt-mode="minimal"] .profile-modal .header-center:has(.label) {
+    pointer-events: none;
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent !important;
+    border: none;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    display: block;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
 }

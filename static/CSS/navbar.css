@@ -1,0 +1,570 @@
+/* ========== Bottom Navbar ========== */
+
+.page.has-navbar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Экран со своим navbar: остаётся position:fixed как обычный .screen */
+.screen.has-navbar {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+    width: 100%;
+    max-width: 100%;
+    isolation: isolate;
+    contain: layout paint;
+}
+
+.page.has-navbar > .navbar-slider,
+.screen.has-navbar > .navbar-slider {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+    touch-action: pan-y;
+}
+
+.page.has-navbar > .navbar-slider > .tab-slide,
+.screen.has-navbar > .navbar-slider > .tab-slide {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    box-sizing: border-box;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    isolation: isolate;
+    contain: paint;
+}
+
+.screen.has-navbar > .navbar-wrapper {
+    z-index: 90;
+}
+
+.screen.has-navbar .tab-container-slider {
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+    isolation: isolate;
+    contain: paint;
+}
+
+/* Вкладки внутри navbar-слайда не должны расширять родитель и светить соседний раздел */
+.navbar-slider > .tab-slide > .tab-container-slider {
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+.navbar-slider > .tab-slide > .tab-container-slider > .tab-slide {
+    max-width: 100%;
+}
+
+/* Экраны поверх navbar */
+.page.has-navbar > [data-screen] {
+    z-index: 100;
+}
+
+.navbar-wrapper {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 75;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0 25px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* Цветовой tint поверх нижнего blur */
+.navbar-wrapper:has(.gradient-blur)::after,
+.bottom-action-wrapper:has(.gradient-blur)::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: calc(100% + 36px + env(safe-area-inset-bottom, 0px));
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--tg-theme-bg-color) 62%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 38%, transparent) 45%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+html[data-opt-mode="medium"] .navbar-wrapper:has(.gradient-blur)::after,
+html[data-opt-mode="medium"] .bottom-action-wrapper:has(.gradient-blur)::after,
+html[data-opt-mode="minimal"] .navbar-wrapper:has(.gradient-blur)::after,
+html[data-opt-mode="minimal"] .bottom-action-wrapper:has(.gradient-blur)::after {
+    content: none;
+    display: none;
+}
+
+/* Градиентное размытие под капсулой (снизу вверх) */
+.navbar-wrapper .gradient-blur,
+.bottom-action-wrapper .gradient-blur {
+    position: absolute;
+    z-index: 0;
+    inset: auto 0 0 0;
+    /* +36px вверх + заход под system navigation / gesture bar */
+    height: calc(100% + 36px + env(safe-area-inset-bottom, 0px));
+    pointer-events: none;
+}
+
+.navbar-wrapper .gradient-blur > div,
+.navbar-wrapper .gradient-blur::before,
+.navbar-wrapper .gradient-blur::after,
+.bottom-action-wrapper .gradient-blur > div,
+.bottom-action-wrapper .gradient-blur::before,
+.bottom-action-wrapper .gradient-blur::after {
+    position: absolute;
+    inset: 0;
+}
+
+.navbar-wrapper .gradient-blur::before,
+.bottom-action-wrapper .gradient-blur::before {
+    content: "";
+    z-index: 1;
+    backdrop-filter: blur(0.5px);
+    -webkit-backdrop-filter: blur(0.5px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 1) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 0) 37.5%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 1) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 0) 37.5%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(1),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(1) {
+    z-index: 2;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 0) 50%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 12.5%,
+        rgba(0, 0, 0, 1) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 0) 50%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(2),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(2) {
+    z-index: 3;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 0) 62.5%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 25%,
+        rgba(0, 0, 0, 1) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 0) 62.5%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(3),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(3) {
+    z-index: 4;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 0) 75%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 37.5%,
+        rgba(0, 0, 0, 1) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 0) 75%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(4),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(4) {
+    z-index: 5;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 0) 87.5%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 0) 87.5%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(5),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(5) {
+    z-index: 6;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 0) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 62.5%,
+        rgba(0, 0, 0, 1) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+
+.navbar-wrapper .gradient-blur > div:nth-of-type(6),
+.bottom-action-wrapper .gradient-blur > div:nth-of-type(6) {
+    z-index: 7;
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 75%,
+        rgba(0, 0, 0, 1) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+}
+
+.navbar-wrapper .gradient-blur::after,
+.bottom-action-wrapper .gradient-blur::after {
+    content: "";
+    z-index: 8;
+    backdrop-filter: blur(64px);
+    -webkit-backdrop-filter: blur(64px);
+    mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    -webkit-mask: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 87.5%,
+        rgba(0, 0, 0, 1) 100%
+    );
+}
+
+/* Капсула navbar — фиксированная ширина, компактная высота */
+.navbar-capsule {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0;
+    width: 350px;
+    max-width: 350px;
+    min-width: 300px;
+    min-height: 0;
+    height: 55px;
+    padding: 3px 4px;
+    box-sizing: border-box;
+    border-radius: 100px;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: pan-y;
+}
+
+.navbar-capsule.is-dragging-underline {
+    touch-action: none;
+    cursor: grabbing;
+}
+
+.navbar-capsule.is-dragging-underline .navbar-item {
+    cursor: grabbing;
+}
+
+.navbar-item {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px 2px;
+    box-sizing: border-box;
+    cursor: pointer;
+    color: var(--tg-theme-text-color);
+    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+}
+
+.navbar-item .navbar-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.navbar-item .navbar-icon svg {
+    width: 24px;
+    height: 24px;
+    display: block;
+    color: inherit;
+    fill: none;
+    stroke: currentColor;
+}
+
+.navbar-item .navbar-icon svg.nav_settings {
+    fill: currentColor;
+    stroke: none;
+}
+
+.navbar-item .navbar-icon svg.nav_profile {
+    fill: none;
+    stroke: currentColor;
+}
+
+.navbar-item .navbar-icon svg.settings2,
+.navbar-item .navbar-icon svg.settings,
+.navbar-item .navbar-icon svg.nav_settings,
+.navbar-item .navbar-icon svg.nav_profile {
+    width: 24px;
+    height: 24px;
+}
+
+.navbar-item .navbar-label {
+    font-family: "Roboto", sans-serif;
+    font-weight: 600;
+    font-size: 11.5px;
+    line-height: 1.1;
+    text-align: center;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    color: inherit;
+}
+
+.navbar-item .navbar-ava {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.navbar-item.actives {
+    color: var(--tg-theme-button-color);
+}
+
+/* Во время перетаскивания панели прежняя активная вкладка — как остальные */
+.navbar-capsule.is-dragging-underline .navbar-item.actives {
+    color: var(--tg-theme-text-color);
+}
+
+.navbar-item.nav-drag-over:not(.actives) {
+    color: color-mix(in srgb, var(--tg-theme-button-color) 70%, var(--tg-theme-text-color));
+}
+
+/* Плавающая подсветка активной вкладки */
+.navbar-underline {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 4px;
+    width: 64px;
+    border-radius: 100px;
+    background: color-mix(in srgb, var(--tg-theme-button-color) 14%, transparent);
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 1;
+    will-change: left, width;
+}
+
+.navbar-capsule.is-dragging-underline .navbar-underline {
+    transition: none;
+}
+
+/* ========== Bottom action button (FAB-панель) ========== */
+
+.bottom-action-wrapper {
+    position: relative;
+    z-index: 75;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0 15px calc(15px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    pointer-events: none;
+    /* blur тянется вверх поверх контента */
+    overflow: visible;
+}
+
+.bottom-action-btn {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    padding: 11px 20px;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 100px;
+    background: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color, #fff);
+    font-family: "Roboto", sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    transition: scale 1s linear(0, 0.038 1.6%, 0.154 3.4%, 1.026 12.6%, 1.166 15.2%, 1.234 18%, 1.221 21.6%, 1.005 31.2%, 0.944 37%, 1.013 56%, 1);
+}
+
+.bottom-action-btn:active,
+.bottom-action-btn.is-pressed {
+    scale: 0.97;
+    transition-timing-function: ease-out;
+    transition-duration: 90ms;
+}
+
+/*
+ * Экран с нижней кнопкой:
+ * — контент скроллится сам (header sticky внутри → blur работает)
+ * — кнопка снаружи скролла (как navbar у .page)
+ */
+.screen.has-bottom-action {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.screen.has-bottom-action .bottom-action-content {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+    box-sizing: border-box;
+    /* запас под выступающий вверх blur кнопки */
+    padding-bottom: 8px;
+}
+.screen.has-bottom-action .bottom-action-content > .header-wrapper {
+    /* sticky внутри своего скролл-контейнера — контент уходит под header */
+    position: sticky;
+    top: 0;
+    z-index: 80;
+}
+
+/* Средний: gradient-blur → обычный градиент снизу */
+html[data-opt-mode="medium"] .navbar-wrapper .gradient-blur,
+html[data-opt-mode="medium"] .bottom-action-wrapper .gradient-blur {
+    display: none !important;
+}
+html[data-opt-mode="medium"] .navbar-wrapper::before,
+html[data-opt-mode="medium"] .bottom-action-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: calc(100% + 28px);
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+
+/* Минимальный: без blur, градиент как на среднем + непрозрачная капсула */
+html[data-opt-mode="minimal"] .navbar-wrapper .gradient-blur,
+html[data-opt-mode="minimal"] .bottom-action-wrapper .gradient-blur {
+    display: none !important;
+}
+html[data-opt-mode="minimal"] .navbar-wrapper::before,
+html[data-opt-mode="minimal"] .bottom-action-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: calc(100% + 28px);
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+    );
+}
+html[data-opt-mode="minimal"] .navbar-capsule,
+html[data-opt-mode="minimal"] .navbar-capsule.header-capsule {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--tg-theme-bg-color) !important;
+}

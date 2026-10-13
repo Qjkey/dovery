@@ -1,6 +1,9 @@
 funcs.md
 electron/
 dovery/
+node_modules/
+package-lock.json
+package.json
 db/
 info.env
 dovery.db

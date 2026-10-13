@@ -426,11 +426,166 @@ img.avatar-pending {
     font-size: 34px;
 }
 
-#user-avatar > .letter-ava1,
-.header-center-two #user-avatar .letter-ava1 {
+/* Wide chat header: avatar as demo item (.ava 40px inside .left) */
+#user-header.header-center-two #user-avatar.left {
+    display: flex;
+    place-items: center;
+    margin-right: 10px;
+    width: auto;
+    height: auto;
+    padding: 0;
+    overflow: visible;
+}
+
+#user-header.header-center-two #user-avatar img.ava,
+#user-header.header-center-two #user-avatar img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+#user-header.header-center-two #user-avatar .ava.letter-ava1,
+#user-header.header-center-two #user-avatar .letter-ava1 {
     width: 40px;
     height: 40px;
     font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Narrow fit: avatar in round capsule 40×40 */
+#user-avatar-fit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+    padding: 0;
+    overflow: hidden;
+}
+
+#user-avatar-fit img.ava,
+#user-avatar-fit img,
+#user-avatar-fit .header-ava:not(.letter-ava1) {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+#user-avatar-fit .ava.letter-ava1,
+#user-avatar-fit .letter-ava1,
+#user-avatar-fit .header-ava.letter-ava1 {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#user-header.header-center-two #user-avatar .saved-ava,
+#user-avatar-fit .saved-ava {
+    text-transform: none;
+}
+
+#user-header-ava-wrap {
+    overflow: hidden;
+    padding: 0;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Dual chat header layout */
+@media (max-width: 750px) {
+  #header-chat .chat-header-wide {
+    display: none !important;
+  }
+}
+@media (min-width: 751px) {
+  #header-chat .chat-header-narrow {
+    display: none !important;
+  }
+}
+
+/* Chat has no gradient-blur — kit would push fit to 38.5px; keep level with back/avatar */
+#header-chat .header-center-fit {
+  top: 50%;
+}
+
+/* Narrow fit subtitle: «в сети» / typing use .active, not gray */
+#header-chat .header-center-fit .header-fit-subtitle.active {
+  color: var(--tg-theme-button-color);
+}
+
+/* Keep gradient-blur nodes in HTML, but never show blur — plain gradient only */
+.page .header-wrapper .gradient-blur,
+.screen .header-wrapper .gradient-blur,
+.overlay-container .header-wrapper .gradient-blur {
+  display: none !important;
+}
+.page .header-wrapper.header-bg:has(.gradient-blur)::after,
+.screen .header-wrapper.header-bg:has(.gradient-blur)::after,
+.overlay-container .header-wrapper.header-bg:has(.gradient-blur)::after {
+  content: none !important;
+  display: none !important;
+}
+.page .header-wrapper.header-bg:has(.gradient-blur),
+.screen .header-wrapper.header-bg:has(.gradient-blur),
+.overlay-container .header-wrapper.header-bg:has(.gradient-blur) {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
+    color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
+  );
+}
+
+/* Chat header: no gradient at all */
+#header-chat,
+#header-chat.header-bg,
+#header-chat.header-bg:has(.gradient-blur) {
+  background: none !important;
+}
+#header-chat .gradient-blur,
+#header-chat.header-wrapper.header-bg::after,
+#bottom-header-chat::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* Side panel: tabs + chat menu */
+.side-panel-header {
+  align-items: center;
+  gap: 8px;
+}
+.side-panel-tabs-host {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 0;
+}
+.side-panel-tabs-host .tab-header {
+  width: 100%;
+}
+
+/* Settings / profile navbar tabs: secondary background */
+#app .navbar-slider > .tab-slide.secondary_bg {
+  background-color: var(--tg-theme-secondary-bg-color);
+}
+
+#user-header.header-skeleton-active .header-fit-text .skeleton-line {
+    display: inline-block;
+    height: 12px;
+    border-radius: 6px;
 }
 
 #account-preview-avatar .letter-ava1 {
@@ -652,7 +807,7 @@ body.is-resizing-chats * {
   .sidebar {
     /* Меняем фиксированную ширину на min/max ограничения */
     width: 350px; 
-    min-width: 250px;
+    min-width: 320px;
     max-width: 600px;
     border-right: none;
     flex-shrink: 0;
@@ -959,7 +1114,7 @@ body.is-resizing-chats * {
     pointer-events: none;
     opacity: 0;
     transform: translateY(-6px);
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
 .sticky-chat-date.is-visible {

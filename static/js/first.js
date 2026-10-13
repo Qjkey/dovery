@@ -220,7 +220,10 @@ async function loginWithKeyBundle(data, passwordValue, passwordInput) {
 }
 
 async function validateAndSubmit_login(el) {
-    const form = el.closest('form'); 
+    const form = (el && el.closest && el.closest('form'))
+        || document.getElementById('loginForm')
+        || document.querySelector('[data-screen="1"] form');
+    if (!form) return;
     const usernameInput = form.querySelector('input[name="username"]');
     const passwordInput = form.querySelector('input[name="password"]');
 
@@ -288,7 +291,10 @@ async function validateAndSubmit_login(el) {
 }
 
 async function validateAndSubmit(el) {
-    const form = el.closest('form');
+    const form = (el && el.closest && el.closest('form'))
+        || document.getElementById('regForm')
+        || document.querySelector('[data-screen="2"] form');
+    if (!form) return;
     const name = form.querySelector('input[name="name"]').value.trim();
     const username = form.querySelector('input[name="username"]').value.trim();
     const passwordInput = form.querySelector('input[name="password"]');

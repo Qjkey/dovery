@@ -239,11 +239,10 @@ function syncUserVerifiedUi(userId) {
     }
 
     const openPartner = getOpenChatPartnerId();
-    if (openPartner && String(openPartner) === uid) {
-        const headerName = document.getElementById('user-name');
-        if (headerName && !favorites) {
-            setNameWithBadge(headerName, user?.name || '', verified);
-        }
+    if (openPartner && String(openPartner) === uid && !favorites) {
+        chatHdrEach('user-name', (el) => {
+            setNameWithBadge(el, user?.name || '', verified);
+        });
     }
 
     const profileId = document.getElementById('profile-id')?.textContent?.trim();
@@ -343,84 +342,134 @@ function appendAvatarHtml(avatarContainer, html) {
     mountAvatarElement(avatarContainer, avatarNode);
 }
 
-function showChatHeaderSkeleton() {
-    const userHeader = document.getElementById('user-header');
-    const headerAvatar = document.getElementById('user-avatar');
-    const headerName = document.getElementById('user-name');
-    const headerStatus = document.getElementById('user-status');
-    const typingEl = document.getElementById('user-typing');
-    if (userHeader) userHeader.classList.add('header-skeleton-active');
-    if (headerAvatar) headerAvatar.innerHTML = '<div class="ava skeleton-shimmer"></div>';
-    if (headerName) headerName.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
-    if (headerStatus) {
-        headerStatus.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
-        headerStatus.classList.remove('hidden');
+/** Wide + narrow chat header nodes (same logical field). */
+function chatHdrAll(baseId) {
+    return [document.getElementById(baseId), document.getElementById(baseId + '-fit')].filter(Boolean);
+}
+
+function chatHdrEach(baseId, fn) {
+    chatHdrAll(baseId).forEach(fn);
+}
+
+function fillChatHeaderAvatar(el, html, uid, favorites) {
+    if (!el) return;
+    el.innerHTML = '';
+    appendAvatarHtml(el, html);
+    // Prefer .ava container (saved/letter), not inner svg
+    const avaNode = el.querySelector('.ava, .letter-ava1, .letter-ava, img');
+    const isFit = el.id === 'user-avatar-fit';
+    if (avaNode) {
+        if (avaNode.classList.contains('letter-ava')) {
+            avaNode.classList.replace('letter-ava', 'letter-ava1');
+        }
+        if (isFit && avaNode.tagName === 'IMG') {
+            avaNode.classList.add('header-ava');
+        } else {
+            avaNode.classList.remove('header-ava');
+            if (avaNode.tagName === 'IMG' && !avaNode.classList.contains('ava')) {
+                avaNode.classList.add('ava');
+            }
+        }
     }
-    if (typingEl) typingEl.classList.add('hidden');
+    el.onclick = uid ? () => openChatHeaderProfile(uid) : null;
+    el.style.cursor = uid ? 'pointer' : 'default';
+    if (favorites) el.setAttribute('aria-label', 'Избранное');
+}
+
+function showChatHeaderSkeleton() {
+    chatHdrEach('user-header', (el) => {
+        el.classList.add('header-skeleton-active', 'has-subtitle');
+    });
+    chatHdrEach('user-avatar', (el) => {
+        el.innerHTML = '<div class="header-ava skeleton-shimmer"></div>';
+    });
+    chatHdrEach('user-name', (el) => {
+        el.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+    });
+    chatHdrEach('user-status', (el) => {
+        el.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
+        el.classList.remove('hidden');
+    });
+    chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
 }
 
 function fillChatHeader(user, partnerId) {
-    const userHeader = document.getElementById('user-header');
-    const headerPanel = document.getElementById('user-header');
-    const headerName = document.getElementById('user-name');
-    const headerStatus = document.getElementById('user-status');
-    const headerAvatar = document.getElementById('user-avatar');
-    const typingEl = document.getElementById('user-typing');
-    const textWrap = headerPanel?.querySelector('.text');
     const uid = partnerId != null ? String(partnerId) : String(user?.userId || '');
     const favorites = isFavoritesChat(user) || isFavoritesUserId(uid);
-    if (userHeader) userHeader.classList.remove('header-skeleton-active');
+    chatHdrEach('user-header', (el) => el.classList.remove('header-skeleton-active'));
     if (!user) return;
 
-    if (headerAvatar) {
-        headerAvatar.innerHTML = '';
-        appendAvatarHtml(headerAvatar, favorites ? savedAvatarHtml() : getDisplayAvatarHtml(user));
-    }
+    const avaHtml = favorites ? savedAvatarHtml() : getDisplayAvatarHtml(user);
+    chatHdrEach('user-avatar', (el) => fillChatHeaderAvatar(el, avaHtml, uid, favorites));
 
     if (favorites) {
-        if (headerName) {
-            headerName.className = 'label headline5 name-with-badge-host';
-            headerName.textContent = 'Избранное';
-        }
-        if (headerStatus) {
-            headerStatus.textContent = '';
-            headerStatus.classList.add('hidden');
-        }
-        if (typingEl) typingEl.classList.add('hidden');
-        if (textWrap) {
-            textWrap.classList.remove('twoline');
-            textWrap.classList.add('oneline');
-        }
-        if (headerPanel) {
-            headerPanel.onclick = null;
-            headerPanel.classList.remove('clicked');
-            headerPanel.style.cursor = 'default';
-        }
+        chatHdrEach('user-name', (el) => {
+            // Old Favorites title style (headline5), not body1/button1 inscription
+            el.className = 'label headline5 name-with-badge-host';
+            el.textContent = 'Избранное';
+        });
+        chatHdrEach('user-status', (el) => {
+            el.textContent = '';
+            el.classList.add('hidden');
+        });
+        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
+        chatHdrEach('user-header', (el) => {
+            el.classList.remove('has-subtitle');
+            el.classList.add('clicked');
+            el.onclick = () => openChatHeaderProfile(uid);
+            el.style.cursor = 'pointer';
+        });
+        if (typeof syncProfileChatMenuVisibility === 'function') syncProfileChatMenuVisibility();
         return;
     }
 
-    if (textWrap) {
-        textWrap.classList.add('twoline');
-        textWrap.classList.remove('oneline');
+    chatHdrEach('user-header', (el) => {
+        el.classList.add('has-subtitle');
+        if (uid) {
+            el.classList.add('clicked');
+            el.style.cursor = '';
+            el.onclick = () => openChatHeaderProfile(uid);
+        }
+    });
+    chatHdrEach('user-name', (el) => {
+        el.className = el.id === 'user-name-fit'
+            ? 'label button1-medium name-with-badge-host'
+            : 'label body1 name-with-badge-host';
+        setNameWithBadge(el, user.name || '', isUserVerified(user));
+    });
+    chatHdrEach('user-status', (el) => el.classList.remove('hidden'));
+    setOpenChatPresence(getEffectiveStatus(user));
+    if (typeof syncProfileChatMenuVisibility === 'function') syncProfileChatMenuVisibility();
+}
+
+function switchDoveryNavTab(tabId) {
+    const id = String(tabId);
+    const item = document.querySelector(`#app .navbar-item[data-nav-tab="${id}"]`);
+    if (item) item.click();
+    if (id === '3' && typeof refreshNavMyProfileTab === 'function') {
+        refreshNavMyProfileTab();
     }
-    if (headerName) {
-        headerName.className = 'label body1 name-with-badge-host';
-        setNameWithBadge(headerName, user.name || '', isUserVerified(user));
-    }
-    if (headerStatus) {
-        headerStatus.classList.remove('hidden');
-        setOpenChatPresence(getEffectiveStatus(user));
-    }
-    if (headerPanel && uid) {
-        headerPanel.classList.add('clicked');
-        headerPanel.style.cursor = '';
-        headerPanel.onclick = () => openChatHeaderProfile(uid);
-    }
+}
+window.switchDoveryNavTab = switchDoveryNavTab;
+
+function bindNavProfileTabRefresh() {
+    document.querySelectorAll('#app .navbar-item[data-nav-tab]').forEach((item) => {
+        item.addEventListener('click', () => {
+            if (item.getAttribute('data-nav-tab') === '3') {
+                refreshNavMyProfileTab();
+            }
+        });
+    });
 }
 
 function openChatHeaderProfile(userId) {
     const uid = userId != null ? String(userId) : '';
     if (!uid) return;
+    const favorites = isFavoritesUserId(uid) || isFavoritesChat(chatsData[uid]);
+    if (favorites) {
+        openFavoritesProfile(uid);
+        return;
+    }
     if (typeof canShowChatSidePanelButton === 'function' && canShowChatSidePanelButton()) {
         if (typeof syncSidePanelProfile === 'function') {
             syncSidePanelProfile(uid);
@@ -434,6 +483,52 @@ function openChatHeaderProfile(userId) {
         return;
     }
     openProfile(uid, false, { source: 'header' });
+}
+
+function openFavoritesProfile(userId) {
+    const uid = userId != null ? String(userId) : (getOpenChatPartnerId() || String(window.userId || ''));
+    openScreen('3');
+    fillFavoritesProfile(uid);
+}
+
+function fillFavoritesProfile(userId) {
+    const screen = document.getElementById('profile-screen');
+    if (screen) screen.dataset.favoritesProfile = '1';
+
+    const block = document.getElementById('profileBlock1');
+    const usernameRow = document.getElementById('profile-username')?.closest('.item');
+    if (block) block.classList.remove('profile-skeleton-active');
+    if (usernameRow) usernameRow.classList.remove('profile-info-skeleton');
+
+    const nameEl = document.getElementById('profile-name');
+    const idEl = document.getElementById('profile-id');
+    const statusEl = document.getElementById('profile-status');
+    const infoSection = document.getElementById('profile-info-section');
+    const actions = document.querySelector('#profile-screen .big-profile-block');
+    const openChatSection = document.getElementById('profile-open-chat-section');
+
+    if (nameEl) {
+        nameEl.classList.add('name-with-badge-host');
+        nameEl.textContent = 'Избранное';
+    }
+    if (idEl) idEl.textContent = userId != null ? String(userId) : '';
+    if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.classList.add('hidden');
+    }
+    if (infoSection) infoSection.classList.add('hidden');
+    if (actions) actions.classList.add('hidden');
+    if (openChatSection) openChatSection.classList.add('hidden');
+
+    const avatar = document.getElementById('profile-avatar');
+    if (avatar) {
+        avatar.classList.remove('avatar-skeleton-active');
+        avatar.innerHTML = '';
+        appendAvatarHtml(avatar, savedAvatarHtml());
+    }
+
+    if (typeof syncBlockMenuItem === 'function') syncBlockMenuItem();
+    syncProfileChatMenuVisibility();
 }
 
 function activateChatSidePanelProfileTab() {
@@ -475,11 +570,16 @@ function canViewUserIds() {
 }
 
 function fillProfileFromUser(user, userId, isSelf, source = 'other') {
+    const screen = document.getElementById('profile-screen');
+    if (screen) delete screen.dataset.favoritesProfile;
+
     const block = document.getElementById('profileBlock1');
     const usernameRow = document.getElementById('profile-username')?.closest('.item');
+    const infoSection = document.getElementById('profile-info-section');
 
     if (block) block.classList.remove('profile-skeleton-active');
     if (usernameRow) usernameRow.classList.remove('profile-info-skeleton');
+    if (infoSection) infoSection.classList.remove('hidden');
 
     const nameEl = document.getElementById('profile-name');
     const idEl = document.getElementById('profile-id');
@@ -492,7 +592,10 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
         setNameWithBadge(nameEl, user.name || '', isUserVerified(user));
     }
     if (idEl) idEl.textContent = userId;
-    if (statusEl) statusEl.textContent = getEffectiveStatus(user);
+    if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.textContent = getEffectiveStatus(user);
+    }
     if (usernameEl) usernameEl.textContent = '@' + (user.username || '');
     if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
     if (userIdRow) userIdRow.classList.toggle('hidden', !canViewUserIds() || !userId);
@@ -510,7 +613,81 @@ function fillProfileFromUser(user, userId, isSelf, source = 'other') {
     }
 
     syncProfileActionButtons(userId, isSelf, source, 'main');
+    if (isSelf) fillNavMyProfileFromUser(user, userId);
+    syncProfileChatMenuVisibility();
 }
+
+function fillNavMyProfileFromUser(user, userId) {
+    if (!user) return;
+    const nameEl = document.getElementById('nav-profile-name');
+    const idEl = document.getElementById('nav-profile-id');
+    const statusEl = document.getElementById('nav-profile-status');
+    const usernameEl = document.getElementById('nav-profile-username');
+    const userIdEl = document.getElementById('nav-profile-userid');
+    const userIdRow = document.getElementById('nav-profile-userid-row');
+    const block = document.getElementById('nav-profileBlock1');
+    if (block) block.classList.remove('profile-skeleton-active');
+    if (nameEl) {
+        nameEl.classList.add('name-with-badge-host');
+        setNameWithBadge(nameEl, user.name || '', isUserVerified(user));
+    }
+    if (idEl) idEl.textContent = userId != null ? String(userId) : '';
+    if (statusEl) statusEl.textContent = getEffectiveStatus(user);
+    if (usernameEl) usernameEl.textContent = '@' + (user.username || '');
+    if (userIdEl) userIdEl.textContent = userId != null ? String(userId) : '';
+    if (userIdRow) userIdRow.classList.toggle('hidden', !canViewUserIds() || !userId);
+    const avatar = document.getElementById('nav-profile-avatar');
+    if (avatar) {
+        avatar.classList.remove('avatar-skeleton-active');
+        avatar.innerHTML = '';
+        appendAvatarHtml(avatar, getDisplayAvatarHtml({
+            ...user,
+            isFavorites: false,
+            is_favorites: false,
+        }));
+    }
+}
+
+async function refreshNavMyProfileTab() {
+    const uid = window.userId != null ? String(window.userId) : '';
+    if (!uid) return;
+    let user = chatsData[uid];
+    const needFresh = !user || user.isFavorites || user.name === 'Избранное' || !user.username;
+    if (needFresh) {
+        const block = document.getElementById('nav-profileBlock1');
+        if (block) block.classList.add('profile-skeleton-active');
+        try {
+            const response = await fetch(`/get_use_profile/${uid}`);
+            if (response.ok) {
+                const data = await response.json();
+                const prev = chatsData[uid] || {};
+                chatsData[uid] = {
+                    ...prev,
+                    username: data.username,
+                    name: data.name,
+                    avatar: '',
+                    avatarRaw: data.avatar,
+                    hideAvatar: !!data.hide_avatar,
+                    publicKey: data.public_key,
+                    signingPublicKey: data.signing_public_key || '',
+                    publicKeySig: data.public_key_sig || '',
+                    status: data.status,
+                    realStatus: data.real_status || data.status,
+                    blockState: normalizeBlockState(data.block_state),
+                    isVerified: !!data.is_verified,
+                    isFavorites: !!prev.isFavorites && !!prev.chatId,
+                    chatId: prev.chatId || null,
+                    keychat: prev.keychat,
+                };
+                user = chatsData[uid];
+            }
+        } catch (e) {
+            console.error('Ошибка загрузки профиля во вкладке:', e);
+        }
+    }
+    if (user) fillNavMyProfileFromUser(user, uid);
+}
+window.refreshNavMyProfileTab = refreshNavMyProfileTab;
 
 function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
     const block = document.getElementById('side-profileBlock1');
@@ -572,6 +749,7 @@ function fillSidePanelProfileFromUser(user, userId, isSelf = false) {
     }
 
     syncProfileActionButtons(userId, isSelf, 'header', 'side');
+    syncProfileChatMenuVisibility();
 }
 
 function getOpenChatPartnerId() {
@@ -1228,16 +1406,15 @@ socket.on("user_status_update", (data) => {
 
         if (idEpt && userId === activePartnerId) {
             if (isFavoritesUserId(userId) || isFavoritesChat(chatsData[userId])) {
-                const headerStatus = document.getElementById('user-status');
-                const typingEl = document.getElementById('user-typing');
-                if (headerStatus) headerStatus.classList.add('hidden');
-                if (typingEl) typingEl.classList.add('hidden');
+                chatHdrEach('user-status', (el) => el.classList.add('hidden'));
+                chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
             } else {
-            const currentStatus = document.getElementById('user-status');
+                const currentStatus = document.getElementById('user-status')
+                    || document.getElementById('user-status-fit');
                 if (currentStatus) {
                     const keepHidden = currentStatus.classList.contains('hidden') && !getConnectionStatusLabel();
                     setOpenChatPresence(getEffectiveStatus(chatsData[userId]));
-                    if (keepHidden) currentStatus.classList.add('hidden');
+                    if (keepHidden) chatHdrEach('user-status', (el) => el.classList.add('hidden'));
                 }
             }
         }
@@ -1296,17 +1473,22 @@ function presenceClass(realStatus, inList) {
 }
 
 function setOpenChatPresence(realStatus) {
-    const headerStatus = document.getElementById('user-status');
-    if (!headerStatus) return;
+    const statusEls = chatHdrAll('user-status');
+    if (!statusEls.length) return;
 
     const override = getConnectionStatusLabel();
-    headerStatus.className = `subtitle2 ${presenceClass(realStatus, false)}`;
-    headerStatus.textContent = displayedPresenceText(realStatus);
+    const pc = presenceClass(realStatus, false);
+    const text = displayedPresenceText(realStatus);
+    statusEls.forEach((el) => {
+        el.className = el.id === 'user-status-fit'
+            ? `label subtitle2 header-fit-subtitle ${pc}`.trim()
+            : `subtitle2 ${pc}`;
+        el.textContent = text;
+    });
 
     if (override) {
-        headerStatus.classList.remove('hidden');
-        const typingEl = document.getElementById('user-typing');
-        if (typingEl) typingEl.classList.add('hidden');
+        chatHdrEach('user-status', (el) => el.classList.remove('hidden'));
+        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
     }
 }
 
@@ -1377,11 +1559,44 @@ function syncBlockMenuItem() {
         );
         window.list_items_icon_02 = items;
     }
+    window.list_items_icon_12 = window.list_items_icon_02;
 
     const profileId = document.getElementById('profile-id')?.textContent?.trim();
     if (profileId) syncProfileBlockLabel(profileId, 'main');
     const sideProfileId = document.getElementById('side-profile-id')?.textContent?.trim();
     if (sideProfileId) syncProfileBlockLabel(sideProfileId, 'side');
+    syncProfileChatMenuVisibility();
+}
+
+/** Wide: ⋮ in chat header. Narrow peer / Favorites profile: ⋮ in profile. Never in side panel. */
+function syncProfileChatMenuVisibility() {
+    const profileScreen = document.getElementById('profile-screen');
+    const favoritesProfile = profileScreen?.dataset.favoritesProfile === '1';
+    const profileId = document.getElementById('profile-id')?.textContent?.trim() || '';
+    const openPartner = getOpenChatPartnerId();
+    const favoritesOpen = isFavoritesUserId(openPartner);
+    const isNarrow = window.matchMedia('(max-width: 750px)').matches;
+    const isPeerProfile = !!profileId
+        && String(profileId) !== String(window.userId || '')
+        && !favoritesProfile;
+
+    const chatMenuBtn = document.getElementById('cntxt_menu_btn_02');
+    if (chatMenuBtn) chatMenuBtn.classList.toggle('hidden', favoritesOpen);
+
+    const mainWrap = document.getElementById('profile-chat-menu-wrap');
+    if (mainWrap) {
+        const showProfileMenu = favoritesProfile || (isNarrow && isPeerProfile);
+        mainWrap.classList.toggle('hidden', !showProfileMenu);
+    }
+
+    const capsule = document.getElementById('chat-header-menu-capsule');
+    if (capsule) {
+        const toggle = document.getElementById('chat-side-panel-toggle');
+        const toggleVisible = toggle && !toggle.classList.contains('hidden');
+        const menuVisible = chatMenuBtn && !chatMenuBtn.classList.contains('hidden');
+        capsule.classList.toggle('one-btn', !(toggleVisible && menuVisible));
+        capsule.classList.toggle('hidden', !toggleVisible && !menuVisible);
+    }
 }
 
 function updateComposerBlockedState(chatId) {
@@ -1404,13 +1619,11 @@ function refreshAllPresenceDisplays() {
     const chatId = idEpt ? idEpt.innerText.trim() : '';
     const partnerId = chatId && window.chatIdToUserId ? window.chatIdToUserId[chatId] : null;
     if (isFavoritesUserId(partnerId) || isFavoritesChat(chatsData[partnerId])) {
-        const headerStatus = document.getElementById('user-status');
-        const typingEl = document.getElementById('user-typing');
-        if (headerStatus) {
-            headerStatus.textContent = '';
-            headerStatus.classList.add('hidden');
-        }
-        if (typingEl) typingEl.classList.add('hidden');
+        chatHdrEach('user-status', (el) => {
+            el.textContent = '';
+            el.classList.add('hidden');
+        });
+        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
     } else {
         const real = partnerId && chatsData[partnerId]
             ? getEffectiveStatus(chatsData[partnerId])
@@ -1626,8 +1839,7 @@ async function openDirectWindow(chatId) {
         }
 
         fillChatHeader(user, partnerId);
-        const typingEl = document.getElementById('user-typing');
-        if (typingEl) typingEl.classList.add('hidden');
+        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
 
         const msgInput = document.getElementById('messages-textarea');
         try {
@@ -1671,7 +1883,7 @@ async function openDirectWindow(chatId) {
 }
 
 const CHAT_LIST_WIDTH_KEY = 'dovery-chat-list-width';
-const CHAT_LIST_MIN_WIDTH = 250;
+const CHAT_LIST_MIN_WIDTH = 320;
 const CHAT_LIST_MAX_WIDTH = 560;
 const CHAT_PANEL_MIN_WIDTH = 380;
 
@@ -1876,11 +2088,11 @@ function isChatComposerKeyboardOpen() {
 }
 
 function setHeaderTypingVisible(show) {
-    const statusEl = document.getElementById('user-status');
-    const typingEl = document.getElementById('user-typing');
-    if (!statusEl || !typingEl) return;
-    typingEl.classList.toggle('hidden', !show);
-    statusEl.classList.toggle('hidden', show);
+    const statusEls = chatHdrAll('user-status');
+    const typingEls = chatHdrAll('user-typing');
+    if (!statusEls.length || !typingEls.length) return;
+    typingEls.forEach((el) => el.classList.toggle('hidden', !show));
+    statusEls.forEach((el) => el.classList.toggle('hidden', show));
 }
 
 function refreshPartnerTypingHeader() {
@@ -1894,8 +2106,7 @@ function refreshPartnerTypingHeader() {
         : null;
     if (isFavoritesUserId(partnerId) || isFavoritesChat(chatsData[partnerId])) {
         setHeaderTypingVisible(false);
-        const statusEl = document.getElementById('user-status');
-        if (statusEl) statusEl.classList.add('hidden');
+        chatHdrEach('user-status', (el) => el.classList.add('hidden'));
         return;
     }
     setHeaderTypingVisible(!!(openId && typingPartners.has(String(openId))));
@@ -2109,9 +2320,10 @@ window.copy_message = copy_message;
 function copy_who(who) {
     const sideUsername = document.getElementById('side-profile-username')?.innerText?.trim() || '';
     const mainUsername = document.getElementById('profile-username')?.innerText?.trim() || '';
+    const navUsername = document.getElementById('nav-profile-username')?.innerText?.trim() || '';
     const username = (typeof isChatSidePanelOpen === 'function' && isChatSidePanelOpen() && sideUsername)
         ? sideUsername
-        : (mainUsername || sideUsername);
+        : (mainUsername || navUsername || sideUsername);
     const u_username = username.startsWith('@') ? username.slice(1) : username;
     navigator.clipboard.writeText(who + u_username).then(() => {
         hideDropdown();
@@ -2129,6 +2341,8 @@ function copy_link_username() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof bindNavProfileTabRefresh === 'function') bindNavProfileTabRefresh();
+
     const params = new URLSearchParams(window.location.search);
     
     const showProfile = params.get('profile');
@@ -2288,6 +2502,7 @@ openDoveryDB().then((db) => {
     const data = getRequest.result;
     if (data) {
       window.userId = String(data.id);
+      if (typeof refreshNavMyProfileTab === 'function') refreshNavMyProfileTab();
     }
   };
   transaction.oncomplete = () => db.close();
@@ -2311,6 +2526,8 @@ function createDateHeaderElement(dateLabel) {
 
 let stickyDateRaf = null;
 let stickyDateBound = false;
+let stickyDateHideTimer = null;
+const STICKY_DATE_HIDE_MS = 900;
 
 function getStickyDateElements() {
     return {
@@ -2319,13 +2536,19 @@ function getStickyDateElements() {
     };
 }
 
-function hideStickyChatDate() {
+function hideStickyChatDate(clearLabel = false) {
     const { sticky } = getStickyDateElements();
     if (!sticky) return;
-    sticky.hidden = true;
     sticky.classList.remove('is-visible');
-    const label = sticky.querySelector('.chat-date-header');
-    if (label) label.textContent = '';
+    window.setTimeout(() => {
+        if (!sticky.classList.contains('is-visible')) {
+            sticky.hidden = true;
+            if (clearLabel) {
+                const label = sticky.querySelector('.chat-date-header');
+                if (label) label.textContent = '';
+            }
+        }
+    }, 380);
 }
 
 function ensureSkeletonStyles() {
@@ -2467,7 +2690,7 @@ function updateStickyChatDate() {
     // Мало сообщений или всё и так видно — достаточно дат в потоке
     if (messages.length <= 3 || !canScroll || headers.length === 0) {
         headers.forEach((header) => header.classList.remove('is-covered'));
-        hideStickyChatDate();
+        hideStickyChatDate(true);
         return;
     }
 
@@ -2501,7 +2724,8 @@ function updateStickyChatDate() {
     }
 
     sticky.hidden = false;
-    sticky.classList.add('is-visible');
+    // next frame → CSS transition opacity
+    requestAnimationFrame(() => sticky.classList.add('is-visible'));
 
     headers.forEach((header) => {
         const same = (header.dataset.date || header.textContent || '').trim() === label;
@@ -2510,25 +2734,36 @@ function updateStickyChatDate() {
     });
 }
 
-function scheduleStickyChatDateUpdate() {
+function scheduleStickyChatDateUpdate(fromScroll = false) {
     if (stickyDateRaf) return;
     stickyDateRaf = requestAnimationFrame(() => {
         stickyDateRaf = null;
-        updateStickyChatDate();
+        if (fromScroll) {
+            updateStickyChatDate();
+            if (stickyDateHideTimer) clearTimeout(stickyDateHideTimer);
+            stickyDateHideTimer = setTimeout(() => {
+                stickyDateHideTimer = null;
+                hideStickyChatDate(false);
+                const { area } = getStickyDateElements();
+                area?.querySelectorAll('.chat-date-group.is-covered')
+                    .forEach((h) => h.classList.remove('is-covered'));
+            }, STICKY_DATE_HIDE_MS);
+        }
         updateScrollToBottomButton();
     });
 }
 
 function bindStickyChatDate() {
     const { area } = getStickyDateElements();
-    if (!area || stickyDateBound) {
-        scheduleStickyChatDateUpdate();
-        return;
+    if (!area) return;
+    if (!stickyDateBound) {
+        stickyDateBound = true;
+        area.addEventListener('scroll', () => scheduleStickyChatDateUpdate(true), { passive: true });
+        window.addEventListener('resize', () => scheduleStickyChatDateUpdate(false));
     }
-    stickyDateBound = true;
-    area.addEventListener('scroll', scheduleStickyChatDateUpdate, { passive: true });
-    window.addEventListener('resize', scheduleStickyChatDateUpdate);
-    scheduleStickyChatDateUpdate();
+    // При открытии чата дата сверху скрыта — только при прокрутке
+    hideStickyChatDate(true);
+    updateScrollToBottomButton();
 }
 
 function insertNewMessageWithDateCheck(messagesArea, messageWrapper, msgTime) {
@@ -3619,8 +3854,7 @@ socket.on('chat_deleted', async (data) => {
         const partnerId = window.chatIdToUserId
             ? (window.chatIdToUserId[deletedChatId] || window.chatIdToUserId[String(deletedChatId)])
             : null;
-        const profileId = document.getElementById('profile-id')?.textContent?.trim();
-        if (profileId && partnerId && String(profileId) === String(partnerId) && !isFavoritesUserId(partnerId)) {
+        if (document.getElementById('profile-screen')?.classList.contains('active')) {
             closeProfile();
         }
 
@@ -3730,11 +3964,10 @@ function renderPartnerAvatar(partnerId, chatId) {
     if (!partnerId || !chatsData[partnerId]) return;
     const user = chatsData[partnerId];
     if (String(getActiveChatId()) === String(chatId)) {
-        const headerAvatar = document.getElementById('user-avatar');
-        if (headerAvatar) {
-            headerAvatar.innerHTML = '';
-            appendAvatarHtml(headerAvatar, getDisplayAvatarHtml(user));
-        }
+        const html = getDisplayAvatarHtml(user);
+        chatHdrEach('user-avatar', (el) => {
+            fillChatHeaderAvatar(el, html, partnerId, false);
+        });
     }
     const profileIdEl = document.getElementById('profile-id');
     const profileAvatar = document.getElementById('profile-avatar');
@@ -3938,7 +4171,7 @@ function openComposerContextMenu(x, y) {
         : (window.list_items_icon_04 || []);
     if (!items.length) return;
 
-    showDropdown(inputField, items, 'icon', { x, y });
+    showDropdown(inputField, items, 'icon', { x, y }, { vertical: true });
 }
 
 if (inputField) {
@@ -4573,6 +4806,9 @@ function applyAccountDataLocally(data, { isSelf = false } = {}) {
         avatarRaw: data.avatar,
         hideAvatar: !!data.hide_avatar,
     });
+    if (isSelf && typeof fillNavMyProfileFromUser === 'function') {
+        fillNavMyProfileFromUser(chatsData[uid], uid);
+    }
 }
 
 async function saveAccountSettings() {
@@ -4662,13 +4898,13 @@ socket.on('contact_profile_updated', (data) => {
         }
     }
     if (String(getActiveChatId()) && window.chatIdToUserId?.[getActiveChatId()] === uid) {
-        const headerName = document.getElementById('user-name');
-        const headerAvatar = document.getElementById('user-avatar');
-        if (headerName) headerName.textContent = data.name || '';
-        if (headerAvatar) {
-            headerAvatar.innerHTML = '';
-            appendAvatarHtml(headerAvatar, getDisplayAvatarHtml(chatsData[uid]));
-        }
+        chatHdrEach('user-name', (el) => {
+            el.textContent = data.name || '';
+        });
+        const html = getDisplayAvatarHtml(chatsData[uid]);
+        chatHdrEach('user-avatar', (el) => {
+            fillChatHeaderAvatar(el, html, uid, false);
+        });
     }
 });
 
@@ -4731,11 +4967,16 @@ function syncChatSidePanelUi() {
         return;
     }
 
+    const toggleWrap = document.getElementById('chat-side-panel-toggle-wrap');
+    if (toggleWrap) toggleWrap.classList.toggle('hidden', !allowed);
     if (toggle) {
         toggle.classList.toggle('hidden', !allowed);
         toggle.classList.toggle('is-active', open);
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         syncChatSidePanelToggleIcon(open);
+    }
+    if (typeof syncProfileChatMenuVisibility === 'function') {
+        syncProfileChatMenuVisibility();
     }
 }
 
@@ -4819,6 +5060,12 @@ function syncViewportWidthDependentUi() {
 
     try {
         syncChatSidePanelUi();
+    } catch (_) { /* ignore */ }
+
+    try {
+        if (typeof syncProfileChatMenuVisibility === 'function') {
+            syncProfileChatMenuVisibility();
+        }
     } catch (_) { /* ignore */ }
 
     try {

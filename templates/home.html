@@ -6,53 +6,227 @@ Dovery
 
 {% block body %}
 <link href="/static/CSS/dovery.css" rel="stylesheet" type="text/css">
-<div class="page chats defult_bg" id="app">
-    <div class="header-wrapper header-bg">
-        <div class="header">
-            <div class="header-left right-two">
-                <div class="header-capsule one-btn" data-open-overlay="1">
-                    <a href="javascript:void(0)" class="element-header">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="33" height="33" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10010" inkscape:label="surface10010" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10010" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 192,255.36 C 198.36,255.36 203.52,249.0 203.52,243.84 C 203.52,243.84 203.52,176.16 203.52,176.16 C 203.52,169.79999999999998 198.36,164.64 192,164.64 C 185.64,164.64 180.48,171.0 180.48,176.16 C 180.48,176.16 180.48,243.84 180.48,243.84 C 180.48,250.20000000000002 185.64,255.36 192,255.36 C 192,255.36 192,255.36 192,255.36 Z" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> <g id="g_4" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 204.5,141.12 C 204.5,134.23000000000002 198.91,128.64 192.02,128.64 C 185.13000000000002,128.64 179.54,134.23000000000002 179.54,141.12 C 179.54,148.01 185.13000000000002,153.6 192.02,153.6 C 198.91,153.6 204.5,148.01 204.5,141.12 " style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> </g> </g> </svg>
-                    </a>
+<div class="page chats defult_bg has-navbar" id="app">
+    <div class="navbar-slider">
+        <!-- Вкладка 1: Все чаты -->
+        <div class="tab-slide">
+            <div class="header-wrapper header-bg">
+                <div class="gradient-blur">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+
+                <div class="header">
+                    <div class="header-left right-two">
+                        <div class="header-capsule one-btn" data-open-overlay="1">
+                            <a href="javascript:void(0)" class="element-header">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="33" height="33" viewBox="0 0 512 512" version="1.1" inkscape:export-xdpi="96" inkscape:export-ydpi="96" style="fill: none; stroke: none"> <g inkscape:groupmode="layer" id="surface10010" inkscape:label="surface10010" transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g id="g_1" inkscape:label="surface10010" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g id="g_2" transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g id="g_3" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 192,255.36 C 198.36,255.36 203.52,249.0 203.52,243.84 C 203.52,243.84 203.52,176.16 203.52,176.16 C 203.52,169.79999999999998 198.36,164.64 192,164.64 C 185.64,164.64 180.48,171.0 180.48,176.16 C 180.48,176.16 180.48,243.84 180.48,243.84 C 180.48,250.20000000000002 185.64,255.36 192,255.36 C 192,255.36 192,255.36 192,255.36 Z" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> <g id="g_4" transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 204.5,141.12 C 204.5,134.23000000000002 198.91,128.64 192.02,128.64 C 185.13000000000002,128.64 179.54,134.23000000000002 179.54,141.12 C 179.54,148.01 185.13000000000002,153.6 192.02,153.6 C 198.91,153.6 204.5,148.01 204.5,141.12 " style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> </g> </g> </svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="header-center">
+                        <div class="label headline6" id="title-status">
+                            <span id="title-status-text">Dovery</span><span class="conn-status-dots hidden" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+                        </div>
+                    </div>
+
+                    <div class="header-right">
+                        <div class="header-capsule one-btn">
+                            <div class="element-header" id="cntxt_menu_btn_01">
+                                <svg class="menu"><use href="#menu"></use></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-capsule search-container" data-open-screen="1" onclick="focusSearch();">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" class="search-input" placeholder="Поиск чатов" spellcheck="false" style="pointer-events: none;">
                 </div>
             </div>
+            <div id="chats-list"></div>
+        </div>
 
-            <div class="header-center">
-                <div class="label headline6" id="title-status">
-                    <span id="title-status-text">Dovery</span><span class="conn-status-dots hidden" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+        <!-- Вкладка 2: Настройки (secondary_bg; header: заголовок без капсулы + 1 кнопка справа) -->
+        <div class="tab-slide secondary_bg">
+            <div class="header-wrapper header-bg">
+                <div class="gradient-blur">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
                 </div>
-            </div>
-
-            <div class="header-right">
-                <div class="header-capsule one-btn">
-                    <div class="element-header" id="cntxt_menu_btn_01">
-                        <svg class="menu"><use href="#menu"></use></svg>
+                <div class="header">
+                    <div class="header-left">
+                        <div class="header-capsule one-btn" data-open-overlay="3">
+                            <div class="element-header" aria-label="Информация">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="33" height="33" viewBox="0 0 512 512" version="1.1" style="fill: none; stroke: none"> <g transform="matrix(1.3333000000000002, 0.0, 0.0, 1.3333000000000002, 0.0, 0.0)"> <g transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)"> <g transform="matrix(0.75, 0.0, 0.0, 0.75, 0.0, 0.0)" style="stroke:var(--tg-theme-text-color);stroke-opacity:1.0;stroke-width:30.72;stroke-miterlimit:4.0;stroke-linecap:butt;stroke-linejoin:miter"> <path d="M 256.02,92.81 C 346.5,92.81 419.86,183.29999999999998 419.86,256.65 C 419.86,347.13 346.5,420.49 256.02,420.49 C 165.53999999999996,420.49 92.18,330.0 92.18,256.65 C 92.18,166.16999999999996 165.53999999999996,92.81 256.02,92.81 C 256.02,92.81 256.02,92.81 256.02,92.81 Z"/> </g> <g transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 192,255.36 C 198.36,255.36 203.52,249.0 203.52,243.84 C 203.52,243.84 203.52,176.16 203.52,176.16 C 203.52,169.79999999999998 198.36,164.64 192,164.64 C 185.64,164.64 180.48,171.0 180.48,176.16 C 180.48,176.16 180.48,243.84 180.48,243.84 C 180.48,250.20000000000002 185.64,255.36 192,255.36 C 192,255.36 192,255.36 192,255.36 Z" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> <g transform="matrix(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)" style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"> <path d="M 204.5,141.12 C 204.5,134.23000000000002 198.91,128.64 192.02,128.64 C 185.13000000000002,128.64 179.54,134.23000000000002 179.54,141.12 C 179.54,148.01 185.13000000000002,153.6 192.02,153.6 C 198.91,153.6 204.5,148.01 204.5,141.12 " style="fill-opacity:1.0;fill:var(--tg-theme-text-color)"/> </g> </g> </g> </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="header-center">
+                        <div class="label headline6">Настройки</div>
+                    </div>
+                    <div class="header-right">
+                        <div class="header-capsule one-btn">
+                            <div class="element-header" id="cntxt_menu_btn_06">
+                                <svg class="menu"><use href="#menu"></use></svg>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            <section class="bottom">
+                <div class="item">
+                    <div class="right">
+                        <div class="title oneline second-title">
+                            <div class="button1-medium">Основные</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="item clicked" id="settings-account-btn" onclick="openAccountScreen();">
+                    <div class="left">
+                        <svg class="chat"><use href="#my_profile"></use></svg>
+                    </div>
+                    <div class="right separator">
+                        <div class="text oneline">
+                            <div class="label body1">Аккаунт</div>
+                        </div>
+                        <div class="element">
+                            <svg class="link"><use href="#link"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="item clicked">
+                    <div class="left">
+                        <svg class="chat"><use href="#chat"></use></svg>
+                    </div>
+                    <div class="right separator">
+                        <div class="text oneline">
+                            <div class="label body1">Настройки чатов</div>
+                        </div>
+                        <div class="element">
+                            <svg class="link"><use href="#link"></use></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="item clicked" id="settings-devices-btn" onclick="openDevicesScreen();">
+                    <div class="left">
+                        <svg class="chat"><use href="#device"></use></svg>
+                    </div>
+                    <div class="right">
+                        <div class="text oneline">
+                            <div class="label body1">Устройства</div>
+                        </div>
+                        <div class="element">
+                            <svg class="link"><use href="#link"></use></svg>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-        <div class="header-capsule search-container" data-open-screen="1" onclick="focusSearch();">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" class="search-input" placeholder="Поиск чатов" spellcheck="false" style="pointer-events: none;">
-        </div>
-        <div class="tab-header header-capsule adaptive">
-            <div class="tab subtitle1-medium actives" data-tab="1"><span>Чаты</span></div>
-            <div class="tab subtitle1-medium" data-tab="2"><span>Новое</span></div>
-            <div class="tab subtitle1-medium" data-tab="3"><span>Вкладка 3</span></div>
-            <div class="tab subtitle1-medium" data-tab="4"><span>Вкладка 4</span></div>
-            <div class="tab subtitle1-medium" data-tab="5"><span>Вкладка 5</span></div>
-            <div class="tab subtitle1-medium" data-tab="6"><span>Вкладка 6</span></div>
-            <div class="tab subtitle1-medium" data-tab="7"><span>Вкладка 7</span></div>
+
+        <!-- Вкладка 3: Профиль (как экран «Мой профиль») -->
+        <div class="tab-slide secondary_bg" id="nav-profile-tab">
+            <div style="position: relative;">
+                <div id="nav-profileBlock1" class="profile-block s-img">
+                    <div class="avatar" id="nav-profile-avatar"></div>
+                    <div class="defult headline6" id="nav-profile-name"></div>
+                    <div class="subname subtitle1" id="nav-profile-status"></div>
+                    <div class="hidden" id="nav-profile-id"></div>
+                </div>
+            </div>
+            <section class="bottom">
+                <div class="item">
+                    <div class="right">
+                        <div class="title oneline second-title">
+                            <div class="button1-medium">Информация</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="item clicked" id="cntxt_menu_btn_16">
+                    <div class="right">
+                        <div class="text twoline">
+                            <div class="label body1" id="nav-profile-username"></div>
+                            <div class="label subtitle subtitle1">Username</div>
+                        </div>
+                        <div class="element">
+                            <svg class="copy"><use href="#copy"></use></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="item hidden" id="nav-profile-userid-row">
+                    <div class="right">
+                        <div class="text oneline">
+                            <div class="label body1" id="nav-profile-userid"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="bottom">
+                <div class="item clicked" onclick="openAccountScreen();">
+                    <div class="left">
+                        <svg class="chat"><use href="#settings3"></use></svg>
+                    </div>
+                    <div class="right">
+                        <div class="text oneline">
+                            <div class="label body1">Редактировать аккаунт</div>
+                        </div>
+                        <div class="element">
+                            <svg class="link"><use href="#link"></use></svg>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 
-    <div class="tab-container-slider"><div class="tab-slide" id="1"><div id="chats-list"></div></div></div>
+    <div class="navbar-wrapper">
+        <div class="navbar-capsule header-capsule">
+            <div class="navbar-item actives" data-nav-tab="1">
+                <div class="navbar-icon">
+                    <svg class="chatol"><use href="#chatol"></use></svg>
+                </div>
+                <div class="navbar-label">Все чаты</div>
+            </div>
+            <div class="navbar-item" data-nav-tab="2">
+                <div class="navbar-icon">
+                    <svg class="nav_settings"><use href="#nav_settings"></use></svg>
+                </div>
+                <div class="navbar-label">Настройки</div>
+            </div>
+            <div class="navbar-item" data-nav-tab="3">
+                <div class="navbar-icon">
+                    <svg class="nav_profile"><use href="#nav_profile"></use></svg>
+                </div>
+                <div class="navbar-label">Профиль</div>
+            </div>
+        </div>
+    </div>
 
     <div data-screen="1" data-swipe class="screen hidden">
         <div class="header-wrapper header-bg">
+                <div class="gradient-blur">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+
             <div class="header">
                 <div class="header-left">
                     <div class="header-capsule one-btn" data-close-screen="1">
@@ -79,82 +253,6 @@ Dovery
         </div>
         <section><div id="search-results"></div></section>
     </div>
-    <div data-screen="4" data-swipe class="screen hidden">
-        <div class="header-wrapper header-bg">
-            <div class="header">
-                <div class="header-left">
-                    <div class="header-capsule one-btn" data-close-screen="4">
-                        <div class="element-header">
-                            <svg class="back"><use href="#back"></use></svg>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="header-center">
-                    <div class="label headline6">Настройки</div>
-                </div>
-
-                <div class="header-right">
-                    <div class="header-capsule one-btn" id="cntxt_menu_btn_06">
-                        <div class="element-header">
-                            <svg class="menu"><use href="#menu"></use></svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <section class="bottom">
-            <div class="item">
-                <div class="right">
-                    <div class="title oneline second-title">
-                        <div class="button1-medium">Основные</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="item clicked" id="settings-account-btn" onclick="openAccountScreen();">
-                <div class="left">
-                    <svg class="chat"><use href="#my_profile"></use></svg>
-                </div>
-                <div class="right separator">
-                    <div class="text oneline">  
-                        <div class="label body1">Аккаунт</div> 
-                    </div>
-                    <div class="element"> 
-                        <svg class="link"><use href="#link"></use></svg>
-                    </div>
-                </div>
-            </div>
-
-            <div class="item clicked">
-                <div class="left">
-                    <svg class="chat"><use href="#chat"></use></svg>
-                </div>
-                <div class="right separator">
-                    <div class="text oneline">  
-                        <div class="label body1">Настройки чатов</div> 
-                    </div>
-                    <div class="element"> 
-                        <svg class="link"><use href="#link"></use></svg>
-                    </div>
-                </div>
-            </div>
-
-            <div class="item clicked" id="settings-devices-btn" onclick="openDevicesScreen();">
-                <div class="left">
-                    <svg class="chat"><use href="#device"></use></svg>
-                </div>
-                <div class="right">
-                    <div class="text oneline">  
-                        <div class="label body1">Устройства</div> 
-                    </div>
-                    <div class="element"> 
-                        <svg class="link"><use href="#link"></use></svg>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
 </div>
 <button type="button" class="resizer" id="dragbar" tabindex="-1" aria-label="Изменить ширину списка чатов"></button>
 <div id="messages-host" class="messages-host">
@@ -164,46 +262,62 @@ Dovery
         <p class="label-no-chats">Выберите чат, либо используйте поиск</p>
     </div>
     <div id="chat-content" class="hidden" style="height: 100%;">
-        <div class="header-wrapper header-chat" id="header-chat">
-            <div class="header">
-                <div class="header-left right-two" id="close-chat-btn">
-                    <div class="header-capsule one-btn">
-                        <div class="element-header">
-                            <svg class="back"><use href="#back"></use></svg>
+                <div class="header-wrapper header-chat" id="header-chat">
+                <div class="header">
+                    <div class="header-left right-two" id="close-chat-btn">
+                        <div class="header-capsule one-btn">
+                            <div class="element-header">
+                                <svg class="back"><use href="#back"></use></svg>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="header-center-two clicked header-capsule" id="user-header">
-                    <div class="item">
-                        <div class="left" id="user-avatar">
-                        </div>
-                        <div class="right">
-                            <div class="text twoline"> 
-                                <div class="label body1" id="user-name"></div> 
-                                <div class="subtitle subtitle2" id="user-status">был(а) недавно</div> 
-                                <div class="subtitle2 active hidden" id="user-typing" aria-live="polite">
-                                    <span class="typing-dots" style="width: 17px;" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span> Печатает
+                    <!-- Wide (>=751): classic center-two + item -->
+                    <div class="header-center-two clicked header-capsule chat-header-wide" id="user-header">
+                        <div class="item">
+                            <div class="left" id="user-avatar">
+                            </div>
+                            <div class="right">
+                                <div class="text twoline">
+                                    <div class="label body1" id="user-name"></div>
+                                    <div class="subtitle subtitle2" id="user-status">был(а) недавно</div>
+                                    <div class="subtitle2 active hidden" id="user-typing" aria-live="polite">
+                                        <span class="typing-dots" style="width: 17px;" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span> Печатает
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="header-right chat-header-actions">
-                    <div class="header-capsule">
-                        <a class="element-header hidden" id="chat-side-panel-toggle" aria-expanded="false" aria-label="Открыть панель профиля">
-                            <svg class="grid" id="chat-side-panel-toggle-icon"><use href="#grid"></use></svg>
-                        </a>
-                        <a href="javascript:void(0)" class="element-header" id="cntxt_menu_btn_02">
-                            <svg class="menu"><use href="#menu"></use></svg>
-                        </a>
+                    <!-- Narrow (<=750): center-fit + avatar right -->
+                    <div class="header-center-fit header-capsule has-subtitle clicked chat-header-narrow" id="user-header-fit">
+                        <div class="header-fit-text">
+                            <div class="label button1-medium name-with-badge-host" id="user-name-fit"></div>
+                            <div class="label subtitle2 header-fit-subtitle" id="user-status-fit">был(а) недавно</div>
+                            <div class="label subtitle2 header-fit-subtitle active hidden" id="user-typing-fit" aria-live="polite">
+                                <span class="typing-dots" style="width: 17px;" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span> Печатает
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div style="display: none;" id="id_ept"></div>
+                    <div class="header-right chat-header-actions">
+                        <div class="header-capsule one-btn chat-header-narrow" id="user-header-ava-wrap">
+                            <div class="element-header" id="user-avatar-fit" aria-label="Профиль собеседника"></div>
+                        </div>
+                        <div class="header-capsule chat-header-wide one-btn" id="chat-header-menu-capsule">
+                            <a class="element-header hidden" id="chat-side-panel-toggle" aria-expanded="false" aria-label="Открыть панель профиля">
+                                <svg class="grid" id="chat-side-panel-toggle-icon"><use href="#grid"></use></svg>
+                            </a>
+                            <a href="javascript:void(0)" class="element-header" id="cntxt_menu_btn_02" aria-label="Меню чата">
+                                <svg class="menu"><use href="#menu"></use></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div style="display: none;" id="id_ept"></div>
+                </div>
             </div>
-        </div>
+
 
         <div class="sticky-chat-date" id="sticky-chat-date" hidden>
             <span class="chat-date-header caption1-medium"></span>
@@ -348,6 +462,14 @@ Dovery
                         </div>
                     </div>
                 </div>
+                <div class="header-center"></div>
+                <div class="header-right">
+                    <div class="header-capsule one-btn hidden" id="profile-chat-menu-wrap">
+                        <a href="javascript:void(0)" class="element-header" id="cntxt_menu_btn_12" aria-label="Меню чата">
+                            <svg class="menu"><use href="#menu"></use></svg>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -375,7 +497,7 @@ Dovery
                 </div>
             </div>
         </div>
-        <section class="bottom">
+        <section class="bottom" id="profile-info-section">
             <div class="item">
                 <div class="right">
                     <div class="title oneline second-title">
@@ -415,6 +537,15 @@ Dovery
 
     <div class="screen hidden devices-screen-dovery" id="devices-screen" data-screen="5" data-swipe data-inset-margin data-reveal-behind="#chat-content, #no-chat-content">
         <div class="header-wrapper header-bg">
+                <div class="gradient-blur">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+
             <div class="header">
                 <div class="header-left">
                     <div class="header-capsule one-btn" data-close-screen="5" id="close-devices">
@@ -546,7 +677,7 @@ Dovery
 <script src="/static/js/chat-list.js"></script>
 <script src="/static/js/check-wifi.js"></script>
 <div class="overlay-container" data-overlay="1">
-    <div class="profile-modal">
+    <div class="profile-modal" data-modal="card">
         <div class="header-wrapper">
             <div class="header">
                 <div class="header-left">
@@ -591,7 +722,7 @@ Dovery
     </div>
 </div>
 <div class="overlay-container" data-overlay="2">
-    <div class="profile-modal">
+    <div class="profile-modal" data-modal="card">
         <div class="header-wrapper">
             <div class="header">
                 <div class="header-left">
@@ -618,14 +749,47 @@ Dovery
         <div class="e2ee-hint subtitle2">Эмодзи строятся из общего ключа чата и одинаковы только у вас двоих.</div>
     </div>
 </div>
-<script src="/static/js/tma-ui-kit-3-0.js"></script>
+<div class="overlay-container" data-overlay="3">
+    <div class="profile-modal" data-modal="card">
+        <div class="header-wrapper">
+            <div class="header">
+                <div class="header-left">
+                    <div class="header-capsule one-btn" data-close-overlay="3">
+                        <div class="element-header">
+                            <svg class="close"><use href="#close"></use></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-center-two header-capsule">
+                    <div class="label headline6">Информация</div>
+                </div>
+            </div>
+        </div>
+        <div class="big-header" style="padding-top: 0;">
+            <img src="/static/img/hello.png">
+            <div class="big-header-title label headline6">Заголовок</div>
+            <div class="label body1">Описание</div>
+        </div>
+        <section class="bottom">
+            <div class="item">
+                <div class="right">
+                    <div class="text oneline">
+                        <div class="label body1">Как сделать</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+<script src="/static/js/tma-ui-kit-3-1.js"></script>
+<script src="/static/js/navbar.js"></script>
 <script>
 var list_items_icon_01 = [    
     { id: "theme", label: "Настройки", onclick:"toggleDoveryTheme();", icon:'settings3'}, 
     { separator: true },
     { label: "Избранное", onclick:"openOrCreateFavoritesChat();", icon:'saved'},
-    { label: "Мой профиль", onclick:"openProfile(); hideDropdown();", icon:'my_profile'},
-    { label: "Настройки", onclick:"openScreen(4); hideDropdown();", icon:'settings3'}
+    { label: "Мой профиль", onclick:"switchDoveryNavTab(3); hideDropdown();", icon:'my_profile'},
+    { label: "Настройки", onclick:"switchDoveryNavTab(2); hideDropdown();", icon:'settings3'}
 ];
 
 var list_items_icon_02 = [            
@@ -647,6 +811,8 @@ var list_items_icon_05 = [
     { label: "Username", onclick:"copy_username();", icon: 'copy_username_link' }
 ];
 var list_items_icon_15 = list_items_icon_05;
+var list_items_icon_16 = list_items_icon_05;
+var list_items_icon_12 = list_items_icon_02;
 
 var list_items_icon_06 = [ 
     { label: "Выход", danger: true, onclick:"logoutAccount();", icon: 'leave' },

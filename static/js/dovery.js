@@ -287,6 +287,15 @@ async function toggle_user_verify() {
     if (!partnerId || isFavoritesUserId(partnerId)) return;
 
     const currently = isUserVerified(chatsData[partnerId]);
+    const confirm = await d_alert(
+        currently ? 'Снять верификацию' : 'Верификация',
+        currently
+            ? 'Действительно снять верификацию у этого пользователя?'
+            : 'Действительно нужно дать верификацию?',
+        'ok_cancel'
+    );
+    if (confirm !== 'ok') return;
+
     try {
         const res = await fetch(`/api/users/${encodeURIComponent(partnerId)}/verify`, {
             method: 'POST',
@@ -466,10 +475,7 @@ function openChatHeaderProfile(userId) {
     const uid = userId != null ? String(userId) : '';
     if (!uid) return;
     const favorites = isFavoritesUserId(uid) || isFavoritesChat(chatsData[uid]);
-    if (favorites) {
-        openFavoritesProfile(uid);
-        return;
-    }
+    // Широкий экран + третья панель: и обычный профиль, и Избранное — в side panel
     if (typeof canShowChatSidePanelButton === 'function' && canShowChatSidePanelButton()) {
         if (typeof syncSidePanelProfile === 'function') {
             syncSidePanelProfile(uid);
@@ -480,6 +486,10 @@ function openChatHeaderProfile(userId) {
             }
         }
         activateChatSidePanelProfileTab();
+        return;
+    }
+    if (favorites) {
+        openFavoritesProfile(uid);
         return;
     }
     openProfile(uid, false, { source: 'header' });
@@ -1568,24 +1578,23 @@ function syncBlockMenuItem() {
     syncProfileChatMenuVisibility();
 }
 
-/** Wide: ⋮ in chat header. Narrow peer / Favorites profile: ⋮ in profile. Never in side panel. */
+/** Wide: ⋮ in chat header (в т.ч. Избранное). Narrow: ⋮ в профиле. Не в side panel. */
 function syncProfileChatMenuVisibility() {
     const profileScreen = document.getElementById('profile-screen');
     const favoritesProfile = profileScreen?.dataset.favoritesProfile === '1';
     const profileId = document.getElementById('profile-id')?.textContent?.trim() || '';
-    const openPartner = getOpenChatPartnerId();
-    const favoritesOpen = isFavoritesUserId(openPartner);
     const isNarrow = window.matchMedia('(max-width: 750px)').matches;
     const isPeerProfile = !!profileId
         && String(profileId) !== String(window.userId || '')
         && !favoritesProfile;
 
     const chatMenuBtn = document.getElementById('cntxt_menu_btn_02');
-    if (chatMenuBtn) chatMenuBtn.classList.toggle('hidden', favoritesOpen);
+    // На wide кнопка в шапке чата всегда доступна (в т.ч. избранное); на narrow шапка-wide скрыта CSS
+    if (chatMenuBtn) chatMenuBtn.classList.remove('hidden');
 
     const mainWrap = document.getElementById('profile-chat-menu-wrap');
     if (mainWrap) {
-        const showProfileMenu = favoritesProfile || (isNarrow && isPeerProfile);
+        const showProfileMenu = (favoritesProfile && isNarrow) || (isNarrow && isPeerProfile);
         mainWrap.classList.toggle('hidden', !showProfileMenu);
     }
 
@@ -2371,12 +2380,12 @@ socket.on('message_deleted', async (data) => {
 
         if (typeof chatHash !== 'undefined' && chatHash[chatId]) {
             const msgToDelete = chatHash[chatId].messages.find(msg => msg.id === data.msg_id);
-            
+
             if (msgToDelete) {
                 dateLabelToRemove = getShortDateLabel(msgToDelete.time);
-                
+
                 chatHash[chatId].messages = chatHash[chatId].messages.filter(msg => msg.id !== data.msg_id);
-                
+
                 const hasMoreMessagesThisDay = chatHash[chatId].messages.some(
                     msg => getShortDateLabel(msg.time) === dateLabelToRemove
                 );
@@ -2391,103 +2400,34 @@ socket.on('message_deleted', async (data) => {
         }
 
         const messageElement = document.querySelector(`[data-id="${data.msg_id}"]`);
-        if (messageElement) {
-            const wrapper = messageElement.closest('.message-wrapper');
-            if (wrapper) {
-                try {
-                    let dateHeaderElement = null;
-                    if (shouldRemoveDateHeader && dateLabelToRemove) {
-                        const headers = messagesArea.querySelectorAll('.chat-date-group');
-                        for (let header of headers) {
-                            if (header.textContent.trim() === dateLabelToRemove) {
-                                dateHeaderElement = header;
-                                break;
-                            }
-                        }
-                    }
+        const wrapper = messageElement?.closest('.message-wrapper');
+        if (!wrapper) return;
 
-                    const pixels = await htmlToImage.toPixelData(wrapper, { pixelRatio: 1 });
-                    
-                    const width = wrapper.offsetWidth;
-                    const height = wrapper.offsetHeight;
-                    const rect = wrapper.getBoundingClientRect();
-
-                    wrapper.style.visibility = 'hidden';
-                    
-                    if (dateHeaderElement) {
-                        dateHeaderElement.style.transition = 'opacity 0.2s ease-out, transform 0.5s ease-out';
-                        dateHeaderElement.style.opacity = '0';
-                    }
-
-                    const layersCount = 20;
-                    const layers = [];
-                    
-                    for (let i = 0; i < layersCount; i++) {
-                        const c = document.createElement('canvas');
-                        c.width = width;
-                        c.height = height;
-                        c.className = 'dust';
-                        c.style.cssText = `
-                            position: absolute;
-                            left: ${rect.left}px;
-                            top: ${rect.top + window.scrollY}px;
-                            width: ${width}px;
-                            height: ${height}px;
-                            pointer-events: none;
-                            z-index: 9999;
-                            transition: transform 0.8s ease-out, opacity 0.6s ease-out;
-                        `;
-                        document.body.appendChild(c);
-                        layers.push({ c, ctx: c.getContext('2d'), imgData: c.getContext('2d').createImageData(width, height) });
-                    }
-
-                    for (let i = 0; i < pixels.length; i += 12) { 
-                        const x = (i / 4) % width;
-                        const lIdx = Math.floor(layersCount * (Math.random() + (2 * x / width)) / 3) % layersCount;
-                        const d = layers[lIdx].imgData.data;
-
-                        d[i] = pixels[i]; 
-                        d[i+1] = pixels[i+1]; 
-                        d[i+2] = pixels[i+2]; 
-                        d[i+3] = pixels[i+3];
-                    }
-
-                    layers.forEach((l, i) => {
-                        l.ctx.putImageData(l.imgData, 0, 0);
-                        requestAnimationFrame(() => {
-                            const x = (i - layersCount / 2) * 10;
-                            const y = 0 - Math.random() * 40;
-                            l.c.style.transform = `translate(${x}px, ${y}px) rotate(${(Math.random()-0.5)}rad)`;
-                            l.c.style.opacity = '0';
-                        });
-                        setTimeout(() => l.c.remove(), 1000);
-                    });
-
-                    setTimeout(() => {
-                        wrapper.remove();
-                        if (dateHeaderElement) {
-                            dateHeaderElement.remove();
-                        }
-                        applyMessageGrouping(messagesArea);
-                        scheduleStickyChatDateUpdate();
-                    }, 500);
-
-                } catch (err) {
-                    wrapper.remove();
-                    if (dateHeaderElement) {
-                        const headers = messagesArea.querySelectorAll('.chat-date-group');
-                        for (let header of headers) {
-                            if (header.textContent.trim() === dateLabelToRemove) {
-                                header.remove();
-                                break;
-                            }
-                        }
-                    }
-                    applyMessageGrouping(messagesArea);
-                    scheduleStickyChatDateUpdate();
+        let dateHeaderElement = null;
+        if (shouldRemoveDateHeader && dateLabelToRemove && messagesArea) {
+            const headers = messagesArea.querySelectorAll('.chat-date-group');
+            for (const header of headers) {
+                if (header.textContent.trim() === dateLabelToRemove) {
+                    dateHeaderElement = header;
+                    break;
                 }
             }
         }
+
+        const finishRemove = () => {
+            wrapper.remove();
+            if (dateHeaderElement) dateHeaderElement.remove();
+            if (typeof applyMessageGrouping === 'function') applyMessageGrouping(messagesArea);
+            if (typeof scheduleStickyChatDateUpdate === 'function') scheduleStickyChatDateUpdate();
+        };
+
+        wrapper.style.transition = 'opacity 0.18s ease-out';
+        wrapper.style.opacity = '0';
+        if (dateHeaderElement) {
+            dateHeaderElement.style.transition = 'opacity 0.18s ease-out';
+            dateHeaderElement.style.opacity = '0';
+        }
+        setTimeout(finishRemove, 180);
     } catch (err) {
         console.error("Ошибка при удалении сообщения:", err);
     }
@@ -2780,6 +2720,7 @@ function insertNewMessageWithDateCheck(messagesArea, messageWrapper, msgTime) {
 
     messagesArea.prepend(messageWrapper);
     applyMessageGrouping(messagesArea);
+    fitMessageMetaLayout(messageWrapper);
     scheduleStickyChatDateUpdate();
 }
 
@@ -3167,6 +3108,63 @@ function receivedMessageInfoHtml(timeStr) {
             </div>`;
 }
 
+/** Короткие однострочные — время (+галочки у sent) в одной строке с текстом.
+ *  Порог одинаковый для received/sent: textW + gap + metaW ≤ max ширины пузыря. */
+function fitMessageMetaLayout(bubbleOrRoot) {
+    const bubble = bubbleOrRoot?.classList?.contains('message-bubble')
+        ? bubbleOrRoot
+        : bubbleOrRoot?.querySelector?.('.message-bubble');
+    if (!bubble) return;
+    const content = bubble.querySelector('.message-content');
+    const info = bubble.querySelector('.message-info');
+    if (!content || !info) return;
+
+    const META_INLINE_GAP = 6;
+
+    const run = () => {
+        if (!bubble.isConnected) return;
+        bubble.classList.remove('is-meta-inline');
+
+        const style = window.getComputedStyle(content);
+        let lineHeight = parseFloat(style.lineHeight);
+        if (!Number.isFinite(lineHeight) || lineHeight < 8) {
+            lineHeight = (parseFloat(style.fontSize) || 16) * 1.5;
+        }
+        if (content.scrollHeight > lineHeight * 1.4 + 1) return;
+
+        const contentW = Math.ceil(content.getBoundingClientRect().width);
+        const infoW = Math.ceil(info.getBoundingClientRect().width);
+        if (contentW < 1 || infoW < 1) return;
+
+        const bubbleStyle = window.getComputedStyle(bubble);
+        const padX = (parseFloat(bubbleStyle.paddingLeft) || 0)
+            + (parseFloat(bubbleStyle.paddingRight) || 0);
+        let maxOuter = parseFloat(bubbleStyle.maxWidth);
+        if (!Number.isFinite(maxOuter) || maxOuter <= 0) {
+            const parent = bubble.parentElement;
+            maxOuter = parent ? parent.clientWidth : bubble.clientWidth;
+        }
+        const availableInner = Math.max(0, maxOuter - padX);
+        if (contentW + META_INLINE_GAP + infoW > availableInner + 0.5) return;
+
+        bubble.classList.add('is-meta-inline');
+        if (content.scrollHeight > lineHeight * 1.4 + 1) {
+            bubble.classList.remove('is-meta-inline');
+        }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(run));
+}
+
+function fitMessageMetaIn(root) {
+    if (!root) return;
+    if (root.classList?.contains('message-bubble')) {
+        fitMessageMetaLayout(root);
+        return;
+    }
+    root.querySelectorAll?.('.message-bubble').forEach((b) => fitMessageMetaLayout(b));
+}
+
 function applyMessageReadStatus(root, isRead) {
     const status = root && root.querySelector('.message-status');
     if (!status) return;
@@ -3258,12 +3256,15 @@ async function sendMessage() {
     wrapper.dataset.sender = String(userId ?? window.userId ?? '');
     wrapper.innerHTML = `
         <div class="message-bubble sent" data-id="${msgId}">
-            <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-            ${sentMessageInfoHtml(time, favorites)}
+            <div class="message-inner">
+                <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
+                ${sentMessageInfoHtml(time, favorites)}
+            </div>
         </div>
     `;
 
     setMessageContent(wrapper.querySelector('.message-content'), text);
+    fitMessageMetaLayout(wrapper);
 
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
@@ -3364,8 +3365,10 @@ socket.on('new_message', async (data) => {
                 wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
                     <div class="message-bubble sent" data-id="${data.msg_id}">
-                        <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-                        ${sentMessageInfoHtml(data.time, readFlag)}
+                        <div class="message-inner">
+                            <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
+                            ${sentMessageInfoHtml(data.time, readFlag)}
+                        </div>
                     </div>
                 `;
             } else {
@@ -3376,13 +3379,16 @@ socket.on('new_message', async (data) => {
                 wrapper.dataset.sender = String(data.sender_id);
                 wrapper.innerHTML = `
                     <div class="message-bubble received" data-id="${data.msg_id}">
-                        <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
-                        ${receivedMessageInfoHtml(data.time)}
+                        <div class="message-inner">
+                            <div class="message-content body1" style="overflow-wrap: anywhere; white-space: pre-wrap;"></div>
+                            ${receivedMessageInfoHtml(data.time)}
+                        </div>
                     </div>
                 `;
             }
 
             setMessageContent(wrapper.querySelector('.message-content'), decryptedText);
+            fitMessageMetaLayout(wrapper);
             insertNewMessageWithDateCheck(messagesArea, wrapper, data.time);
 
             // Входящие: вниз только если уже были у низа ленты
@@ -3545,11 +3551,14 @@ function buildMessageWrapper(msg, currentUserId) {
     wrapper.dataset.sender = String(msg.sender_id);
     wrapper.innerHTML = `
         <div class="message-bubble ${typeClass}">
-            <div class="message-content body1"></div>
-            ${mne ? receivedMessageInfoHtml(msg.time) : sentMessageInfoHtml(msg.time, isMessageRead(msg.is_read))}
+            <div class="message-inner">
+                <div class="message-content body1"></div>
+                ${mne ? receivedMessageInfoHtml(msg.time) : sentMessageInfoHtml(msg.time, isMessageRead(msg.is_read))}
+            </div>
         </div>
     `;
     setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
+    fitMessageMetaLayout(wrapper);
     return wrapper;
 }
 
@@ -3609,6 +3618,7 @@ async function loadOlderMessages(chatId) {
             }
             rebuildDateHeaders(area);
             applyMessageGrouping(area);
+            fitMessageMetaIn(area);
             if (cache.hasMore) ensureHistorySentinel(area);
             else area.querySelector('#history-load-sentinel')?.remove();
         });
@@ -3721,6 +3731,7 @@ function renderChat(messagesArea, messages, currentUserId) {
 
     messagesArea.prepend(fragment);
     applyMessageGrouping(messagesArea);
+    fitMessageMetaIn(messagesArea);
     // column-reverse: низ ленты (новые) при scrollTop = 0
     messagesArea.scrollTop = 0;
     bindStickyChatDate();
@@ -3728,7 +3739,13 @@ function renderChat(messagesArea, messages, currentUserId) {
 
 function formatTime(timeStr) {
     const date = new Date(timeStr);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (Number.isNaN(date.getTime())) return '';
+    // Всегда 24ч без AM/PM (на en-US toLocaleTimeString иначе добавляет AM/PM)
+    return date.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
 }
 
 /**
@@ -3986,11 +4003,27 @@ function renderPartnerAvatar(partnerId, chatId) {
 }
 
 const THEME_STORAGE_KEY = 'dovery-theme';
+const WALLPAPER_STORAGE_KEY = 'dovery-wallpaper';
 
 function getDoveryTheme() {
     const attr = document.documentElement.getAttribute('data-theme');
     if (attr === 'dark' || attr === 'light') return attr;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+/** classic — прежний стек градиентов; pattern — чёрный фон + шаблон bg.png (по умолчанию в dark). */
+function getDoveryWallpaper() {
+    const attr = document.documentElement.getAttribute('data-wallpaper');
+    if (attr === 'classic' || attr === 'pattern') return attr;
+    return getDoveryTheme() === 'dark' ? 'pattern' : 'classic';
+}
+
+function applyDoveryWallpaper(mode) {
+    const next = mode === 'classic' ? 'classic' : 'pattern';
+    document.documentElement.setAttribute('data-wallpaper', next);
+    try {
+        localStorage.setItem(WALLPAPER_STORAGE_KEY, next);
+    } catch (e) {}
 }
 
 function getThemeMenuItem() {
@@ -4031,6 +4064,14 @@ function applyDoveryTheme(theme) {
     try {
         localStorage.setItem(THEME_STORAGE_KEY, next);
     } catch (e) {}
+    // При смене темы подставляем дефолтные обои, если пользователь ещё не выбирал явно
+    let wallpaper = null;
+    try {
+        wallpaper = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+    } catch (e) {}
+    if (wallpaper !== 'classic' && wallpaper !== 'pattern') {
+        applyDoveryWallpaper(next === 'dark' ? 'pattern' : 'classic');
+    }
     syncThemeMenuItem();
 }
 
@@ -4042,6 +4083,8 @@ window.getDoveryTheme = getDoveryTheme;
 window.toggleDoveryTheme = toggleDoveryTheme;
 window.syncThemeMenuItem = syncThemeMenuItem;
 window.applyDoveryTheme = applyDoveryTheme;
+window.getDoveryWallpaper = getDoveryWallpaper;
+window.applyDoveryWallpaper = applyDoveryWallpaper;
 
 const E2EE_EMOJI_POOL = [
     '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈',
@@ -4074,6 +4117,9 @@ async function buildE2eeEmojiStrip(count = 6) {
 }
 
 async function openE2eeOverlay() {
+    if (typeof hideDropdown === 'function') {
+        await hideDropdown();
+    }
     const strip = document.getElementById('e2ee-emoji-strip');
     if (strip) {
         const emojis = await buildE2eeEmojiStrip(6);
@@ -4226,7 +4272,7 @@ function openMessageContextMenu(wrapper, x, y) {
     if (!wrapper || typeof showDropdown !== 'function') return;
     if (Date.now() - messageMenuAt < 350) return;
     messageMenuAt = Date.now();
-    showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y });
+    showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y }, { vertical: true });
 }
 
 if (messagesArea) {

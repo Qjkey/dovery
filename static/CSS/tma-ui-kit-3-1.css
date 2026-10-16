@@ -27,6 +27,7 @@
 
     --tg-theme-icon-message-color: #57B84C;
 
+    --wallpaper-base: var(--bg-one);
     --first-gradient: linear-gradient(135deg, 
         color-mix(in srgb, var(--bg-one) 54%, transparent) 0%, 
         color-mix(in srgb, var(--bg-two) 54%, transparent) 50%, 
@@ -55,28 +56,48 @@
         --tg-theme-profile-block-bg-color: var(--tg-theme-header-bg-color);
         --tg-theme-button-profile-color: rgba(0, 0, 0, 0.3);
 
-        --bg-one: #172431;
-        --bg-two: #0E141A;
-        --bg-three: #0F171E;
-
         --rainbow-one: #ff416c;
         --rainbow-two: #8a2387;
         --rainbow-three: #3a7bd5;
-        
+
         --tg-theme-message-bg-color-sent: var(--tg-theme-section-bg-color);
         --tg-theme-message-bg-color-received: var(--tg-theme-bg-color);
         --tg-theme-message-text-color: var(--tg-theme-text-color);
 
         --tg-theme-icon-message-color: var(--tg-theme-accent-text-color);
 
-        --first-gradient: linear-gradient(135deg, var(--bg-one) 0%, var(--bg-two) 50%, var(--bg-three) 100%);
-        --main-gradient: linear-gradient(135deg, 
-            color-mix(in srgb, var(--rainbow-one) 30%, transparent) 0%, 
-            color-mix(in srgb, var(--rainbow-two) 30%, transparent) 50%, 
-            color-mix(in srgb, var(--rainbow-three) 30%, transparent) 100%
+        /* Default dark: чёрная база + bg.png через exclusion (soft-light на #000 паттерн не проявляет) */
+        --wallpaper-base: #000000;
+        --bg-one: #1e2d3c;
+        --bg-two: #141c24;
+        --bg-three: #0f161c;
+        --first-gradient: linear-gradient(135deg,
+            color-mix(in srgb, var(--bg-one) 50%, transparent) 0%,
+            color-mix(in srgb, var(--bg-two) 50%, transparent) 50%,
+            color-mix(in srgb, var(--bg-three) 50%, transparent) 100%
+        );
+        --main-gradient: linear-gradient(135deg,
+            color-mix(in srgb, var(--rainbow-one) 32%, transparent) 0%,
+            color-mix(in srgb, var(--rainbow-two) 32%, transparent) 50%,
+            color-mix(in srgb, var(--rainbow-three) 32%, transparent) 100%
         );
         --blend-mode: exclusion, normal;
         color-scheme: dark;
+}
+
+/* Preserved previous dark wallpaper (opaque blue gradient + exclusion) — for future chat wallpaper settings */
+:root[data-theme="dark"][data-wallpaper="classic"] {
+        --wallpaper-base: #0E141A;
+        --bg-one: #172431;
+        --bg-two: #0E141A;
+        --bg-three: #0F171E;
+        --first-gradient: linear-gradient(135deg, var(--bg-one) 0%, var(--bg-two) 50%, var(--bg-three) 100%);
+        --main-gradient: linear-gradient(135deg,
+            color-mix(in srgb, var(--rainbow-one) 30%, transparent) 0%,
+            color-mix(in srgb, var(--rainbow-two) 30%, transparent) 50%,
+            color-mix(in srgb, var(--rainbow-three) 30%, transparent) 100%
+        );
+        --blend-mode: exclusion, normal;
 }
 
 .label {
@@ -605,8 +626,8 @@ input:checked + .slider:before {
 
 @font-face {
     font-family: "Roboto";
-    src: url("fonts/Roboto.ttf") format("truetype");
-    font-display: block;
+    src: url("font/Roboto.ttf") format("truetype");
+    font-display: swap;
 }
 .headline-sf {
     font-family: "SF pro display";
@@ -1293,10 +1314,13 @@ input:focus {
 }
 
 :root {
-    --message-border-radius: 18px;
+    --message-border-radius: 20px;
+    --message-join-radius: 10px;
     --message-sent-background: #DCB8FF;
     --message-received-background: #ffffff;
     --message-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    /* Хвостик из templates/Sender=False, Message Type=Text.svg (path у левого края) */
+    --message-tail-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='2.3 15 13.2 17'%3E%3Cpath fill='black' d='M8.26074 15C8.51337 17.8617 9.00269 20.0067 9.95312 21.8721C11.2481 24.4135 13.1224 26.5983 15.4082 28.2598C12.5307 30.56 8.91647 31.9305 4.99121 31.9307C4.10302 31.9307 3.23034 31.8598 2.37891 31.7246C5.57649 30.0392 7.79925 26.7524 7.97852 22.9307V15H8.26074Z'/%3E%3C/svg%3E");
 }
 
 
@@ -1309,7 +1333,7 @@ input:focus {
     max-width: 100%;
     min-width: 0;
     flex-shrink: 0;
-    margin-top: 8px;
+    margin-top: 10px;
     box-sizing: border-box;
 }
 
@@ -1321,21 +1345,30 @@ input:focus {
     justify-content: flex-start; 
 }
 
-/* Сообщения в группе ближе друг к другу */
+/* Одинаковый тип (ряд) — 5px; разный тип — базовые 10px */
 .message-wrapper.msg-group-follow {
-    margin-top: 2px;
+    margin-top: 4px;
 }
 
 .message-bubble {
     position: relative;
+    width: fit-content;
     max-width: min(60vw, 100%);
     min-width: 0;
-    padding: 5px 10px;
-    border-radius: 14px; 
+    padding: 8px 10px;
+    border-radius: var(--message-border-radius);
     line-height: 1.5;
     box-sizing: border-box;
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+.message-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .message-content {
@@ -1345,6 +1378,25 @@ input:focus {
     color: var(--tg-theme-message-text-color);
     min-width: 0;
     max-width: 100%;
+}
+
+/* Короткие однострочные: текст + время(/галочки) в одну строку — sent и received */
+.message-bubble.is-meta-inline .message-inner {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 6px;
+}
+.message-bubble.is-meta-inline .message-content {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: none;
+}
+.message-bubble.is-meta-inline .message-info {
+    flex: 0 0 auto;
+    margin-top: 0;
+    margin-bottom: 0;
+    align-self: flex-end;
 }
 
 .msg-link,
@@ -1368,66 +1420,112 @@ input:focus {
 
 .message-bubble.received {
     background-color: var(--tg-theme-message-bg-color-received);
-    border-bottom-left-radius: 0px;
 }
 
 .message-bubble.sent {
     background-color: var(--tg-theme-message-bg-color-sent);
-    border-bottom-right-radius: 0px;
 }
 
-/* Последнее в группе (самое новое): верхний угол «хвоста» без радиуса — склейка с предыдущим */
-.message-wrapper.msg-group-last .message-bubble.sent {
-    border-top-right-radius: 0;
+/* Хвостик сбоку — только у одиночного или последнего в ряду */
+.message-bubble.received::after,
+.message-bubble.sent::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 14px;
+    height: 18px;
+    pointer-events: none;
+    background-color: inherit;
+    -webkit-mask-image: var(--message-tail-mask);
+    mask-image: var(--message-tail-mask);
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
 }
+
+.message-bubble.received::after {
+    left: -6px;
+}
+
+.message-bubble.sent::after {
+    right: -6px;
+    left: auto;
+    transform: scaleX(-1);
+}
+
+.message-wrapper.msg-group-first .message-bubble::after,
+.message-wrapper.msg-group-middle .message-bubble::after {
+    content: none;
+    display: none;
+}
+
+/* Стыки соседних в ряду: 10px на стороне выравнивания */
 .message-wrapper.msg-group-last .message-bubble.received {
-    border-top-left-radius: 0;
+    border-top-left-radius: var(--message-join-radius);
 }
-
-/* Средние в группе: плоские углы со стороны склейки */
-.message-wrapper.msg-group-middle .message-bubble.sent {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
+.message-wrapper.msg-group-first .message-bubble.received {
+    border-bottom-left-radius: var(--message-join-radius);
 }
 .message-wrapper.msg-group-middle .message-bubble.received {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+    border-top-left-radius: var(--message-join-radius);
+    border-bottom-left-radius: var(--message-join-radius);
 }
 
-/* Адаптация для десктопа - все сообщения слева */
+.message-wrapper.msg-group-last .message-bubble.sent {
+    border-top-right-radius: var(--message-join-radius);
+}
+.message-wrapper.msg-group-first .message-bubble.sent {
+    border-bottom-right-radius: var(--message-join-radius);
+}
+.message-wrapper.msg-group-middle .message-bubble.sent {
+    border-top-right-radius: var(--message-join-radius);
+    border-bottom-right-radius: var(--message-join-radius);
+}
+
+/* Адаптация для десктопа — все сообщения слева, хвостик слева и у sent */
 @media (min-width: 768px) {
     .message-wrapper.sent { 
         justify-content: flex-start; 
     }
 
-    .message-bubble.sent {
-        border-bottom-right-radius: 14px;
-        border-bottom-left-radius: 0px;
+    .message-bubble.sent::after {
+        left: -6px;
+        right: auto;
+        transform: none;
     }
 
     .message-wrapper.msg-group-last .message-bubble.sent {
-        border-top-right-radius: 14px;
-        border-top-left-radius: 0;
+        border-top-right-radius: var(--message-border-radius);
+        border-top-left-radius: var(--message-join-radius);
     }
-
+    .message-wrapper.msg-group-first .message-bubble.sent {
+        border-bottom-right-radius: var(--message-border-radius);
+        border-bottom-left-radius: var(--message-join-radius);
+    }
     .message-wrapper.msg-group-middle .message-bubble.sent {
-        border-top-right-radius: 14px;
-        border-bottom-right-radius: 14px;
-        border-top-left-radius: 0;
-        border-bottom-left-radius: 0;
+        border-top-right-radius: var(--message-border-radius);
+        border-bottom-right-radius: var(--message-border-radius);
+        border-top-left-radius: var(--message-join-radius);
+        border-bottom-left-radius: var(--message-join-radius);
     }
 }
 
-/* Информация о сообщении (время, статус) */
+/* Мета в углу пузыря: заходит в padding, текст padding сохраняет */
 .message-info {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 4px;
-    margin-top: 4px;
+    margin-top: 2px;
+    margin-bottom: -4px;
+    margin-right: -2px;
     font-size: 11px;
     opacity: 0.6;
     color: var(--tg-theme-subtitle-text-color);
+    line-height: 1.2;
 }
 
 .message-status svg {
@@ -2130,7 +2228,7 @@ body.screens-active {
 
   .messages.screen {
     height: 100dvh;
-    background-color: transparent !important; 
+    background-color: var(--wallpaper-base, transparent) !important;
     background-image: var(--first-gradient), 
                       var(--bg-image), 
                       var(--main-gradient);
@@ -2284,7 +2382,7 @@ body {
     overscroll-behavior: none;
     position: fixed;
     inset: 0;
-    background-color: var(--bg-one);
+    background-color: var(--wallpaper-base, var(--bg-one));
     background-position: center, center;
     background-image: var(--first-gradient), 
                       var(--bg-image), 

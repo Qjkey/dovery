@@ -528,6 +528,27 @@ img.avatar-pending {
   color: var(--tg-theme-button-color);
 }
 
+/* Nav profile = same action buttons as peer profile (section-bg), no extra gaps */
+#nav-profile-tab .big-profile-block {
+  margin: 0;
+  padding: 0;
+}
+#nav-profile-tab .big-profile-block .buttons {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+#nav-profile-tab .big-profile-block .button-icon svg.settings {
+  color: var(--tg-theme-text-color);
+  fill: var(--tg-theme-text-color);
+}
+
+/* Chat messages: finger scroll; swipe-to-close still handled by screen listeners */
+.messages-area {
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Keep gradient-blur nodes in HTML, but never show blur — plain gradient only */
 .page .header-wrapper .gradient-blur,
 .screen .header-wrapper .gradient-blur,
@@ -1310,6 +1331,18 @@ body.is-resizing-chats * {
 }
 
 .message-info .message-time {
+  opacity: 0.6;
+}
+
+/* Светлая тема: время исходящих = цвет галочки */
+:root:not([data-theme="dark"]) .message-bubble.sent .message-info .message-time {
+  color: var(--tg-theme-icon-message-color);
+  opacity: 1;
+}
+
+/* Тёмная тема: время как раньше (subtitle) */
+:root[data-theme="dark"] .message-info .message-time {
+  color: var(--tg-theme-subtitle-text-color);
   opacity: 0.6;
 }
 

@@ -317,22 +317,32 @@ function positionTagDropdown(buttonElement, widthSize, anchor, vertical) {
           ? (() => { const r = buttonElement.getBoundingClientRect(); return r.left + r.width / 2; })()
           : window.innerWidth / 2);
 
+  // Вертикальное меню — чуть выше точки нажатия, чтобы не перекрывать текст
+  const VERTICAL_ABOVE_PX = 9;
+
   if (isV && window.innerWidth < 750) {
-      // Узкий экран: X по центру viewport, Y — по пальцу/мыши
+      // Узкий экран: X по центру viewport, Y — над пальцем/мышью
       tagDropdown.classList.add('is-centered');
       tagDropdown.style.left = '50%';
-      top = anchorY - menuH / 2;
+      top = anchorY - menuH - VERTICAL_ABOVE_PX;
+      if (top < pad) {
+          // Не хватает места сверху — ставим ниже точки
+          top = Math.min(anchorY + VERTICAL_ABOVE_PX, window.innerHeight - menuH - pad);
+      }
       if (top + menuH > window.innerHeight - pad) top = window.innerHeight - menuH - pad;
       if (top < pad) top = pad;
       tagDropdown.style.top = `${top}px`;
-      tagDropdown.style.transformOrigin = 'center center';
+      tagDropdown.style.transformOrigin = 'center bottom';
       return;
   }
 
   if (isV) {
-      // Широкий экран: чётко по координатам клика (центр меню в точке)
+      // Широкий экран: по X центрируем, по Y — над точкой клика
       left = anchorX - menuW / 2;
-      top = anchorY - menuH / 2;
+      top = anchorY - menuH - VERTICAL_ABOVE_PX;
+      if (top < pad) {
+          top = Math.min(anchorY + VERTICAL_ABOVE_PX, window.innerHeight - menuH - pad);
+      }
   } else if (anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)) {
       left = anchor.x;
       top = anchor.y;
@@ -358,7 +368,7 @@ function positionTagDropdown(buttonElement, widthSize, anchor, vertical) {
 
   tagDropdown.style.left = `${left}px`;
   tagDropdown.style.top = `${top}px`;
-  tagDropdown.style.transformOrigin = isV ? 'center center' : 'top right';
+  tagDropdown.style.transformOrigin = isV ? 'center bottom' : 'top right';
 }
 
 function isDropdownVisible() {
@@ -940,17 +950,25 @@ document.querySelectorAll('[id^="cntxt_menu_btn_"]').forEach(button => {
 });
 
 
-// Закрываем меню, если клик произошел вне его или вне кнопки, которая его открыла
-document.addEventListener('click', function(event) {
+function isEventInsideOpenDropdown(target) {
+  if (!target || !target.closest) return false;
+  if (tagDropdown && tagDropdown.contains(target)) return true;
+  if (currentOpenButton && currentOpenButton.contains(target)) return true;
+  // Кнопка-триггер (шапка и т.п.)
+  if (target.closest('[id^="cntxt_menu_btn_"]')) return true;
+  return false;
+}
+
+function closeDropdownIfOutside(event) {
   if (!tagDropdown || !isDropdownVisible()) return;
   if (tagDropdown.classList.contains('closing') || tagDropdown.classList.contains('morphing')) return;
-  if (
-      !tagDropdown.contains(event.target) &&
-      currentOpenButton && !currentOpenButton.contains(event.target)
-  ) {
-      hideDropdown();
-  }
-});
+  if (isEventInsideOpenDropdown(event.target)) return;
+  hideDropdown();
+}
+
+// pointerdown в capture — надёжнее click на таче для вертикального/обычного меню
+document.addEventListener('pointerdown', closeDropdownIfOutside, true);
+document.addEventListener('click', closeDropdownIfOutside, true);
 
 // Дополнительно: закрываем меню по нажатию клавиши Escape
 document.addEventListener('keydown', function(event) {
@@ -2560,10 +2578,12 @@ document.addEventListener('DOMContentLoaded', initTabsLogic);
  * CSS overscroll-behavior на части WebKit недостаточен.
  */
 (function initScrollOverscrollLock() {
+  // Чат (.messages-area, column-reverse) НЕ трогаем: scrollTop/atTop на WebKit
+  // ломаются и preventDefault глушит пальцевый скролл (колёсико при этом работает).
   const SCROLLER_SELECTOR = [
     '.screen.has-navbar > .navbar-slider > .tab-slide',
     '.page.has-navbar > .navbar-slider > .tab-slide',
-    '.screen',
+    '.screen:not(.messages)',
     '.profile-modal-scroll',
     '.profile-modal'
   ].join(', ');
@@ -2582,6 +2602,15 @@ document.addEventListener('DOMContentLoaded', initTabsLogic);
     return null;
   }
 
+  function hasNestedTouchScroller(scroller) {
+    if (!scroller || !scroller.querySelector) return false;
+    const nested = scroller.querySelector('.messages-area, .tab-slide, .profile-modal-scroll');
+    if (!nested || nested === scroller) return false;
+    const oy = getComputedStyle(nested).overflowY;
+    if (oy !== 'auto' && oy !== 'scroll') return false;
+    return nested.scrollHeight > nested.clientHeight + 1;
+  }
+
   document.addEventListener(
     'touchstart',
     (e) => {
@@ -2598,6 +2627,8 @@ document.addEventListener('DOMContentLoaded', initTabsLogic);
       if (!e.touches || e.touches.length !== 1) return;
       // Не мешаем жестам шапки модалки (растягивание fullscreen)
       if (e.target.closest?.('.profile-modal .header-wrapper')) return;
+      // Нативный скролл ленты сообщений / экрана чата
+      if (e.target.closest?.('.messages-area, .messages.screen, #message-chats, #chat-content')) return;
 
       const scroller = findScrollParent(e.target);
       if (!scroller) return;
@@ -2632,6 +2663,8 @@ document.addEventListener('DOMContentLoaded', initTabsLogic);
 
       if (maxScroll <= 0) {
         if (isModal && !modalExpanded) return;
+        // Экран-оболочка без своего скролла, но с вложенным скроллером — не блокируем
+        if (hasNestedTouchScroller(scroller)) return;
         if (Math.abs(dy) > 2 && e.cancelable) e.preventDefault();
         return;
       }

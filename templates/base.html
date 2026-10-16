@@ -17,6 +17,11 @@
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 }
                 document.documentElement.setAttribute('data-theme', theme);
+                var wallpaper = localStorage.getItem('dovery-wallpaper');
+                if (wallpaper !== 'classic' && wallpaper !== 'pattern') {
+                    wallpaper = theme === 'dark' ? 'pattern' : 'classic';
+                }
+                document.documentElement.setAttribute('data-wallpaper', wallpaper);
             } catch (e) {}
         })();
     </script>

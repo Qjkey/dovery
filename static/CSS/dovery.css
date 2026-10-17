@@ -153,8 +153,8 @@ html, body {
   }
 
   .message-bubble {
-    /* В панели чата — не шире 60% экрана и не шире самой панели */
-    max-width: min(60vw, 100%);
+    /* Широкий layout: не шире 500px и не шире панели */
+    max-width: min(500px, 100%);
   }
 }
 
@@ -1101,8 +1101,8 @@ body.is-resizing-chats * {
 .chat-date-group {
     width: 100%;
     text-align: center;
-    margin-top: 3px;
-    margin-bottom: 3px;
+    margin-top: 11px;
+    margin-bottom: 1px;
     transition: opacity 0.12s ease;
 }
 

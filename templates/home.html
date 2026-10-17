@@ -293,7 +293,7 @@ Dovery
                     <!-- Narrow (<=750): center-fit + avatar right -->
                     <div class="header-center-fit header-capsule has-subtitle clicked chat-header-narrow" id="user-header-fit">
                         <div class="header-fit-text">
-                            <div class="label button1-medium name-with-badge-host" id="user-name-fit"></div>
+                            <div class="label body1 name-with-badge-host" id="user-name-fit"></div>
                             <div class="label subtitle2 header-fit-subtitle" id="user-status-fit">был(а) недавно</div>
                             <div class="label subtitle2 header-fit-subtitle active hidden" id="user-typing-fit" aria-live="polite">
                                 <span class="typing-dots" style="width: 17px;" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span> Печатает
@@ -327,26 +327,18 @@ Dovery
         <div class="messages-area" id="messages-area">
         </div>
 
+        <!-- Оверлей FAB над лентой: 0–5 кнопок, не влияет на разметку composer/messages -->
+        <div class="chat-fab-stack" id="chat-fab-stack">
+            <button type="button" class="chat-fab" id="scroll-to-bottom-btn" aria-label="К последним сообщениям" aria-hidden="true">
+                <svg width="19" height="13" viewBox="0 0 19 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9.50002 13C9.32978 13 9.17654 12.9713 9.04034 12.9139C8.90415 12.8508 8.77362 12.7533 8.64876 12.6213L0.314965 3.90219C0.104988 3.68988 1.49878e-07 3.4288 1.36333e-07 3.11894C1.27304e-07 2.91236 0.0510755 2.72587 0.153226 2.55952C0.249702 2.38729 0.380228 2.25249 0.544804 2.15492C0.709381 2.05164 0.893819 2 1.09812 2C1.3989 2 1.66279 2.11188 1.88979 2.33565L9.50002 10.3232L17.1018 2.33565C17.3287 2.11188 17.5926 2 17.8934 2C18.1034 2 18.2907 2.05164 18.4552 2.15492C18.6255 2.25249 18.7589 2.38729 18.8553 2.55952C18.9518 2.72587 19 2.91236 19 3.11894C19 3.4288 18.8951 3.68988 18.6851 3.90219L10.3513 12.6213C10.2264 12.7533 10.0959 12.8508 9.9597 12.9139C9.81783 12.9713 9.66459 13 9.50002 13Z" fill="currentColor"/></svg>
+            </button>
+        </div>
+
         <div id="welcome-panel" class="hidden">
             <div class="body1-medium label-header as">Добро пожаловать!</div>
             <div class="caption1-medium label-header">Здесь пока ничего нет. Начните общение.</div>
         </div>
         <div class="header-wrapper bottom-bar" id="bottom-header-chat" style="top: calc(100% - 77px);">
-            <div class="header header-bottom hidden" id="scroll-to-bottom">
-                <div class="header-left right-two">
-                </div>
-
-                <div class="header-center">
-                </div>
-
-                <div class="header-right">
-                    <div class="header-capsule one-btn">
-                    <a href="javascript:void(0)" class="element-header" id="scroll-to-bottom-btn" aria-label="К последним сообщениям">
-                        <svg width="19" height="13" viewBox="0 0 19 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.50002 13C9.32978 13 9.17654 12.9713 9.04034 12.9139C8.90415 12.8508 8.77362 12.7533 8.64876 12.6213L0.314965 3.90219C0.104988 3.68988 1.49878e-07 3.4288 1.36333e-07 3.11894C1.27304e-07 2.91236 0.0510755 2.72587 0.153226 2.55952C0.249702 2.38729 0.380228 2.25249 0.544804 2.15492C0.709381 2.05164 0.893819 2 1.09812 2C1.3989 2 1.66279 2.11188 1.88979 2.33565L9.50002 10.3232L17.1018 2.33565C17.3287 2.11188 17.5926 2 17.8934 2C18.1034 2 18.2907 2.05164 18.4552 2.15492C18.6255 2.25249 18.7589 2.38729 18.8553 2.55952C18.9518 2.72587 19 2.91236 19 3.11894C19 3.4288 18.8951 3.68988 18.6851 3.90219L10.3513 12.6213C10.2264 12.7533 10.0959 12.8508 9.9597 12.9139C9.81783 12.9713 9.66459 13 9.50002 13Z" fill="var(--tg-theme-subtitle-text-color)"/></svg>
-                    </a>
-                    </div>
-                </div>
-            </div>
             <div class="textarea">
                 <!-- <div class="header-left right-two">
                     <div class="header-capsule one-btn">
@@ -799,13 +791,20 @@ var list_items_icon_02 = [
     { label: "Удалить чат", danger: true, onclick:"delete_chat();", icon: 'delete'}
 ];
 
-var list_items_icon_03 = [ 
-    { label: "Копировать", onclick:"copy_text();", icon: 'copy' },
-    { label: "Вставить", onclick:"paste_text();", icon: 'paste' }
+/* Вертикальное: первые 2 в ряд + ⋮ → форматирование (Назад — отдельный пункт) */
+var list_items_icon_03 = [
+    { label: "Копировать", icon: 'copy', onclick: "copy_text();" },
+    { label: "Вставить", icon: 'paste', onclick: "paste_text();" },
+    { label: "Жирный", icon: 'fmt_bold', onclick: "wrapComposerMarkdown('bold');" },
+    { label: "Курсив", icon: 'fmt_italic', onclick: "wrapComposerMarkdown('italic');" },
+    { label: "Подчёркнутый", icon: 'fmt_underline', onclick: "wrapComposerMarkdown('underline');" },
+    { label: "Зачёркнутый", icon: 'fmt_strike', onclick: "wrapComposerMarkdown('strike');" },
+    { label: "Моноширный", icon: 'fmt_mono', onclick: "wrapComposerMarkdown('mono');" },
+    { label: "Назад", icon: 'back1', isBack: true }
 ];
 
-var list_items_icon_04 = [ 
-    { label: "Вставить", onclick:"paste_text();", icon: 'paste' }
+var list_items_icon_04 = [
+    { label: "Вставить", onclick: "paste_text();", icon: 'paste' }
 ];
 var list_items_icon_05 = [ 
     { label: "Ссылку", onclick:"copy_link_username();", icon: 'copy_username' },

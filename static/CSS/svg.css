@@ -46,7 +46,7 @@ svg.close2 {
     fill: var(--tg-theme-hint-color);
 }
 
-svg.lock, svg.copy, svg.settings3, svg.diamond, svg.delete, svg.settings, svg.pop, svg.chat, svg.chatol, svg.paste, svg.sun, svg.moon, svg.device, svg.my_profile, svg.nav_settings, svg.nav_profile, svg.check, svg.saved, svg.saved1, svg.verified, svg.block {
+svg.lock, svg.copy, svg.settings3, svg.diamond, svg.delete, svg.settings, svg.pop, svg.chat, svg.chatol, svg.paste, svg.sun, svg.moon, svg.device, svg.my_profile, svg.nav_settings, svg.nav_profile, svg.check, svg.saved, svg.saved1, svg.verified, svg.block, svg.fmt_bold, svg.fmt_italic, svg.fmt_underline, svg.fmt_strike, svg.fmt_mono, svg.back1, svg.menu1 {
     width: 30px;
     height: 30px;
     fill: none;

@@ -442,7 +442,7 @@ function fillChatHeader(user, partnerId) {
     });
     chatHdrEach('user-name', (el) => {
         el.className = el.id === 'user-name-fit'
-            ? 'label button1-medium name-with-badge-host'
+            ? 'label body1-medium name-with-badge-host'
             : 'label body1 name-with-badge-host';
         setNameWithBadge(el, user.name || '', isUserVerified(user));
     });
@@ -1708,38 +1708,29 @@ function rememberChatUserMapping(chatId, userId) {
 const tx = document.getElementById('messages-textarea');
 const ma = document.getElementById('messages-area');
 const bottomBar = document.querySelector('.bottom-bar');
+const chatContentEl = document.getElementById('chat-content');
 const COMPOSER_BASE_HEIGHT = 77;
-const SCROLL_DOWN_ROW_HEIGHT = 62;
-
-function isScrollToBottomVisible() {
-    const row = document.getElementById('scroll-to-bottom');
-    return !!(row && !row.classList.contains('hidden'));
-}
 
 function getComposerBarHeight() {
     if (!tx || !bottomBar) return COMPOSER_BASE_HEIGHT;
     const currentRows = parseInt(tx.getAttribute('rows') || '1', 10);
-    let totalBarHeight;
 
     if (currentRows <= 1) {
-        totalBarHeight = COMPOSER_BASE_HEIGHT;
-    } else {
-        const textareaHeight = tx.offsetHeight;
-        const barPaddingTop = parseFloat(window.getComputedStyle(bottomBar).paddingTop) || 0;
-        const barPaddingBottom = parseFloat(window.getComputedStyle(bottomBar).paddingBottom) || 0;
-        totalBarHeight = textareaHeight + barPaddingTop + barPaddingBottom;
+        return COMPOSER_BASE_HEIGHT;
     }
-
-    if (isScrollToBottomVisible()) {
-        totalBarHeight += SCROLL_DOWN_ROW_HEIGHT;
-    }
-    return totalBarHeight;
+    const textareaHeight = tx.offsetHeight;
+    const barPaddingTop = parseFloat(window.getComputedStyle(bottomBar).paddingTop) || 0;
+    const barPaddingBottom = parseFloat(window.getComputedStyle(bottomBar).paddingBottom) || 0;
+    return textareaHeight + barPaddingTop + barPaddingBottom;
 }
 
 function syncComposerBarLayout() {
     const totalBarHeight = getComposerBarHeight();
     if (bottomBar) bottomBar.style.top = `calc(100% - ${totalBarHeight}px)`;
     if (ma) ma.style.paddingBottom = `${totalBarHeight}px`;
+    if (chatContentEl) {
+        chatContentEl.style.setProperty('--chat-composer-height', `${totalBarHeight}px`);
+    }
 }
 
 tx.addEventListener('input', function() {
@@ -2501,6 +2492,7 @@ function ensureSkeletonStyles() {
             pointer-events: none;
         }
         .message-wrapper.loading-skeleton .message-bubble {
+            min-width: 120px;
             background: linear-gradient(90deg,
                 color-mix(in srgb, var(--tg-theme-hint-color) 38%, var(--tg-theme-message-bg-color-received)) 25%,
                 color-mix(in srgb, var(--tg-theme-hint-color) 14%, var(--tg-theme-message-bg-color-received)) 50%,
@@ -2526,18 +2518,15 @@ function ensureSkeletonStyles() {
         }
         .message-wrapper.loading-skeleton .message-content {
             color: transparent;
-            min-height: 10px;
-            width: 60%;
             border-radius: 4px;
         }
-        .message-wrapper.loading-skeleton .message-content::after {
-            content: '';
-            display: inline-block;
-            width: 100%;
-            height: 100%;
-        }
         .message-wrapper.loading-skeleton .message-info {
-            opacity: 0.5;
+            position: static;
+            opacity: 0.45;
+            margin-top: 6px;
+            margin-bottom: 0;
+            right: auto;
+            bottom: auto;
         }
         .message-wrapper.loading-skeleton .message-info span {
             color: transparent;
@@ -2563,21 +2552,30 @@ function ensureSkeletonStyles() {
 }
 
 function createSkeletonMessage(type, textLines = 1) {
+    const lines = Math.max(1, Math.min(4, textLines | 0));
     const wrapper = document.createElement('div');
     wrapper.className = `message-wrapper loading-skeleton ${type}`;
-    
+
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${type}`;
-    
+
+    const inner = document.createElement('div');
+    inner.className = 'message-inner';
+
     const content = document.createElement('div');
     content.className = 'message-content body1';
-    
+    // fit-content + absolute meta схлопывали пузырь — явная ширина/высота по «строкам»
+    const widths = { 1: 132, 2: 188, 3: 248, 4: 280 };
+    content.style.width = `${widths[lines] || 180}px`;
+    content.style.minHeight = `${Math.round(lines * 18)}px`;
+
     const info = document.createElement('div');
     info.className = 'message-info caption2';
     info.innerHTML = '<span>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;</span>';
-    
-    bubble.appendChild(content);
-    bubble.appendChild(info);
+
+    inner.appendChild(content);
+    inner.appendChild(info);
+    bubble.appendChild(inner);
     wrapper.appendChild(bubble);
     return wrapper;
 }
@@ -2592,6 +2590,8 @@ const HISTORY_SKELETON_PATTERNS = [
     ];
     
 function showLoadingSkeletons(container) {
+    if (!container) return;
+    ensureSkeletonStyles();
     container.innerHTML = '';
     const fragment = document.createDocumentFragment();
     HISTORY_SKELETON_PATTERNS.forEach((pattern) => {
@@ -2619,6 +2619,13 @@ function removeHistorySkeletons(container) {
     container?.querySelectorAll('.history-loading-skeletons').forEach((el) => el.remove());
 }
 
+/** column-reverse: визуальный «конец» чата (новые сообщения) при scrollTop ≈ 0 */
+function isChatAtLatestEnd() {
+    const area = document.getElementById('messages-area');
+    if (!area) return true;
+    return Math.abs(area.scrollTop) < 24;
+}
+
 function updateStickyChatDate() {
     const { area, sticky } = getStickyDateElements();
     if (!area || !sticky) return;
@@ -2627,8 +2634,8 @@ function updateStickyChatDate() {
     const headers = Array.from(area.querySelectorAll('.chat-date-group'));
     const canScroll = area.scrollHeight > area.clientHeight + 8;
 
-    // Мало сообщений или всё и так видно — достаточно дат в потоке
-    if (messages.length <= 3 || !canScroll || headers.length === 0) {
+    // У низа ленты / мало контента — закреплённую дату сразу прячем
+    if (isChatAtLatestEnd() || messages.length <= 3 || !canScroll || headers.length === 0) {
         headers.forEach((header) => header.classList.remove('is-covered'));
         hideStickyChatDate(true);
         return;
@@ -2637,6 +2644,8 @@ function updateStickyChatDate() {
     // Линия закрепления совпадает с CSS top плашки (~70px от верха области чата)
     const areaRect = area.getBoundingClientRect();
     const stickyLine = areaRect.top + 82;
+    // Когда дата в потоке «доезжает» до слота sticky — оставляем только её
+    const STICKY_MEET_PX = 40;
 
     let active = null;
     let activeTop = -Infinity;
@@ -2657,6 +2666,15 @@ function updateStickyChatDate() {
         });
     }
 
+    const headerTop = active.getBoundingClientRect().top;
+
+    // Sticky совпала с датой в ленте → сразу прячем sticky, дату в потоке показываем
+    if (headerTop > stickyLine - STICKY_MEET_PX) {
+        headers.forEach((header) => header.classList.remove('is-covered'));
+        hideStickyChatDate(false);
+        return;
+    }
+
     const label = (active.dataset.date || active.textContent || '').trim();
     const labelEl = sticky.querySelector('.chat-date-header');
     if (labelEl && labelEl.textContent !== label) {
@@ -2664,7 +2682,6 @@ function updateStickyChatDate() {
     }
 
     sticky.hidden = false;
-    // next frame → CSS transition opacity
     requestAnimationFrame(() => sticky.classList.add('is-visible'));
 
     headers.forEach((header) => {
@@ -2679,15 +2696,21 @@ function scheduleStickyChatDateUpdate(fromScroll = false) {
     stickyDateRaf = requestAnimationFrame(() => {
         stickyDateRaf = null;
         if (fromScroll) {
-            updateStickyChatDate();
-            if (stickyDateHideTimer) clearTimeout(stickyDateHideTimer);
-            stickyDateHideTimer = setTimeout(() => {
+            if (stickyDateHideTimer) {
+                clearTimeout(stickyDateHideTimer);
                 stickyDateHideTimer = null;
-                hideStickyChatDate(false);
-                const { area } = getStickyDateElements();
-                area?.querySelectorAll('.chat-date-group.is-covered')
-                    .forEach((h) => h.classList.remove('is-covered'));
-            }, STICKY_DATE_HIDE_MS);
+            }
+            updateStickyChatDate();
+            // У конца чата уже скрыли сразу; иначе — автоскрытие после паузы скролла
+            if (!isChatAtLatestEnd()) {
+                stickyDateHideTimer = setTimeout(() => {
+                    stickyDateHideTimer = null;
+                    hideStickyChatDate(false);
+                    const { area } = getStickyDateElements();
+                    area?.querySelectorAll('.chat-date-group.is-covered')
+                        .forEach((h) => h.classList.remove('is-covered'));
+                }, STICKY_DATE_HIDE_MS);
+            }
         }
         updateScrollToBottomButton();
     });
@@ -3010,14 +3033,13 @@ function isChatScrolledFarUp() {
 }
 
 function updateScrollToBottomButton() {
-    const row = document.getElementById('scroll-to-bottom');
-    if (!row) return;
+    const btn = document.getElementById('scroll-to-bottom-btn');
+    if (!btn) return;
     const shouldShow = isChatScrolledFarUp();
-    const isShown = !row.classList.contains('hidden');
+    const isShown = btn.classList.contains('is-visible');
     if (shouldShow === isShown) return;
-    row.classList.toggle('hidden', !shouldShow);
-    if (bottomBar) bottomBar.classList.toggle('has-scroll-down', shouldShow);
-    syncComposerBarLayout();
+    btn.classList.toggle('is-visible', shouldShow);
+    btn.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
 }
 
 function initScrollToBottomButton() {
@@ -3108,8 +3130,28 @@ function receivedMessageInfoHtml(timeStr) {
             </div>`;
 }
 
-/** Короткие однострочные — время (+галочки у sent) в одной строке с текстом.
- *  Порог одинаковый для received/sent: textW + gap + metaW ≤ max ширины пузыря. */
+/** Мета в углу: резерв ширины в конце последней строки текста (хвост),
+ *  чтобы верхние строки шли на всю ширину, а последняя оставляла место под время/галочки. */
+function ensureMessageMetaTail(content) {
+    if (!content) return null;
+    let tail = null;
+    for (let i = content.children.length - 1; i >= 0; i--) {
+        if (content.children[i].classList?.contains('message-meta-tail')) {
+            tail = content.children[i];
+            break;
+        }
+    }
+    if (!tail) {
+        tail = document.createElement('span');
+        tail.className = 'message-meta-tail';
+        tail.setAttribute('aria-hidden', 'true');
+        content.appendChild(tail);
+    } else if (content.lastChild !== tail) {
+        content.appendChild(tail);
+    }
+    return tail;
+}
+
 function fitMessageMetaLayout(bubbleOrRoot) {
     const bubble = bubbleOrRoot?.classList?.contains('message-bubble')
         ? bubbleOrRoot
@@ -3119,37 +3161,30 @@ function fitMessageMetaLayout(bubbleOrRoot) {
     const info = bubble.querySelector('.message-info');
     if (!content || !info) return;
 
-    const META_INLINE_GAP = 6;
-
     const run = () => {
         if (!bubble.isConnected) return;
-        bubble.classList.remove('is-meta-inline');
+        bubble.classList.remove('is-meta-inline', 'is-meta-below');
+        ensureMessageMetaTail(content);
 
-        const style = window.getComputedStyle(content);
-        let lineHeight = parseFloat(style.lineHeight);
-        if (!Number.isFinite(lineHeight) || lineHeight < 8) {
-            lineHeight = (parseFloat(style.fontSize) || 16) * 1.5;
-        }
-        if (content.scrollHeight > lineHeight * 1.4 + 1) return;
-
-        const contentW = Math.ceil(content.getBoundingClientRect().width);
         const infoW = Math.ceil(info.getBoundingClientRect().width);
-        if (contentW < 1 || infoW < 1) return;
+        const infoH = Math.ceil(info.getBoundingClientRect().height);
+        if (infoW < 1) return;
 
-        const bubbleStyle = window.getComputedStyle(bubble);
-        const padX = (parseFloat(bubbleStyle.paddingLeft) || 0)
-            + (parseFloat(bubbleStyle.paddingRight) || 0);
-        let maxOuter = parseFloat(bubbleStyle.maxWidth);
-        if (!Number.isFinite(maxOuter) || maxOuter <= 0) {
-            const parent = bubble.parentElement;
-            maxOuter = parent ? parent.clientWidth : bubble.clientWidth;
-        }
-        const availableInner = Math.max(0, maxOuter - padX);
-        if (contentW + META_INLINE_GAP + infoW > availableInner + 0.5) return;
+        const reserve = infoW + 6;
 
-        bubble.classList.add('is-meta-inline');
-        if (content.scrollHeight > lineHeight * 1.4 + 1) {
-            bubble.classList.remove('is-meta-inline');
+        // Без резерва — базовая высота текста
+        bubble.style.setProperty('--meta-reserve', '0px');
+        const h0 = content.offsetHeight;
+
+        // С резервом: если высота выросла — хвост уехал на новую строку (мета под текстом)
+        bubble.style.setProperty('--meta-reserve', `${reserve}px`);
+        const h1 = content.offsetHeight;
+
+        if (h1 > h0 + 2) {
+            // Не оставляем пустую строку line-height — низкий pad под мету
+            bubble.classList.add('is-meta-below');
+            bubble.style.setProperty('--meta-reserve', '0px');
+            content.style.paddingBottom = `${Math.max(infoH - 2, 10)}px`;
         }
     };
 
@@ -3170,6 +3205,8 @@ function applyMessageReadStatus(root, isRead) {
     if (!status) return;
     status.classList.toggle('is-read', !!isRead);
     status.innerHTML = isRead ? TICK_DOUBLE_SVG : TICK_SINGLE_SVG;
+    // Две галочки шире одной — пересчитать резерв меты
+    fitMessageMetaLayout(root);
 }
 
 function setCachedMessageRead(chatId, msgId, isRead) {
@@ -3748,14 +3785,25 @@ function formatTime(timeStr) {
     });
 }
 
-/**
- * Безопасно заполняет .message-content: ссылки → <a>, @username → подсветка.
- */
-function setMessageContent(el, text) {
-    if (!el) return;
-    el.replaceChildren();
-    if (text == null || text === '') return;
+/** Markdown-маркеры (в БД/шифротексте хранятся как есть). */
+const MSG_MD_MARKERS = {
+    bold: ['*', '*'],
+    italic: ['_', '_'],
+    underline: ['__', '__'],
+    strike: ['~', '~'],
+    mono: ['`', '`'],
+};
 
+const MSG_MD_RULES = [
+    { open: '`', close: '`', tag: 'code', className: 'msg-md-code', leaf: true },
+    { open: '__', close: '__', tag: 'span', className: 'msg-md-underline' },
+    { open: '*', close: '*', tag: 'strong', className: 'msg-md-bold' },
+    { open: '_', close: '_', tag: 'em', className: 'msg-md-italic' },
+    { open: '~', close: '~', tag: 'del', className: 'msg-md-strike' },
+];
+
+function appendPlainWithLinks(parent, text) {
+    if (!text) return;
     const source = String(text);
     const urlPart =
         String.raw`https?:\/\/[^\s<]+` +
@@ -3770,15 +3818,14 @@ function setMessageContent(el, text) {
     let lastIndex = 0;
     let match;
     while ((match = pattern.exec(source)) !== null) {
-        // Не цепляем домен из email (user@domain.com)
         if (match[1] && match.index > 0 && source[match.index - 1] === '@') {
-            el.appendChild(document.createTextNode(source.slice(lastIndex, pattern.lastIndex)));
+            parent.appendChild(document.createTextNode(source.slice(lastIndex, pattern.lastIndex)));
             lastIndex = pattern.lastIndex;
             continue;
         }
 
         if (match.index > lastIndex) {
-            el.appendChild(document.createTextNode(source.slice(lastIndex, match.index)));
+            parent.appendChild(document.createTextNode(source.slice(lastIndex, match.index)));
         }
 
         if (match[1]) {
@@ -3790,40 +3837,119 @@ function setMessageContent(el, text) {
             }
 
             const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-
             const a = document.createElement('a');
             a.className = 'msg-link';
             a.href = href;
             a.target = '_blank';
             a.rel = 'noopener noreferrer';
             a.textContent = raw;
-            el.appendChild(a);
+            parent.appendChild(a);
 
             if (trailing) {
-                el.appendChild(document.createTextNode(trailing));
+                parent.appendChild(document.createTextNode(trailing));
             }
         } else if (match[2]) {
-            const currentMention = match[2]; 
-
+            const currentMention = match[2];
             const span = document.createElement('span');
             span.className = 'msg-mention';
             span.textContent = currentMention;
             span.style.cursor = 'pointer';
             span.title = 'Открыть профиль';
-            span.addEventListener('click', function(e) {
+            span.addEventListener('click', function (e) {
                 e.stopPropagation();
-                const username = currentMention.slice(1);
-                openProfileByUsername(username);
+                openProfileByUsername(currentMention.slice(1));
             });
-            el.appendChild(span);
+            parent.appendChild(span);
         }
 
         lastIndex = pattern.lastIndex;
     }
 
     if (lastIndex < source.length) {
-        el.appendChild(document.createTextNode(source.slice(lastIndex)));
+        parent.appendChild(document.createTextNode(source.slice(lastIndex)));
     }
+}
+
+function findNextMarkdownMatch(text, from) {
+    let best = null;
+    for (const rule of MSG_MD_RULES) {
+        const openIdx = text.indexOf(rule.open, from);
+        if (openIdx < 0) continue;
+        const innerStart = openIdx + rule.open.length;
+        if (innerStart >= text.length) continue;
+        const closeIdx = text.indexOf(rule.close, innerStart);
+        if (closeIdx < 0 || closeIdx === innerStart) continue;
+        // Для `_` не путать с `__`
+        if (rule.open === '_' && text.startsWith('__', openIdx)) continue;
+        if (rule.open === '*' && text.startsWith('**', openIdx)) continue;
+
+        if (
+            !best
+            || openIdx < best.index
+            || (openIdx === best.index && rule.open.length > best.rule.open.length)
+        ) {
+            best = {
+                index: openIdx,
+                end: closeIdx + rule.close.length,
+                inner: text.slice(innerStart, closeIdx),
+                rule,
+            };
+        }
+    }
+    return best;
+}
+
+function appendMarkdownFormatted(parent, text, depth = 0) {
+    if (text == null || text === '') return;
+    if (depth > 8) {
+        appendPlainWithLinks(parent, text);
+        return;
+    }
+
+    let pos = 0;
+    const source = String(text);
+    while (pos < source.length) {
+        const hit = findNextMarkdownMatch(source, pos);
+        if (!hit) {
+            appendPlainWithLinks(parent, source.slice(pos));
+            break;
+        }
+        if (hit.index > pos) {
+            appendPlainWithLinks(parent, source.slice(pos, hit.index));
+        }
+
+        const node = document.createElement(hit.rule.tag);
+        node.className = hit.rule.className;
+        if (hit.rule.leaf) {
+            node.textContent = hit.inner;
+            if (hit.rule.className === 'msg-md-code') {
+                node.title = 'Нажмите, чтобы скопировать';
+                node.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const val = node.textContent || '';
+                    if (!val) return;
+                    if (navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(val).catch(() => {});
+                    }
+                });
+            }
+        } else {
+            appendMarkdownFormatted(node, hit.inner, depth + 1);
+        }
+        parent.appendChild(node);
+        pos = hit.end;
+    }
+}
+
+/**
+ * Безопасно заполняет .message-content: markdown + ссылки + @username.
+ */
+function setMessageContent(el, text) {
+    if (!el) return;
+    el.replaceChildren();
+    if (text == null || text === '') return;
+    appendMarkdownFormatted(el, String(text));
 }
 
 
@@ -4135,11 +4261,36 @@ window.buildE2eeEmojiStrip = buildE2eeEmojiStrip;
 
 const inputField = document.querySelector('#messages-textarea');
 
+/** Сохраняем выделение: клик по пункту меню снимает selection у textarea. */
+let composerSavedSelection = { start: 0, end: 0 };
+
+function rememberComposerSelection() {
+    if (!inputField) return;
+    composerSavedSelection = {
+        start: inputField.selectionStart || 0,
+        end: inputField.selectionEnd || 0,
+    };
+}
+
+function restoreComposerSelection() {
+    if (!inputField) return;
+    const { start, end } = composerSavedSelection;
+    inputField.focus({ preventScroll: true });
+    try {
+        inputField.setSelectionRange(start, end);
+    } catch (_) { /* ignore */ }
+}
+
 function getComposerSelection() {
     if (!inputField) return '';
-    const start = inputField.selectionStart || 0;
-    const end = inputField.selectionEnd || 0;
-    return start !== end ? inputField.value.substring(start, end) : '';
+    const start = composerSavedSelection.start;
+    const end = composerSavedSelection.end;
+    if (start === end) {
+        const s = inputField.selectionStart || 0;
+        const e = inputField.selectionEnd || 0;
+        return s !== e ? inputField.value.substring(s, e) : '';
+    }
+    return inputField.value.substring(start, end);
 }
 
 function copy_text() {
@@ -4148,13 +4299,13 @@ function copy_text() {
 
     const done = () => {
         hideDropdown();
-        inputField.focus({ preventScroll: true });
+        restoreComposerSelection();
     };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(selectedText).then(done).catch(() => {
             try {
-            inputField.focus();
+                restoreComposerSelection();
                 document.execCommand('copy');
             } catch (err) {
                 console.error('Ошибка копирования:', err);
@@ -4165,7 +4316,7 @@ function copy_text() {
     }
 
     try {
-        inputField.focus();
+        restoreComposerSelection();
         document.execCommand('copy');
     } catch (err) {
         console.error('Ошибка копирования:', err);
@@ -4175,8 +4326,9 @@ function copy_text() {
 
 async function paste_text() {
     if (!inputField) return;
-    const start = inputField.selectionStart || 0;
-    const end = inputField.selectionEnd || 0;
+    restoreComposerSelection();
+    const start = composerSavedSelection.start;
+    const end = composerSavedSelection.end;
     let text = '';
 
     try {
@@ -4190,6 +4342,10 @@ async function paste_text() {
     if (text) {
         inputField.setRangeText(text, start, end, 'end');
         inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        composerSavedSelection = {
+            start: start + text.length,
+            end: start + text.length,
+        };
     } else {
         inputField.focus({ preventScroll: true });
         try {
@@ -4198,10 +4354,70 @@ async function paste_text() {
             console.warn('Доступ к буферу отклонен пользователем', err);
         }
     }
-        
-        hideDropdown();
+
+    hideDropdown();
     inputField.focus({ preventScroll: true });
 }
+
+/** Оборачивает выделение markdown-маркерами (в БД уходит как есть). Toggle при повторном. */
+function wrapComposerMarkdown(kind) {
+    if (!inputField) return;
+    const markers = MSG_MD_MARKERS[kind];
+    if (!markers) return;
+
+    restoreComposerSelection();
+    let start = composerSavedSelection.start;
+    let end = composerSavedSelection.end;
+    if (start === end) {
+        hideDropdown();
+        return;
+    }
+    if (start > end) {
+        const t = start;
+        start = end;
+        end = t;
+    }
+
+    const [open, close] = markers;
+    const value = inputField.value;
+    const selected = value.slice(start, end);
+    let newValue;
+    let newStart;
+    let newEnd;
+
+    const before = value.slice(Math.max(0, start - open.length), start);
+    const after = value.slice(end, end + close.length);
+
+    if (before === open && after === close) {
+        newValue = value.slice(0, start - open.length) + selected + value.slice(end + close.length);
+        newStart = start - open.length;
+        newEnd = newStart + selected.length;
+    } else if (
+        selected.startsWith(open)
+        && selected.endsWith(close)
+        && selected.length > open.length + close.length
+    ) {
+        const inner = selected.slice(open.length, selected.length - close.length);
+        newValue = value.slice(0, start) + inner + value.slice(end);
+        newStart = start;
+        newEnd = start + inner.length;
+    } else {
+        newValue = value.slice(0, start) + open + selected + close + value.slice(end);
+        newStart = start + open.length;
+        newEnd = newStart + selected.length;
+    }
+
+    inputField.value = newValue;
+    inputField.setSelectionRange(newStart, newEnd);
+    composerSavedSelection = { start: newStart, end: newEnd };
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    hideDropdown();
+    inputField.focus({ preventScroll: true });
+}
+
+window.copy_text = copy_text;
+window.paste_text = paste_text;
+window.wrapComposerMarkdown = wrapComposerMarkdown;
 
 let composerMenuAt = 0;
 let composerPressTimer = null;
@@ -4211,6 +4427,7 @@ function openComposerContextMenu(x, y) {
     if (Date.now() - composerMenuAt < 350) return;
     composerMenuAt = Date.now();
 
+    rememberComposerSelection();
     const selectedText = getComposerSelection();
     const items = selectedText
         ? (window.list_items_icon_03 || [])
@@ -4221,6 +4438,14 @@ function openComposerContextMenu(x, y) {
 }
 
 if (inputField) {
+    // Тап по полю ввода — закрыть любое открытое контекстное меню (в т.ч. у сообщений)
+    inputField.addEventListener('pointerdown', () => {
+        const dd = document.getElementById('tagDropdown');
+        if (dd && dd.classList.contains('is-open') && typeof hideDropdown === 'function') {
+            hideDropdown();
+        }
+    });
+
     inputField.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -4257,7 +4482,7 @@ function getMessageMenuItems(msgId) {
 function findMessageMenuWrapper(target) {
     if (!target || typeof target.closest !== 'function') return null;
     if (target.closest('#tagDropdown')) return null;
-    if (target.closest('a, .msg-mention')) return null;
+    if (target.closest('a, .msg-mention, .msg-md-code')) return null;
     if (target.closest('.loading-skeleton')) return null;
     if (!target.closest('.message-bubble')) return null;
     const wrapper = target.closest('.message-wrapper');
@@ -4272,7 +4497,7 @@ function openMessageContextMenu(wrapper, x, y) {
     if (!wrapper || typeof showDropdown !== 'function') return;
     if (Date.now() - messageMenuAt < 350) return;
     messageMenuAt = Date.now();
-    showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y }, { vertical: true });
+    showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y }, { vertical: false });
 }
 
 if (messagesArea) {

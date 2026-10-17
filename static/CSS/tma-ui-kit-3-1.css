@@ -25,7 +25,7 @@
     --tg-theme-message-bg-color-received: var(--tg-theme-bg-color);
     --tg-theme-message-text-color: var(--tg-theme-text-color);
 
-    --tg-theme-icon-message-color: #57B84C;
+    --tg-theme-icon-message-color: #6fcc64;
 
     --wallpaper-base: var(--bg-one);
     --first-gradient: linear-gradient(135deg, 
@@ -503,6 +503,14 @@
 .icon-wrapper svg.back1 {
     stroke: none;
 }
+.icon-wrapper svg.fmt_bold,
+.icon-wrapper svg.fmt_italic,
+.icon-wrapper svg.fmt_underline,
+.icon-wrapper svg.fmt_strike,
+.icon-wrapper svg.fmt_mono {
+    width: 22px;
+    height: 22px;
+}
 .checkmark-icon {
     display: none;
     width: 100%;
@@ -627,6 +635,11 @@ input:checked + .slider:before {
 @font-face {
     font-family: "Roboto";
     src: url("font/Roboto.ttf") format("truetype");
+    font-display: swap;
+}
+@font-face {
+    font-family: "Roboto Mono";
+    src: local("Roboto Mono"), local("RobotoMono-Regular");
     font-display: swap;
 }
 .headline-sf {
@@ -1315,6 +1328,7 @@ input:focus {
 
 :root {
     --message-border-radius: 20px;
+    --message-tail-radius: 18px;
     --message-join-radius: 10px;
     --message-sent-background: #DCB8FF;
     --message-received-background: #ffffff;
@@ -1353,20 +1367,32 @@ input:focus {
 .message-bubble {
     position: relative;
     width: fit-content;
-    max-width: min(60vw, 100%);
+    max-width: min(70vw, 100%);
     min-width: 0;
     padding: 8px 10px;
     border-radius: var(--message-border-radius);
-    line-height: 1.5;
+    line-height: 1.3;
     box-sizing: border-box;
     overflow-wrap: anywhere;
     word-break: break-word;
 }
+@media (min-width: 751px) {
+    .message-bubble {
+        max-width: min(500px, 100%);
+    }
+}
+
+/* Угол с хвостиком — всегда 18px; остальные до 20px */
+.message-bubble.received {
+    border-radius: var(--message-border-radius) var(--message-border-radius) var(--message-border-radius) var(--message-tail-radius);
+}
+.message-bubble.sent {
+    border-radius: var(--message-border-radius) var(--message-border-radius) var(--message-tail-radius) var(--message-border-radius);
+}
 
 .message-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+    display: block;
+    position: relative;
     min-width: 0;
     max-width: 100%;
 }
@@ -1380,23 +1406,20 @@ input:focus {
     max-width: 100%;
 }
 
-/* Короткие однострочные: текст + время(/галочки) в одну строку — sent и received */
-.message-bubble.is-meta-inline .message-inner {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    gap: 6px;
+/* Невидимый хвост в конце текста: место под мету на последней строке;
+   верхние строки занимают всю ширину (текст может быть над метой). */
+.message-meta-tail {
+    display: inline-block;
+    width: var(--meta-reserve, 40px);
+    height: 0;
+    vertical-align: baseline;
+    pointer-events: none;
+    user-select: none;
 }
-.message-bubble.is-meta-inline .message-content {
-    flex: 0 1 auto;
-    width: auto;
-    max-width: none;
-}
-.message-bubble.is-meta-inline .message-info {
-    flex: 0 0 auto;
-    margin-top: 0;
-    margin-bottom: 0;
-    align-self: flex-end;
+
+/* Мета под текстом (хвост не влез): без пустой строки line-height — только низкий pad */
+.message-bubble.is-meta-below .message-meta-tail {
+    width: 0;
 }
 
 .msg-link,
@@ -1418,12 +1441,46 @@ input:focus {
     text-decoration: underline;
 }
 
+/* Markdown в сообщениях (*bold* _italic_ __u__ ~s~ `code`) */
+.msg-md-bold {
+    font-weight: 700;
+}
+.msg-md-italic {
+    font-style: italic;
+}
+.msg-md-underline {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.msg-md-strike {
+    text-decoration: line-through;
+}
+.msg-md-code {
+    font-family: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: color-mix(in srgb, var(--tg-theme-accent-text-color) 10%, transparent);
+    border-radius: 4px;
+    padding: 0.05em 0.28em;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.msg-md-code:active {
+    opacity: 0.85;
+}
+
 .message-bubble.received {
     background-color: var(--tg-theme-message-bg-color-received);
 }
 
 .message-bubble.sent {
     background-color: var(--tg-theme-message-bg-color-sent);
+}
+
+@media (min-width: 768px) {
+    /* На десктопе хвостик слева и у sent */
+    .message-bubble.sent {
+        border-radius: var(--message-border-radius) var(--message-border-radius) var(--message-border-radius) var(--message-tail-radius);
+    }
 }
 
 /* Хвостик сбоку — только у одиночного или последнего в ряду */
@@ -1513,19 +1570,23 @@ input:focus {
     }
 }
 
-/* Мета в углу пузыря: заходит в padding, текст padding сохраняет */
+/* Мета — маленький блок в углу пузыря (не колонка на всю высоту).
+   position absolute от padding-edge: в углу, текст по-прежнему с padding. */
 .message-info {
+    position: absolute;
+    right: -1px;
+    bottom: -4.5px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 4px;
-    margin-top: 2px;
-    margin-bottom: -4px;
-    margin-right: -2px;
+    margin: 0;
     font-size: 11px;
-    opacity: 0.6;
+    opacity: 0.8;
     color: var(--tg-theme-subtitle-text-color);
     line-height: 1.2;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .message-status svg {
@@ -2732,13 +2793,19 @@ textarea::placeholder {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    padding: 77px 20px 77px;
+    padding: 77px 11px 77px;
     box-sizing: border-box;
     overflow-y: auto; 
     overflow-x: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-overflow-scrolling: touch; 
+}
+@media (min-width: 751px) {
+    .messages-area {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
 }
 .messages-area::-webkit-scrollbar {
     display: none;
@@ -2752,6 +2819,7 @@ textarea::placeholder {
     width: 100%;
     position: relative;
     overflow: hidden;
+    --chat-composer-height: 77px;
 }
 
 .bottom-bar {
@@ -2763,8 +2831,53 @@ textarea::placeholder {
     flex-shrink: 0;
 }
 
-#scroll-to-bottom {
+/* Стек плавающих кнопок чата (0–5): absolute, не двигает composer/ленту */
+.chat-fab-stack {
+    position: absolute;
+    right: 15px;
+    bottom: calc(var(--chat-composer-height, 77px));
+    z-index: 11;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+}
+.chat-fab {
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 45px;
+    height: 45px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--tg-theme-bg-color) 40%, transparent);
+    border-radius: 22.5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.3);
+    background: color-mix(in srgb, var(--tg-theme-bg-color) 55%, transparent);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    color: var(--tg-theme-subtitle-text-color);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px) scale(0.92);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+.chat-fab.is-visible {
     pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+.chat-fab:active {
+    transform: scale(0.94);
+}
+.chat-fab svg {
+    display: block;
+    flex-shrink: 0;
 }
 
 /* ========== Режимы оптимизации ========== */

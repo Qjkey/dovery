@@ -2874,10 +2874,29 @@ async function decryptMessageForUser(encryptedBase64, userId) {
 
 const CHAT_LIST_EMPTY_PREVIEW = 'Чат создан';
 
+/** Убирает markdown-обёртки для превью (*bold* → bold), сами «буквы» оставляем. */
+function stripMarkdownMarkers(text) {
+    let s = String(text ?? '');
+    // Повторяем, пока есть пары (вложенность / несколько кусков)
+    for (let i = 0; i < 4; i++) {
+        const next = s
+            .replace(/`([^`\n]+)`/g, '$1')
+            .replace(/__([^_\n]+?)__/g, '$1')
+            .replace(/\*([^*\n]+?)\*/g, '$1')
+            .replace(/_([^_\n]+?)_/g, '$1')
+            .replace(/~([^~\n]+?)~/g, '$1');
+        if (next === s) break;
+        s = next;
+    }
+    return s;
+}
+
 function formatChatListPreviewPlain(text, isOwn) {
-    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+    const normalized = stripMarkdownMarkers(text).replace(/\s+/g, ' ').trim();
     return normalized;
 }
+
+window.stripMarkdownMarkers = stripMarkdownMarkers;
 
 function updateChatListLastPreview(chatId, plainText, isOwn) {
     const map = window.chatIdToUserId || {};
@@ -3107,10 +3126,9 @@ function removeOptimisticMessage(msgId) {
 function isMessageRead(value) {
     return value === true || value === 1 || value === '1';
 }
-const TICK_DOUBLE_SVG = '<svg class="msg-ticks" width="18" height="9" viewBox="0 0 18 9" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M0.75 5.23153L3.70486 7.9894L11.4614 0.75M16.6324 0.922367L8.87586 8.16177L7.95246 7.29993" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg>'
-// const TICK_SINGLE_SVG = '<svg class="msg-ticks" viewBox="0 0 12 11" width="16" height="11" aria-hidden="true"><path d="M1.2 5.8 L4.4 9 L10.8 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-// const TICK_DOUBLE_SVG = '<svg class="msg-ticks" viewBox="0 0 16 11" width="18" height="11" aria-hidden="true"><path d="M0.9 5.8 L4.1 9 L10.5 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.2 5.8 L8.4 9 L14.8 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const TICK_SINGLE_SVG = '<svg class="msg-ticks" width="14" height="9" viewBox="0 0 14 9" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M0.75 5.29813L3.94355 8.16177L12.3971 0.75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg>'
+/* Одна галочка = левая из пары (тот же viewBox 18×9), две — обе */
+const TICK_DOUBLE_SVG = '<svg class="msg-ticks" width="18" height="9" viewBox="0 0 18 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0.75 5.23153L3.70486 7.9894L11.4614 0.75M16.6324 0.922367L8.87586 8.16177L7.95246 7.29993" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const TICK_SINGLE_SVG = '<svg class="msg-ticks" width="18" height="9" viewBox="0 0 18 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0.75 5.23153L3.70486 7.9894L11.4614 0.75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 
 function messageStatusHtml(isRead) {
@@ -3205,8 +3223,7 @@ function applyMessageReadStatus(root, isRead) {
     if (!status) return;
     status.classList.toggle('is-read', !!isRead);
     status.innerHTML = isRead ? TICK_DOUBLE_SVG : TICK_SINGLE_SVG;
-    // Две галочки шире одной — пересчитать резерв меты
-    fitMessageMetaLayout(root);
+    // Ширина слота галочек фиксирована (18px) — пересчёт меты не нужен
 }
 
 function setCachedMessageRead(chatId, msgId, isRead) {
@@ -3523,11 +3540,26 @@ function getLastRealMessage(area) {
 }
 
 function preserveScrollAround(area, anchor, fn) {
+    if (!area) {
+        fn();
+        return;
+    }
+    // column-reverse: надёжнее якорить по delta scrollHeight (+ позиция якоря)
+    const prevHeight = area.scrollHeight;
+    const prevScroll = area.scrollTop;
     const prevTop = anchor ? anchor.getBoundingClientRect().top : null;
     fn();
-    if (!anchor || prevTop == null) return;
-    const newTop = anchor.getBoundingClientRect().top;
-    area.scrollTop += newTop - prevTop;
+    const heightDelta = area.scrollHeight - prevHeight;
+    if (heightDelta) {
+        area.scrollTop = prevScroll - heightDelta;
+    }
+    if (anchor && prevTop != null && anchor.isConnected) {
+        const newTop = anchor.getBoundingClientRect().top;
+        const drift = newTop - prevTop;
+        if (Math.abs(drift) > 0.5) {
+            area.scrollTop += drift;
+        }
+    }
 }
 
 function teardownHistoryLoader() {
@@ -3559,8 +3591,10 @@ function setupHistoryLoader(chatId) {
     const sentinel = ensureHistorySentinel(area);
     historyObserver = new IntersectionObserver((entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
+        const cache = chatHash[chatId];
+        if (cache?.loadingMore) return;
         loadOlderMessages(chatId);
-    }, { root: area, rootMargin: '280px 0px', threshold: 0 });
+    }, { root: area, rootMargin: '120px 0px', threshold: 0 });
     historyObserver.observe(sentinel);
 }
 
@@ -3578,7 +3612,7 @@ function rebuildDateHeaders(area) {
     });
 }
 
-function buildMessageWrapper(msg, currentUserId) {
+function buildMessageWrapper(msg, currentUserId, opts = {}) {
     const mne = msg.sender_id != currentUserId;
     const typeClass = mne ? 'received' : 'sent';
     const wrapper = document.createElement('div');
@@ -3595,7 +3629,8 @@ function buildMessageWrapper(msg, currentUserId) {
         </div>
     `;
     setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
-    fitMessageMetaLayout(wrapper);
+    // skipMetaFit — при подгрузке истории fit делаем синхронно до коррекции scroll
+    if (!opts.skipMetaFit) fitMessageMetaLayout(wrapper);
     return wrapper;
 }
 
@@ -3612,13 +3647,16 @@ async function loadOlderMessages(chatId) {
     if (!area) return;
 
     cache.loadingMore = true;
-    const anchor = getLastRealMessage(area);
+    // Не даём observer повторно вызвать load, пока идёт запрос
+    if (historyObserver) {
+        historyObserver.disconnect();
+        historyObserver = null;
+    }
 
-    preserveScrollAround(area, anchor, () => {
-        appendHistorySkeletons(area);
-        ensureHistorySentinel(area);
-    });
-    scheduleStickyChatDateUpdate();
+    const anchor = getLastRealMessage(area);
+    const prevHeight = area.scrollHeight;
+    const prevScroll = area.scrollTop;
+    const prevTop = anchor ? anchor.getBoundingClientRect().top : null;
 
     try {
         const params = new URLSearchParams({
@@ -3644,31 +3682,77 @@ async function loadOlderMessages(chatId) {
         if (String(getActiveChatId()) !== String(chatId)) return;
 
         const sorted = [...decrypted].sort((a, b) => new Date(b.time) - new Date(a.time));
-        preserveScrollAround(area, anchor, () => {
-            removeHistorySkeletons(area);
-            if (sorted.length) {
-                const fragment = document.createDocumentFragment();
-                sorted.forEach((msg) => fragment.appendChild(buildMessageWrapper(msg, window.userId)));
-                const lastReal = getLastRealMessage(area);
-                if (lastReal) lastReal.after(fragment);
-                else area.prepend(fragment);
+
+        // Вставляем без скелетонов — они меняли высоту и давали рывок
+        if (sorted.length) {
+            const fragment = document.createDocumentFragment();
+            sorted.forEach((msg) => {
+                fragment.appendChild(buildMessageWrapper(msg, window.userId, { skipMetaFit: true }));
+            });
+            const lastReal = getLastRealMessage(area);
+            if (lastReal) lastReal.after(fragment);
+            else area.prepend(fragment);
+        }
+        rebuildDateHeaders(area);
+        applyMessageGrouping(area);
+        if (cache.hasMore) ensureHistorySentinel(area);
+        else area.querySelector('#history-load-sentinel')?.remove();
+
+        // Meta layout синхронно меняет высоту — сначала fit, потом коррекция скролла
+        const bubbles = sorted.length
+            ? Array.from(area.querySelectorAll('.message-bubble')).slice(-sorted.length)
+            : [];
+        bubbles.forEach((b) => {
+            // синхронный проход без ожидания двойного rAF
+            const content = b.querySelector('.message-content');
+            const info = b.querySelector('.message-info');
+            if (!content || !info) return;
+            b.classList.remove('is-meta-inline', 'is-meta-below');
+            content.style.removeProperty('padding-bottom');
+            ensureMessageMetaTail(content);
+            const infoW = Math.ceil(info.getBoundingClientRect().width);
+            const infoH = Math.ceil(info.getBoundingClientRect().height);
+            if (infoW < 1) return;
+            const reserve = infoW + 6;
+            b.style.setProperty('--meta-reserve', '0px');
+            const h0 = content.offsetHeight;
+            b.style.setProperty('--meta-reserve', `${reserve}px`);
+            const h1 = content.offsetHeight;
+            if (h1 > h0 + 2) {
+                b.classList.add('is-meta-below');
+                b.style.setProperty('--meta-reserve', '0px');
+                content.style.paddingBottom = `${Math.max(infoH - 2, 10)}px`;
             }
-            rebuildDateHeaders(area);
-            applyMessageGrouping(area);
-            fitMessageMetaIn(area);
-            if (cache.hasMore) ensureHistorySentinel(area);
-            else area.querySelector('#history-load-sentinel')?.remove();
         });
+
+        const heightDelta = area.scrollHeight - prevHeight;
+        area.scrollTop = prevScroll - heightDelta;
+        if (anchor && prevTop != null && anchor.isConnected) {
+            const drift = anchor.getBoundingClientRect().top - prevTop;
+            if (Math.abs(drift) > 0.5) area.scrollTop += drift;
+        }
+
+        // После paint — добить оставшийся drift (шрифты/хвосты)
+        requestAnimationFrame(() => {
+            if (!area.isConnected) return;
+            if (anchor && prevTop != null && anchor.isConnected) {
+                const drift = anchor.getBoundingClientRect().top - prevTop;
+                if (Math.abs(drift) > 0.5) area.scrollTop += drift;
+            }
+        });
+
         scheduleStickyChatDateUpdate();
     } catch (err) {
         console.error('Ошибка подгрузки истории:', err);
-        if (String(getActiveChatId()) === String(chatId)) {
-            preserveScrollAround(area, anchor, () => removeHistorySkeletons(area));
-        }
     } finally {
         if (cache) cache.loadingMore = false;
         if (String(getActiveChatId()) === String(chatId) && cache?.hasMore) {
-            setupHistoryLoader(chatId);
+            // Небольшая пауза, чтобы sentinel не сразу снова пересекся после вставки
+            requestAnimationFrame(() => {
+                if (String(getActiveChatId()) === String(chatId) && cache?.hasMore && !cache.loadingMore) {
+                    setupHistoryLoader(chatId);
+                }
+            });
         } else if (String(getActiveChatId()) === String(chatId)) {
             teardownHistoryLoader();
             document.getElementById('history-load-sentinel')?.remove();
@@ -4137,15 +4221,17 @@ function getDoveryTheme() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-/** classic — прежний стек градиентов; pattern — чёрный фон + шаблон bg.png (по умолчанию в dark). */
+/** classic | pattern | rainbow — rainbow: чёрный + радуга через mask bg.png (dark). */
 function getDoveryWallpaper() {
     const attr = document.documentElement.getAttribute('data-wallpaper');
-    if (attr === 'classic' || attr === 'pattern') return attr;
-    return getDoveryTheme() === 'dark' ? 'pattern' : 'classic';
+    if (attr === 'classic' || attr === 'pattern' || attr === 'rainbow') return attr;
+    return getDoveryTheme() === 'dark' ? 'rainbow' : 'classic';
 }
 
 function applyDoveryWallpaper(mode) {
-    const next = mode === 'classic' ? 'classic' : 'pattern';
+    const next = mode === 'classic' || mode === 'pattern' || mode === 'rainbow'
+        ? mode
+        : (getDoveryTheme() === 'dark' ? 'rainbow' : 'classic');
     document.documentElement.setAttribute('data-wallpaper', next);
     try {
         localStorage.setItem(WALLPAPER_STORAGE_KEY, next);
@@ -4195,9 +4281,18 @@ function applyDoveryTheme(theme) {
     try {
         wallpaper = localStorage.getItem(WALLPAPER_STORAGE_KEY);
     } catch (e) {}
-    if (wallpaper !== 'classic' && wallpaper !== 'pattern') {
-        applyDoveryWallpaper(next === 'dark' ? 'pattern' : 'classic');
+    if (wallpaper !== 'classic' && wallpaper !== 'pattern' && wallpaper !== 'rainbow') {
+        applyDoveryWallpaper(next === 'dark' ? 'rainbow' : 'classic');
     }
+    // Dark + устаревший pattern после миграции — подтянуть rainbow, если mig ещё не было
+    try {
+        if (next === 'dark' && !localStorage.getItem('dovery-wp-mig-rainbow')) {
+            if (!wallpaper || wallpaper === 'pattern') {
+                applyDoveryWallpaper('rainbow');
+            }
+            localStorage.setItem('dovery-wp-mig-rainbow', '1');
+        }
+    } catch (e) {}
     syncThemeMenuItem();
 }
 
@@ -4492,18 +4587,58 @@ function findMessageMenuWrapper(target) {
 
 let messageMenuAt = 0;
 let messagePressTimer = null;
+/** Меню было открыто на pointerdown — следующий click/contextmenu только закрывает, не открывает новое */
+let suppressNextMessageMenuOpen = false;
+
+function isTagDropdownOpen() {
+    const dd = document.getElementById('tagDropdown');
+    if (!dd) return false;
+    if (typeof isDropdownVisible === 'function') return isDropdownVisible();
+    const d = dd.style.display;
+    return d === 'block' || d === 'flex' || dd.classList.contains('is-open');
+}
 
 function openMessageContextMenu(wrapper, x, y) {
     if (!wrapper || typeof showDropdown !== 'function') return;
+
+    if (suppressNextMessageMenuOpen) {
+        suppressNextMessageMenuOpen = false;
+        if (typeof hideDropdown === 'function') hideDropdown();
+        return;
+    }
+
+    if (isTagDropdownOpen()) {
+        if (typeof hideDropdown === 'function') hideDropdown();
+        return;
+    }
+
     if (Date.now() - messageMenuAt < 350) return;
     messageMenuAt = Date.now();
     showDropdown(wrapper, getMessageMenuItems(wrapper.dataset.id), 'icon', { x, y }, { vertical: false });
 }
 
 if (messagesArea) {
+    messagesArea.addEventListener('pointerdown', (e) => {
+        if (!isTagDropdownOpen()) {
+            suppressNextMessageMenuOpen = false;
+            return;
+        }
+        // Любой клик по ленте при открытом меню — только закрыть (не открыть снова на click)
+        suppressNextMessageMenuOpen = true;
+        if (typeof hideDropdown === 'function') hideDropdown();
+        // Не даём дойти до открытия по этому же жесту
+        if (findMessageMenuWrapper(e.target)) {
+            e.stopPropagation();
+        }
+    }, true);
+
     messagesArea.addEventListener('click', (e) => {
         const wrapper = findMessageMenuWrapper(e.target);
         if (!wrapper) return;
+        if (suppressNextMessageMenuOpen) {
+            suppressNextMessageMenuOpen = false;
+            return;
+        }
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed && wrapper.contains(sel.anchorNode)) return;
         openMessageContextMenu(wrapper, e.clientX, e.clientY);
@@ -4514,11 +4649,20 @@ if (messagesArea) {
         if (!wrapper) return;
         e.preventDefault();
         e.stopPropagation();
+        if (suppressNextMessageMenuOpen) {
+            suppressNextMessageMenuOpen = false;
+            return;
+        }
         openMessageContextMenu(wrapper, e.clientX, e.clientY);
     }, true);
 
     messagesArea.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
+        if (isTagDropdownOpen()) {
+            suppressNextMessageMenuOpen = true;
+            if (typeof hideDropdown === 'function') hideDropdown();
+            return;
+        }
         const wrapper = findMessageMenuWrapper(e.target);
         if (!wrapper) return;
         const touch = e.touches[0];

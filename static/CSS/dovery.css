@@ -1349,6 +1349,10 @@ body.is-resizing-chats * {
 .message-status {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  /* Всегда ширина двойной галочки — при прочтении пузырь не растёт */
+  width: 18px;
+  min-width: 18px;
   color: var(--tg-theme-icon-message-color);
   opacity: 1;
   line-height: 0;
@@ -1357,7 +1361,7 @@ body.is-resizing-chats * {
 
 .message-status svg,
 .message-status .msg-ticks {
-  width: 13px;
+  width: 18px;
   height: 11px;
   fill: none;
   stroke: currentColor;
@@ -1367,11 +1371,6 @@ body.is-resizing-chats * {
 .message-status svg path {
   fill: none;
   stroke: currentColor;
-}
-
-.message-status.is-read svg,
-.message-status.is-read .msg-ticks {
-  width: 18px;
 }
 
 :root[data-theme="dark"] .message-status {

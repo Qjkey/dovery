@@ -100,6 +100,19 @@
         --blend-mode: exclusion, normal;
 }
 
+/* Dark: чёрный фон + радужный градиент через mask (белый силуэт bg-mask.png) */
+:root[data-theme="dark"][data-wallpaper="rainbow"] {
+        --wallpaper-base: #000000;
+        --first-gradient: none;
+        --main-gradient: none;
+        --bg-image: none;
+        --blend-mode: normal;
+        --wallpaper-rainbow: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
+        /* bg.png — чёрные иконки: для luminance нужна белая маска */
+        --wallpaper-mask: url("../img/bg-mask.png");
+        --wallpaper-mask-size: 200px auto;
+}
+
 .label {
     color: var(--tg-theme-text-color);
     cursor: default;
@@ -2295,6 +2308,34 @@ body.screens-active {
                       var(--main-gradient);
     background-blend-mode: var(--blend-mode);
   }
+
+  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen {
+    background-color: #000000 !important;
+    background-image: none !important;
+    isolation: isolate;
+  }
+  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: transparent;
+    background-image: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
+    background-size: 100% 100%;
+    -webkit-mask-image: url("../img/bg-mask.png");
+    mask-image: url("../img/bg-mask.png");
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
+    -webkit-mask-size: 200px auto;
+    mask-size: 200px auto;
+    -webkit-mask-mode: luminance;
+    mask-mode: luminance;
+  }
+  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen > * {
+    position: relative;
+    z-index: 1;
+  }
 }
 @media (min-width: 751px) {
     .screen {
@@ -2414,6 +2455,18 @@ section.top {
     --otstup: 20px;
     --bg-image: url("../img/bg.png");
 }
+
+/* После общего :root — иначе --bg-image перебивает rainbow */
+:root[data-theme="dark"][data-wallpaper="rainbow"] {
+    --wallpaper-base: #000000;
+    --first-gradient: none;
+    --main-gradient: none;
+    --bg-image: none;
+    --blend-mode: normal;
+    --wallpaper-rainbow: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
+    --wallpaper-mask: url("../img/bg-mask.png");
+    --wallpaper-mask-size: 200px auto;
+}
 html { scrollbar-width: none; } 
 body { -ms-overflow-style: none; }
 body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; }
@@ -2449,6 +2502,36 @@ body {
                       var(--bg-image), 
                       var(--main-gradient);
     background-blend-mode: var(--blend-mode); 
+}
+
+/* Rainbow wallpaper layer (mask + gradient), не трогает classic/pattern */
+:root[data-theme="dark"][data-wallpaper="rainbow"] body {
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+:root[data-theme="dark"][data-wallpaper="rainbow"] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* Только радуга в форме иконок; чёрный даёт body под слоем */
+    background-color: transparent;
+    background-image: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
+    background-size: 100% 100%;
+    background-attachment: fixed;
+    -webkit-mask-image: url("../img/bg-mask.png");
+    mask-image: url("../img/bg-mask.png");
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
+    -webkit-mask-size: 200px auto;
+    mask-size: 200px auto;
+    -webkit-mask-mode: luminance;
+    mask-mode: luminance;
+}
+:root[data-theme="dark"][data-wallpaper="rainbow"] body > * {
+    position: relative;
+    z-index: 1;
 }
 * {
     box-sizing: border-box;
@@ -2799,7 +2882,34 @@ textarea::placeholder {
     overflow-x: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    -webkit-overflow-scrolling: touch; 
+    -webkit-overflow-scrolling: touch;
+    /* Fade: 0 у края экрана → полностью видимо ниже капсул header */
+    --chat-fade-top: 128px;
+    --chat-fade-bottom: 112px;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 10px,
+        #000 var(--chat-fade-top),
+        #000 calc(100% - var(--chat-fade-bottom)),
+        transparent calc(100% - 10px),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 10px,
+        #000 var(--chat-fade-top),
+        #000 calc(100% - var(--chat-fade-bottom)),
+        transparent calc(100% - 10px),
+        transparent 100%
+    );
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
 }
 @media (min-width: 751px) {
     .messages-area {

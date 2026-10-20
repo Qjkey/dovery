@@ -93,9 +93,9 @@
     pointer-events: none;
 }
 
-/* Цветовой tint поверх нижнего blur */
-.navbar-wrapper:has(.gradient-blur)::after,
-.bottom-action-wrapper:has(.gradient-blur)::after {
+/* Нижний fade под капсулой navbar */
+.navbar-wrapper::before,
+.bottom-action-wrapper::before {
     content: "";
     position: absolute;
     inset: auto 0 0 0;
@@ -104,203 +104,11 @@
     pointer-events: none;
     background: linear-gradient(
         to top,
-        color-mix(in srgb, var(--tg-theme-bg-color) 62%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 38%, transparent) 45%,
+        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
         color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
     );
 }
-html[data-opt-mode="medium"] .navbar-wrapper:has(.gradient-blur)::after,
-html[data-opt-mode="medium"] .bottom-action-wrapper:has(.gradient-blur)::after,
-html[data-opt-mode="minimal"] .navbar-wrapper:has(.gradient-blur)::after,
-html[data-opt-mode="minimal"] .bottom-action-wrapper:has(.gradient-blur)::after {
-    content: none;
-    display: none;
-}
 
-/* Градиентное размытие под капсулой (снизу вверх) */
-.navbar-wrapper .gradient-blur,
-.bottom-action-wrapper .gradient-blur {
-    position: absolute;
-    z-index: 0;
-    inset: auto 0 0 0;
-    /* +36px вверх + заход под system navigation / gesture bar */
-    height: calc(100% + 36px + env(safe-area-inset-bottom, 0px));
-    pointer-events: none;
-}
-
-.navbar-wrapper .gradient-blur > div,
-.navbar-wrapper .gradient-blur::before,
-.navbar-wrapper .gradient-blur::after,
-.bottom-action-wrapper .gradient-blur > div,
-.bottom-action-wrapper .gradient-blur::before,
-.bottom-action-wrapper .gradient-blur::after {
-    position: absolute;
-    inset: 0;
-}
-
-.navbar-wrapper .gradient-blur::before,
-.bottom-action-wrapper .gradient-blur::before {
-    content: "";
-    z-index: 1;
-    backdrop-filter: blur(0.5px);
-    -webkit-backdrop-filter: blur(0.5px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 0) 37.5%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 0) 37.5%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(1),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(1) {
-    z-index: 2;
-    backdrop-filter: blur(1px);
-    -webkit-backdrop-filter: blur(1px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 0) 50%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 0) 50%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(2),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(2) {
-    z-index: 3;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 0) 62.5%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 0) 62.5%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(3),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(3) {
-    z-index: 4;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 0) 75%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 0) 75%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(4),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(4) {
-    z-index: 5;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 0) 87.5%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 0) 87.5%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(5),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(5) {
-    z-index: 6;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 0) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 0) 100%
-    );
-}
-
-.navbar-wrapper .gradient-blur > div:nth-of-type(6),
-.bottom-action-wrapper .gradient-blur > div:nth-of-type(6) {
-    z-index: 7;
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-}
-
-.navbar-wrapper .gradient-blur::after,
-.bottom-action-wrapper .gradient-blur::after {
-    content: "";
-    z-index: 8;
-    backdrop-filter: blur(64px);
-    -webkit-backdrop-filter: blur(64px);
-    mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-}
 
 /* Капсула navbar — фиксированная ширина, компактная высота */
 .navbar-capsule {
@@ -496,7 +304,7 @@ html[data-opt-mode="minimal"] .bottom-action-wrapper:has(.gradient-blur)::after 
 
 /*
  * Экран с нижней кнопкой:
- * — контент скроллится сам (header sticky внутри → blur работает)
+ * — контент скроллится сам (header sticky внутри)
  * — кнопка снаружи скролла (как navbar у .page)
  */
 .screen.has-bottom-action {
@@ -513,7 +321,6 @@ html[data-opt-mode="minimal"] .bottom-action-wrapper:has(.gradient-blur)::after 
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: none;
     box-sizing: border-box;
-    /* запас под выступающий вверх blur кнопки */
     padding-bottom: 8px;
 }
 .screen.has-bottom-action .bottom-action-content > .header-wrapper {
@@ -523,48 +330,9 @@ html[data-opt-mode="minimal"] .bottom-action-wrapper:has(.gradient-blur)::after 
     z-index: 80;
 }
 
-/* Средний: gradient-blur → обычный градиент снизу */
-html[data-opt-mode="medium"] .navbar-wrapper .gradient-blur,
-html[data-opt-mode="medium"] .bottom-action-wrapper .gradient-blur {
-    display: none !important;
-}
-html[data-opt-mode="medium"] .navbar-wrapper::before,
-html[data-opt-mode="medium"] .bottom-action-wrapper::before {
-    content: "";
-    position: absolute;
-    inset: auto 0 0 0;
-    height: calc(100% + 28px);
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(
-        to top,
-        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-    );
-}
 
-/* Минимальный: без blur, градиент как на среднем + непрозрачная капсула */
-html[data-opt-mode="minimal"] .navbar-wrapper .gradient-blur,
-html[data-opt-mode="minimal"] .bottom-action-wrapper .gradient-blur {
-    display: none !important;
-}
-html[data-opt-mode="minimal"] .navbar-wrapper::before,
-html[data-opt-mode="minimal"] .bottom-action-wrapper::before {
-    content: "";
-    position: absolute;
-    inset: auto 0 0 0;
-    height: calc(100% + 28px);
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(
-        to top,
-        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-    );
-}
+/* Минимальный: непрозрачная капсула */
 html[data-opt-mode="minimal"] .navbar-capsule,
 html[data-opt-mode="minimal"] .navbar-capsule.header-capsule {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     background: var(--tg-theme-bg-color) !important;
 }

@@ -17,19 +17,10 @@
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 }
                 document.documentElement.setAttribute('data-theme', theme);
-                var wallpaper = localStorage.getItem('dovery-wallpaper');
-                // Одноразовая миграция: старый dark-default «pattern» → «rainbow»
-                if (!localStorage.getItem('dovery-wp-mig-rainbow')) {
-                    if (theme === 'dark' && (!wallpaper || wallpaper === 'pattern')) {
-                        wallpaper = 'rainbow';
-                        localStorage.setItem('dovery-wallpaper', 'rainbow');
-                    }
-                    localStorage.setItem('dovery-wp-mig-rainbow', '1');
-                }
-                if (wallpaper !== 'classic' && wallpaper !== 'pattern' && wallpaper !== 'rainbow') {
-                    wallpaper = theme === 'dark' ? 'rainbow' : 'classic';
-                }
-                document.documentElement.setAttribute('data-wallpaper', wallpaper);
+                try {
+                    localStorage.removeItem('dovery-wallpaper');
+                    localStorage.removeItem('dovery-wp-mig-rainbow');
+                } catch (e2) {}
             } catch (e) {}
         })();
     </script>

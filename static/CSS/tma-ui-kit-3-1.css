@@ -66,27 +66,7 @@
 
         --tg-theme-icon-message-color: var(--tg-theme-accent-text-color);
 
-        /* Default dark: чёрная база + bg.png через exclusion (soft-light на #000 паттерн не проявляет) */
-        --wallpaper-base: #000000;
-        --bg-one: #1e2d3c;
-        --bg-two: #141c24;
-        --bg-three: #0f161c;
-        --first-gradient: linear-gradient(135deg,
-            color-mix(in srgb, var(--bg-one) 50%, transparent) 0%,
-            color-mix(in srgb, var(--bg-two) 50%, transparent) 50%,
-            color-mix(in srgb, var(--bg-three) 50%, transparent) 100%
-        );
-        --main-gradient: linear-gradient(135deg,
-            color-mix(in srgb, var(--rainbow-one) 32%, transparent) 0%,
-            color-mix(in srgb, var(--rainbow-two) 32%, transparent) 50%,
-            color-mix(in srgb, var(--rainbow-three) 32%, transparent) 100%
-        );
-        --blend-mode: exclusion, normal;
-        color-scheme: dark;
-}
-
-/* Preserved previous dark wallpaper (opaque blue gradient + exclusion) — for future chat wallpaper settings */
-:root[data-theme="dark"][data-wallpaper="classic"] {
+        /* Dark wallpaper: opaque blue gradient + pattern via exclusion */
         --wallpaper-base: #0E141A;
         --bg-one: #172431;
         --bg-two: #0E141A;
@@ -98,19 +78,7 @@
             color-mix(in srgb, var(--rainbow-three) 30%, transparent) 100%
         );
         --blend-mode: exclusion, normal;
-}
-
-/* Dark: чёрный фон + радужный градиент через mask (белый силуэт bg-mask.png) */
-:root[data-theme="dark"][data-wallpaper="rainbow"] {
-        --wallpaper-base: #000000;
-        --first-gradient: none;
-        --main-gradient: none;
-        --bg-image: none;
-        --blend-mode: normal;
-        --wallpaper-rainbow: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
-        /* bg.png — чёрные иконки: для luminance нужна белая маска */
-        --wallpaper-mask: url("../img/bg-mask.png");
-        --wallpaper-mask-size: 200px auto;
+        color-scheme: dark;
 }
 
 .label {
@@ -184,9 +152,7 @@
     transition: opacity 0.2s ease;
 }
 .d-alert-box {
-    background: color-mix(in srgb, var(--tg-theme-bg-color) 80%, transparent);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
     color: var(--tg-theme-text-color);
     width: 320px;
     padding: 20px 8px 8px 20px;
@@ -277,9 +243,7 @@
     font-family: "Roboto";
     font-weight: 400;
     position: absolute;
-    background: color-mix(in srgb, var(--tg-theme-bg-color) 80%, transparent);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
     box-shadow: 0px 0px 3px 0px var(--tg-theme-section-separator-color);
     border-radius: 12px;
     min-width: 200px;
@@ -756,16 +720,9 @@ textarea::placeholder {
     flex-shrink: 0;
     width: 100%;
     z-index: 80;
-    /* edge-to-edge: контент header ниже статус-бара, blur/gradient заходят под него */
+    /* edge-to-edge: контент header ниже статус-бара, градиент заходит под него */
     padding: calc(var(--margin) + env(safe-area-inset-top, 0px)) 0 var(--margin);
     flex-shrink: 0;
-}
-.header-wrapper .gradient-blur,
-.header-wrapper.header-bg:has(.gradient-blur)::after {
-    top: 0;
-    bottom: 0;
-    /* растягиваем визуал на всю высоту wrapper, включая safe-area padding */
-    height: auto;
 }
 
 /* Страницы / экраны без header — тот же верхний inset, что у header-wrapper */
@@ -789,7 +746,7 @@ textarea::placeholder {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 var(--margin); 
+    padding: 0 var(--margin);
     box-sizing: border-box;
     width: 100%;
 }
@@ -799,200 +756,8 @@ textarea::placeholder {
 .header-wrapper.header-bg {
     background: linear-gradient(to bottom, color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%, color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%);
 }
-.header-wrapper.header-bg:has(.gradient-blur) {
-    background: none;
-    overflow: visible;
-}
-/* Цветовой tint поверх blur (под контентом header) */
-.header-wrapper.header-bg:has(.gradient-blur)::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background: linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--tg-theme-bg-color) 62%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 38%, transparent) 45%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-    );
-}
-html[data-opt-mode="medium"] .header-wrapper.header-bg:has(.gradient-blur)::after,
-html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur)::after {
-    content: none;
-    display: none;
-}
-/* stick: blur скрыт — tint тоже не нужен */
-.header-wrapper.stick.header-bg::after {
-    content: none;
-    display: none;
-}
-/* stick прилипает к блоку ниже — без градиентного размытия */
-.header-wrapper.stick .gradient-blur {
-    display: none !important;
-}
 .header-wrapper.stick.header-bg {
     background: none;
-}
-.header-wrapper .gradient-blur {
-    position: absolute;
-    z-index: 0;
-    inset: 0;
-    pointer-events: none;
-}
-.header-wrapper .gradient-blur > div,
-.header-wrapper .gradient-blur::before,
-.header-wrapper .gradient-blur::after {
-    position: absolute;
-    inset: 0;
-}
-.header-wrapper .gradient-blur::before {
-    content: "";
-    z-index: 1;
-    backdrop-filter: blur(0.5px);
-    -webkit-backdrop-filter: blur(0.5px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 0) 37.5%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 1) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 0) 37.5%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(1) {
-    z-index: 2;
-    backdrop-filter: blur(1px);
-    -webkit-backdrop-filter: blur(1px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 0) 50%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 12.5%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 0) 50%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(2) {
-    z-index: 3;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 0) 62.5%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 25%,
-        rgba(0, 0, 0, 1) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 0) 62.5%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(3) {
-    z-index: 4;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 0) 75%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 37.5%,
-        rgba(0, 0, 0, 1) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 0) 75%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(4) {
-    z-index: 5;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 0) 87.5%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 50%,
-        rgba(0, 0, 0, 1) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 0) 87.5%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(5) {
-    z-index: 6;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 0) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 62.5%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 0) 100%
-    );
-}
-.header-wrapper .gradient-blur > div:nth-of-type(6) {
-    z-index: 7;
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 75%,
-        rgba(0, 0, 0, 1) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-}
-.header-wrapper .gradient-blur::after {
-    content: "";
-    z-index: 8;
-    backdrop-filter: blur(64px);
-    -webkit-backdrop-filter: blur(64px);
-    mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
-    -webkit-mask: linear-gradient(
-        to top,
-        rgba(0, 0, 0, 0) 87.5%,
-        rgba(0, 0, 0, 1) 100%
-    );
 }
 
 .header-wrapper .header {
@@ -1012,15 +777,12 @@ html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur)::aft
 .header-center {
     position: absolute;
     left: 50%;
-    top: 38.5px;
+    top: 50%;
     transform: translate(-50%, -50%);
     z-index: 1;
     pointer-events: none;
 }
-.header-wrapper:has(.gradient-blur) .header-center {
-    top: 50%;
-}
-.header-wrapper.stick:has(.gradient-blur) .header-center {
+.header-wrapper.stick .header-center {
     top: 38.5px;
 }
 .element-header {
@@ -1035,10 +797,8 @@ html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur)::aft
     display: flex;
     border-radius: 22.5px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.13), inset 0 0px 1px rgba(255, 255, 255, 0.3);
-    background: color-mix(in srgb, var(--tg-theme-bg-color) 55%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tg-theme-bg-color) 40%, transparent);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
+    border: 1px solid color-mix(in srgb, var(--tg-theme-hint-color) 16%, var(--tg-theme-bg-color));
     transition: scale 1s linear(0, 0.038 1.6%, 0.154 3.4%, 1.026 12.6%, 1.166 15.2%, 1.234 18%, 1.221 21.6%, 1.005 31.2%, 0.944 37%, 1.013 56%, 1);
 }
 .header-center-two {
@@ -1071,10 +831,7 @@ html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur)::aft
     text-align: center;
     transition: max-width 0.25s ease;
 }
-.header-wrapper:not(:has(.gradient-blur)) .header-center-fit {
-    top: 38.5px;
-}
-.header-wrapper.stick:has(.gradient-blur) .header-center-fit {
+.header-wrapper.stick .header-center-fit {
     top: 38.5px;
 }
 .header-center-fit .header-fit-text {
@@ -1421,6 +1178,13 @@ input:focus {
 
 /* Невидимый хвост в конце текста: место под мету на последней строке;
    верхние строки занимают всю ширину (текст может быть над метой). */
+.message-bubble.sent {
+    --meta-reserve: 54px;
+}
+.message-bubble.received {
+    --meta-reserve: 36px;
+}
+
 .message-meta-tail {
     display: inline-block;
     width: var(--meta-reserve, 40px);
@@ -1874,9 +1638,7 @@ td .img_s {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #2b2b2bd8;
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background-color: var(--tg-theme-bg-color);
   border-radius: 14px;
   padding: 10px;
   pointer-events: auto;
@@ -2227,15 +1989,11 @@ td .img_s {
     width: 31%;
     box-sizing: border-box;
     cursor: pointer;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     transition: scale 1s linear(0, 0.038 1.6%, 0.154 3.4%, 1.026 12.6%, 1.166 15.2%, 1.234 18%, 1.221 21.6%, 1.005 31.2%, 0.944 37%, 1.013 56%, 1);
 }
 .button-link.profile-action-btn {
     background-color: var(--tg-theme-section-bg-color);
     color: var(--tg-theme-text-color);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 .button-link:active {
     scale: .90;
@@ -2309,33 +2067,6 @@ body.screens-active {
     background-blend-mode: var(--blend-mode);
   }
 
-  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen {
-    background-color: #000000 !important;
-    background-image: none !important;
-    isolation: isolate;
-  }
-  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background-color: transparent;
-    background-image: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
-    background-size: 100% 100%;
-    -webkit-mask-image: url("../img/bg-mask.png");
-    mask-image: url("../img/bg-mask.png");
-    -webkit-mask-repeat: repeat;
-    mask-repeat: repeat;
-    -webkit-mask-size: 200px auto;
-    mask-size: 200px auto;
-    -webkit-mask-mode: luminance;
-    mask-mode: luminance;
-  }
-  :root[data-theme="dark"][data-wallpaper="rainbow"] .messages.screen > * {
-    position: relative;
-    z-index: 1;
-  }
 }
 @media (min-width: 751px) {
     .screen {
@@ -2456,17 +2187,6 @@ section.top {
     --bg-image: url("../img/bg.png");
 }
 
-/* После общего :root — иначе --bg-image перебивает rainbow */
-:root[data-theme="dark"][data-wallpaper="rainbow"] {
-    --wallpaper-base: #000000;
-    --first-gradient: none;
-    --main-gradient: none;
-    --bg-image: none;
-    --blend-mode: normal;
-    --wallpaper-rainbow: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
-    --wallpaper-mask: url("../img/bg-mask.png");
-    --wallpaper-mask-size: 200px auto;
-}
 html { scrollbar-width: none; } 
 body { -ms-overflow-style: none; }
 body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; }
@@ -2504,35 +2224,6 @@ body {
     background-blend-mode: var(--blend-mode); 
 }
 
-/* Rainbow wallpaper layer (mask + gradient), не трогает classic/pattern */
-:root[data-theme="dark"][data-wallpaper="rainbow"] body {
-    background-color: #000000 !important;
-    background-image: none !important;
-}
-:root[data-theme="dark"][data-wallpaper="rainbow"] body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    /* Только радуга в форме иконок; чёрный даёт body под слоем */
-    background-color: transparent;
-    background-image: linear-gradient(135deg, #ff007f, #7f00ff, #00bfff, #00ff7f, #ffff00);
-    background-size: 100% 100%;
-    background-attachment: fixed;
-    -webkit-mask-image: url("../img/bg-mask.png");
-    mask-image: url("../img/bg-mask.png");
-    -webkit-mask-repeat: repeat;
-    mask-repeat: repeat;
-    -webkit-mask-size: 200px auto;
-    mask-size: 200px auto;
-    -webkit-mask-mode: luminance;
-    mask-mode: luminance;
-}
-:root[data-theme="dark"][data-wallpaper="rainbow"] body > * {
-    position: relative;
-    z-index: 1;
-}
 * {
     box-sizing: border-box;
     margin: 0;
@@ -2806,12 +2497,12 @@ textarea::placeholder {
 
 .textarea-center {
     display: flex;
-    align-items: center; 
+    align-items: center;
     justify-content: flex-start;
-    flex-grow: 1; 
+    flex-grow: 1;
     padding-left: 12px;
     box-sizing: border-box;
-    min-height: 45px; 
+    min-height: 45px;
     overflow: hidden;
 }
 
@@ -2825,10 +2516,10 @@ textarea::placeholder {
     cursor: pointer;
     padding: 12px;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    align-self: flex-end; 
+    align-self: flex-end;
     box-sizing: border-box;
     width: 44px;
-    height: 45px; 
+    height: 45px;
     flex-shrink: 0; /* Чтобы кнопка не сжималась при длинном тексте */
 }
 
@@ -2841,10 +2532,10 @@ textarea::placeholder {
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    align-self: flex-end; 
+    align-self: flex-end;
     box-sizing: border-box;
     flex-shrink: 0;
-    
+
     /* Изначальное скрытое состояние */
     width: 0;
     height: 45px;
@@ -2852,19 +2543,19 @@ textarea::placeholder {
     opacity: 0;
     overflow: hidden; /* Скрывает SVG внутри, пока ширина равна 0 */
     transform: scale(0.8);
-    
+
     /* Плавная анимация появления */
-    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-                padding 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-                opacity 0.2s ease, 
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease,
                 transform 0.2s ease;
 }
 
 #messages-textarea:not(:placeholder-shown) ~ .send-btn {
     width: 44px;
     padding: 12px;
-    opacity: 1; 
-    transform: scale(1);  
+    opacity: 1;
+    transform: scale(1);
 }
 
 
@@ -2884,8 +2575,8 @@ textarea::placeholder {
     -ms-overflow-style: none;
     -webkit-overflow-scrolling: touch;
     /* Fade: 0 у края экрана → полностью видимо ниже капсул header */
-    --chat-fade-top: 128px;
-    --chat-fade-bottom: 112px;
+    --chat-fade-top: 72px;
+    --chat-fade-bottom: 64px;
     -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0,
@@ -2955,19 +2646,17 @@ textarea::placeholder {
 }
 .chat-fab {
     pointer-events: none;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     width: 45px;
     height: 45px;
     margin: 0;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--tg-theme-bg-color) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tg-theme-hint-color) 16%, var(--tg-theme-bg-color));
     border-radius: 22.5px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.3);
-    background: color-mix(in srgb, var(--tg-theme-bg-color) 55%, transparent);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
     color: var(--tg-theme-subtitle-text-color);
     cursor: pointer;
     opacity: 0;
@@ -2977,6 +2666,7 @@ textarea::placeholder {
     -webkit-tap-highlight-color: transparent;
 }
 .chat-fab.is-visible {
+    display: flex;
     pointer-events: auto;
     opacity: 1;
     visibility: visible;
@@ -3002,10 +2692,8 @@ html[data-opt-mode="medium"] .profile-modal .header-center:has(.label) {
     box-sizing: border-box;
     border-radius: 22.5px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.3);
-    background: color-mix(in srgb, var(--tg-theme-bg-color) 55%, transparent);
-    border: 1px solid color-mix(in srgb, var(--tg-theme-bg-color) 40%, transparent);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
+    border: 1px solid color-mix(in srgb, var(--tg-theme-hint-color) 16%, var(--tg-theme-bg-color));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3029,48 +2717,20 @@ html[data-opt-mode="minimal"] [data-overlay="2"] .profile-modal .header-center:h
     box-shadow: none;
     background: transparent !important;
     border: none;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     display: block;
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
 }
 
-/* --- Средний: всё gradient-blur → обычный градиент --- */
-html[data-opt-mode="medium"] .gradient-blur {
-    display: none !important;
-}
-html[data-opt-mode="medium"] .header-wrapper.header-bg:has(.gradient-blur),
-html[data-opt-mode="medium"] .header-wrapper:has(.gradient-blur),
-html[data-opt-mode="medium"] .profile-modal .header-wrapper.header-bg:has(.gradient-blur),
-html[data-opt-mode="medium"] .profile-modal .header-wrapper:has(.gradient-blur) {
-    background: linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-    );
-}
 
-/* --- Минимальный: без анимаций, без blur / gradient-blur --- */
+/* --- Минимальный: без анимаций --- */
 html[data-opt-mode="minimal"] *,
 html[data-opt-mode="minimal"] *::before,
 html[data-opt-mode="minimal"] *::after {
     animation: none !important;
     animation-duration: 0s !important;
     transition: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-html[data-opt-mode="minimal"] .gradient-blur {
-    display: none !important;
-}
-html[data-opt-mode="minimal"] .header-wrapper.header-bg:has(.gradient-blur) {
-    background: linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
-        color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-    );
 }
 /* Закрытие меню: правило .closing !important иначе перебивает общий animation:none */
 html[data-opt-mode="minimal"] .tag-dropdown,
@@ -3101,8 +2761,6 @@ html[data-opt-mode="minimal"] .profile-modal .header-center:has(.label) {
     box-shadow: none;
     background: transparent !important;
     border: none;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     display: block;
     white-space: normal;
     overflow: visible;

@@ -147,132 +147,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row 
     return conn
 
-# Миграция схемы БД: добавляем chat_id в messages и id в chats
-def migrate_schema():
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("PRAGMA table_info(chats)")
-            chats_columns = [row[1] for row in cursor.fetchall()]
-            
-            cursor.execute("PRAGMA table_info(message)")
-            message_columns = [row[1] for row in cursor.fetchall()]
-            
-            if 'id' not in chats_columns:
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS chats_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_one_id INTEGER NOT NULL,
-                        user_two_id INTEGER NOT NULL,
-                        UNIQUE(user_one_id, user_two_id)
-                    )
-                ''')
-                cursor.execute('INSERT INTO chats_new (user_one_id, user_two_id) SELECT user_one_id, user_two_id FROM chats')
-                cursor.execute('DROP TABLE chats')
-                cursor.execute('ALTER TABLE chats_new RENAME TO chats')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_chats_users ON chats(user_one_id, user_two_id)')
-            
-            if 'chat_id' not in message_columns:
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS message_new (
-                        id TEXT PRIMARY KEY,
-                        chat_id INTEGER NOT NULL,
-                        sender_id INTEGER NOT NULL,
-                        message_text TEXT NOT NULL,
-                        time TEXT NOT NULL,
-                        FOREIGN KEY (chat_id) REFERENCES chats(id)
-                    )
-                ''')
-                cursor.execute('''
-                    INSERT INTO message_new (id, chat_id, sender_id, message_text, time)
-                    SELECT m.id, c.id, m.sender_id, m.message_text, m.time
-                    FROM message m
-                    JOIN chats c ON (CAST(m.sender_id AS INTEGER) = c.user_one_id AND CAST(m.receiver_id AS INTEGER) = c.user_two_id)
-                       OR (CAST(m.sender_id AS INTEGER) = c.user_two_id AND CAST(m.receiver_id AS INTEGER) = c.user_one_id)
-                ''')
-                cursor.execute('DROP TABLE message')
-                cursor.execute('ALTER TABLE message_new RENAME TO message')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_message_chat_id ON message(chat_id)')
-
-            cursor.execute("PRAGMA table_info(message)")
-            message_columns = [row[1] for row in cursor.fetchall()]
-            if 'is_read' not in message_columns:
-                # Старые сообщения считаем прочитанными, чтобы не вспыхнули бейджи
-                cursor.execute('ALTER TABLE message ADD COLUMN is_read INTEGER NOT NULL DEFAULT 1')
-                cursor.execute(
-                    'CREATE INDEX IF NOT EXISTS idx_message_chat_unread ON message(chat_id, is_read, sender_id)'
-                )
-
-            cursor.execute(
-                'CREATE INDEX IF NOT EXISTS idx_message_chat_time ON message(chat_id, time, id)'
-            )
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS blocks (
-                    chat_id INTEGER NOT NULL,
-                    blocked_user_id INTEGER NOT NULL,
-                    UNIQUE(chat_id, blocked_user_id)
-                )
-            ''')
-            cursor.execute(
-                'CREATE INDEX IF NOT EXISTS idx_blocks_chat_id ON blocks(chat_id)'
-            )
-            cursor.execute(
-                'CREATE INDEX IF NOT EXISTS idx_blocks_blocked_user_id ON blocks(blocked_user_id)'
-            )
-
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    token_hash TEXT NOT NULL UNIQUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    device_name TEXT,
-                    device_os TEXT
-                )
-            ''')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_token_hash ON sessions(token_hash)')
-            cursor.execute("PRAGMA table_info(sessions)")
-            session_columns = [row[1] for row in cursor.fetchall()]
-            if 'device_name' not in session_columns:
-                cursor.execute('ALTER TABLE sessions ADD COLUMN device_name TEXT')
-            if 'device_os' not in session_columns:
-                cursor.execute('ALTER TABLE sessions ADD COLUMN device_os TEXT')
-
-            cursor.execute("PRAGMA table_info(users)")
-            user_columns = [row[1] for row in cursor.fetchall()]
-            if 'key_salt' not in user_columns:
-                cursor.execute('ALTER TABLE users ADD COLUMN key_salt TEXT')
-            if 'signing_public_key' not in user_columns:
-                cursor.execute('ALTER TABLE users ADD COLUMN signing_public_key TEXT')
-            if 'signing_private_key' not in user_columns:
-                cursor.execute('ALTER TABLE users ADD COLUMN signing_private_key TEXT')
-            if 'public_key_sig' not in user_columns:
-                cursor.execute('ALTER TABLE users ADD COLUMN public_key_sig TEXT')
-            if 'is_verified' not in user_columns:
-                cursor.execute(
-                    'ALTER TABLE users ADD COLUMN is_verified INTEGER NOT NULL DEFAULT 0'
-                )
-            if 'can_verify' not in user_columns:
-                cursor.execute(
-                    'ALTER TABLE users ADD COLUMN can_verify INTEGER NOT NULL DEFAULT 0'
-                )
-
-            verifier_ids = (os.getenv('DOVERY_VERIFIER_IDS') or '').strip()
-            for raw_id in verifier_ids.split(','):
-                raw_id = raw_id.strip()
-                if raw_id.isdigit():
-                    cursor.execute(
-                        'UPDATE users SET can_verify = 1 WHERE id = ?',
-                        (int(raw_id),),
-                    )
-
-            conn.commit()
-    except Exception as e:
-        print(f"Ошибка миграции схемы БД: {e}")
-
-migrate_schema()
-
 # Генерация id
 def generate_id(length=10):
     first_digit = secrets.choice(string.digits[1:]) 
@@ -820,7 +694,6 @@ def handle_disconnect():
         if not online_users[user_id]:
             del online_users[user_id]
             send_user_status(user_id, 'был(а) недавно')
-            clear_user_typing(user_id)
 
 # Главная страница
 @app.route("/")
@@ -1530,42 +1403,8 @@ def handle_message(data):
 
 @socketio.on('typing')
 def handle_typing(data):
-    sender_id = get_current_user_id()
-    if not sender_id or not isinstance(data, dict):
-        return
-
-    chat_id = data.get('chat_id')
-    is_typing = bool(data.get('typing'))
-    if not chat_id:
-        return
-
-    peer_id = get_chat_peer(chat_id, sender_id)
-    if peer_id is None:
-        return
-    if not get_block_state(chat_id, sender_id).get('can_send', True):
-        emit(
-            'partner_typing',
-            {'chat_id': str(chat_id), 'typing': False},
-            to=f"user_{peer_id}",
-        )
-        return
-
-    if is_typing:
-        prev_chat = typing_in_chat.get(sender_id)
-        if prev_chat is not None and str(prev_chat) != str(chat_id):
-            emit_partner_typing(prev_chat, sender_id, False)
-        typing_in_chat[sender_id] = chat_id
-    else:
-        current_chat = typing_in_chat.get(sender_id)
-        if current_chat is None or str(current_chat) != str(chat_id):
-            return
-        typing_in_chat.pop(sender_id, None)
-
-    emit(
-        'partner_typing',
-        {'chat_id': str(chat_id), 'typing': is_typing},
-        to=f"user_{peer_id}",
-    )
+    # Статус «Печатает» временно отключён (будет переделан)
+    return
 
 
 @socketio.on('viewing_chat')

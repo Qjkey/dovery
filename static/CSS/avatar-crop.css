@@ -34,11 +34,9 @@
 }
 
 .avatar-crop-screen .header-capsule {
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.72);
     border-color: rgba(255, 255, 255, 0.12);
     box-shadow: none;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 
 .avatar-crop-viewport {

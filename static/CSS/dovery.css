@@ -518,12 +518,11 @@ img.avatar-pending {
   }
 }
 
-/* Chat has no gradient-blur — kit would push fit to 38.5px; keep level with back/avatar */
 #header-chat .header-center-fit {
   top: 50%;
 }
 
-/* Narrow fit subtitle: «в сети» / typing use .active, not gray */
+/* Narrow fit subtitle: «в сети» use .active, not gray */
 #header-chat .header-center-fit .header-fit-subtitle.active {
   color: var(--tg-theme-button-color);
 }
@@ -549,36 +548,11 @@ img.avatar-pending {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Keep gradient-blur nodes in HTML, but never show blur — plain gradient only */
-.page .header-wrapper .gradient-blur,
-.screen .header-wrapper .gradient-blur,
-.overlay-container .header-wrapper .gradient-blur {
-  display: none !important;
-}
-.page .header-wrapper.header-bg:has(.gradient-blur)::after,
-.screen .header-wrapper.header-bg:has(.gradient-blur)::after,
-.overlay-container .header-wrapper.header-bg:has(.gradient-blur)::after {
-  content: none !important;
-  display: none !important;
-}
-.page .header-wrapper.header-bg:has(.gradient-blur),
-.screen .header-wrapper.header-bg:has(.gradient-blur),
-.overlay-container .header-wrapper.header-bg:has(.gradient-blur) {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--tg-theme-bg-color) 100%, transparent) 0%,
-    color-mix(in srgb, var(--tg-theme-bg-color) 0%, transparent) 100%
-  );
-}
-
-/* Chat header: no gradient at all */
+/* Chat header: без градиента фона */
 #header-chat,
-#header-chat.header-bg,
-#header-chat.header-bg:has(.gradient-blur) {
+#header-chat.header-bg {
   background: none !important;
 }
-#header-chat .gradient-blur,
-#header-chat.header-wrapper.header-bg::after,
 #bottom-header-chat::before {
   display: none !important;
   content: none !important;
@@ -621,12 +595,7 @@ img.avatar-pending {
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    background: linear-gradient(135deg, 
-        color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%, 
-        color-mix(in srgb, var(--bg-two) 54%, black 10%) 100%
-    );
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
+    background: var(--tg-theme-bg-color);
     white-space: nowrap;
     border-radius: 100px;
     padding: 3px 8px;
@@ -943,54 +912,6 @@ body.is-resizing-chats * {
   }
 }
 
-#user-typing {
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-}
-
-.typing-dots {
-  display: inline-flex;
-  min-width: 1.85em;
-  letter-spacing: 0.02em;
-}
-
-.typing-dots span {
-  opacity: 0;
-  animation-duration: 1.6s;
-  animation-iteration-count: infinite;
-  animation-timing-function: step-end;
-}
-
-.typing-dots span:nth-child(1) {
-  animation-name: typing-dot-1;
-}
-.typing-dots span:nth-child(2) {
-  animation-name: typing-dot-2;
-}
-.typing-dots span:nth-child(3) {
-  animation-name: typing-dot-3;
-}
-
-@keyframes typing-dot-1 {
-  0% { opacity: 0; }
-  14% { opacity: 1; }
-  85% { opacity: 0; }
-  100% { opacity: 0; }
-}
-@keyframes typing-dot-2 {
-  0% { opacity: 0; }
-  28% { opacity: 1; }
-  71% { opacity: 0; }
-  100% { opacity: 0; }
-}
-@keyframes typing-dot-3 {
-  0% { opacity: 0; }
-  42% { opacity: 1; }
-  57% { opacity: 0; }
-  100% { opacity: 0; }
-}
-
 #title-status {
   display: inline-flex;
   align-items: baseline;
@@ -1076,12 +997,10 @@ body.is-resizing-chats * {
   pointer-events: none;
   color: white;
 
-  background: linear-gradient(135deg, 
-      color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%, 
+  background: linear-gradient(135deg,
+      color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%,
       color-mix(in srgb, var(--bg-two) 54%, black 10%) 100%
   );
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
   z-index: 10;
 }
 
@@ -1113,12 +1032,10 @@ body.is-resizing-chats * {
 .chat-date-header {
     display: inline-block;
     padding: 3px 7px;
-    background: linear-gradient(135deg, 
-        color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%, 
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--bg-one) 54%, black 10%) 0%,
         color-mix(in srgb, var(--bg-two) 54%, black 10%) 100%
     );
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
     border-radius: 50px;
     color: #ffffff;
 }
@@ -1157,6 +1074,72 @@ body.is-resizing-chats * {
 
 #messages-textarea {
     -webkit-touch-callout: none;
+}
+
+.composer-expand-textarea {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 40vh;
+    max-height: none;
+    border: none;
+    outline: none;
+    resize: none;
+    box-sizing: border-box;
+    padding: 8px var(--margin) calc(16px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    background: transparent;
+    color: var(--tg-theme-text-color);
+    caret-color: var(--tg-theme-button-color);
+    line-height: 1.45;
+    font-family: "Roboto", sans-serif;
+    font-size: 18px;
+}
+
+#composer-expand-modal {
+    min-height: 55%;
+}
+
+#composer-expand-modal.profile-modal--fullscreen .composer-expand-textarea {
+    min-height: calc(100dvh - 120px);
+}
+
+.composer-expand-fmt-bar,
+.composer-expand-edit-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 4px;
+}
+
+.composer-expand-fmt-bar .element-header,
+.composer-expand-edit-bar .element-header {
+    width: 36px;
+    height: 45px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--tg-theme-text-color);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.composer-expand-fmt-bar .element-header svg,
+.composer-expand-edit-bar .element-header svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+#composer-expand-header-select .header-left {
+    margin-right: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#composer-expand-header-select .header-right {
+    margin-left: 0;
+    flex-shrink: 0;
 }
 
 @media (max-width: 750px) {

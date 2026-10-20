@@ -399,7 +399,6 @@ function showChatHeaderSkeleton() {
         el.innerHTML = '<span class="skeleton-line skeleton-shimmer"></span>';
         el.classList.remove('hidden');
     });
-    chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
 }
 
 function fillChatHeader(user, partnerId) {
@@ -421,7 +420,6 @@ function fillChatHeader(user, partnerId) {
             el.textContent = '';
             el.classList.add('hidden');
         });
-        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
         chatHdrEach('user-header', (el) => {
             el.classList.remove('has-subtitle');
             el.classList.add('clicked');
@@ -1417,7 +1415,6 @@ socket.on("user_status_update", (data) => {
         if (idEpt && userId === activePartnerId) {
             if (isFavoritesUserId(userId) || isFavoritesChat(chatsData[userId])) {
                 chatHdrEach('user-status', (el) => el.classList.add('hidden'));
-                chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
             } else {
                 const currentStatus = document.getElementById('user-status')
                     || document.getElementById('user-status-fit');
@@ -1498,7 +1495,6 @@ function setOpenChatPresence(realStatus) {
 
     if (override) {
         chatHdrEach('user-status', (el) => el.classList.remove('hidden'));
-        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
     }
 }
 
@@ -1619,7 +1615,6 @@ function updateComposerBlockedState(chatId) {
     sendBtn.classList.toggle('is-disabled', blocked);
     if (blocked) {
         msgInput.value = '';
-        syncComposerTyping();
     }
 }
 
@@ -1632,16 +1627,11 @@ function refreshAllPresenceDisplays() {
             el.textContent = '';
             el.classList.add('hidden');
         });
-        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
     } else {
         const real = partnerId && chatsData[partnerId]
             ? getEffectiveStatus(chatsData[partnerId])
             : 'был(а) недавно';
         setOpenChatPresence(real);
-    }
-
-    if (!getConnectionStatusLabel() && typeof refreshPartnerTypingHeader === 'function') {
-        window.refreshPartnerTypingHeader();
     }
 
     document.querySelectorAll('#chats-list .item[data-user-id]').forEach((item) => {
@@ -1731,16 +1721,19 @@ function syncComposerBarLayout() {
     if (chatContentEl) {
         chatContentEl.style.setProperty('--chat-composer-height', `${totalBarHeight}px`);
     }
+    if (typeof updateExpandComposerButton === 'function') updateExpandComposerButton();
 }
 
-tx.addEventListener('input', function() {
-    this.setAttribute('rows', '1');
-    const computedStyle = window.getComputedStyle(this);
-    const computedLineHeight = parseFloat(computedStyle.lineHeight);
-    const currentRows = Math.round(this.scrollHeight / computedLineHeight);
-    this.setAttribute('rows', currentRows);
-    syncComposerBarLayout();
-});
+if (tx) {
+    tx.addEventListener('input', function() {
+        this.setAttribute('rows', '1');
+        const computedStyle = window.getComputedStyle(this);
+        const computedLineHeight = parseFloat(computedStyle.lineHeight);
+        const currentRows = Math.round(this.scrollHeight / computedLineHeight);
+        this.setAttribute('rows', currentRows);
+        syncComposerBarLayout();
+    });
+}
 
 async function assertContactPublicKeyTrusted(user) {
     if (!user?.publicKey) return false;
@@ -1839,7 +1832,6 @@ async function openDirectWindow(chatId) {
         }
 
         fillChatHeader(user, partnerId);
-        chatHdrEach('user-typing', (el) => el.classList.add('hidden'));
 
         const msgInput = document.getElementById('messages-textarea');
         try {
@@ -1857,13 +1849,6 @@ async function openDirectWindow(chatId) {
         updateComposerBlockedState(chatId);
         syncBlockMenuItem();
         loadChat(chatId);
-
-        if (typeof window.refreshPartnerTypingHeader === 'function') {
-            window.refreshPartnerTypingHeader();
-        }
-        if (typeof window.syncComposerTyping === 'function') {
-            window.syncComposerTyping();
-        }
         if (typeof window.setChatUnreadBadge === 'function') {
             window.setChatUnreadBadge(chatId, 0);
         }
@@ -2060,13 +2045,7 @@ function initChatListResizer() {
 
 document.addEventListener('DOMContentLoaded', initChatListResizer);
 
-const TYPING_HEARTBEAT_MS = 2500;
-const TYPING_EXPIRE_MS = 4500;
 const VIEWING_HEARTBEAT_MS = 2500;
-const typingPartners = new Set();
-let emittedTypingChatId = null;
-let typingHeartbeatTimer = null;
-let typingExpireTimers = {};
 let emittedViewingChatId = null;
 let viewingHeartbeatTimer = null;
 
@@ -2081,115 +2060,7 @@ function getOpenChatId() {
     return chatId || null;
 }
 
-function isChatComposerKeyboardOpen() {
-    const ta = document.getElementById('messages-textarea');
-    if (!ta) return false;
-    return document.activeElement === ta && document.visibilityState === 'visible';
-}
-
-function setHeaderTypingVisible(show) {
-    const statusEls = chatHdrAll('user-status');
-    const typingEls = chatHdrAll('user-typing');
-    if (!statusEls.length || !typingEls.length) return;
-    typingEls.forEach((el) => el.classList.toggle('hidden', !show));
-    statusEls.forEach((el) => el.classList.toggle('hidden', show));
-}
-
-function refreshPartnerTypingHeader() {
-    if (getConnectionStatusLabel()) {
-        setHeaderTypingVisible(false);
-        return;
-    }
-    const openId = getOpenChatId();
-    const partnerId = openId && window.chatIdToUserId
-        ? (window.chatIdToUserId[openId] || window.chatIdToUserId[String(openId)])
-        : null;
-    if (isFavoritesUserId(partnerId) || isFavoritesChat(chatsData[partnerId])) {
-        setHeaderTypingVisible(false);
-        chatHdrEach('user-status', (el) => el.classList.add('hidden'));
-        return;
-    }
-    setHeaderTypingVisible(!!(openId && typingPartners.has(String(openId))));
-}
-
-function emitComposerTyping(isTyping, force) {
-    const chatId = isTyping ? getOpenChatId() : (getOpenChatId() || emittedTypingChatId);
-    if (!chatId || isPendingChatId(chatId)) {
-        if (!isTyping && emittedTypingChatId && !isPendingChatId(emittedTypingChatId)) {
-            socket.emit('typing', { chat_id: emittedTypingChatId, typing: false });
-            emittedTypingChatId = null;
-        }
-        return;
-    }
-    if (isTyping) {
-        if (emittedTypingChatId && emittedTypingChatId !== chatId) {
-            socket.emit('typing', { chat_id: emittedTypingChatId, typing: false });
-        } else if (emittedTypingChatId === chatId && !force) {
-            return;
-        }
-        socket.emit('typing', { chat_id: chatId, typing: true });
-        emittedTypingChatId = chatId;
-    } else if (emittedTypingChatId) {
-        socket.emit('typing', { chat_id: emittedTypingChatId, typing: false });
-        emittedTypingChatId = null;
-    }
-}
-
-function syncComposerTyping() {
-    const openId = getOpenChatId();
-    const shouldType = !!openId && !isPendingChatId(openId) && isChatComposerKeyboardOpen();
-    if (shouldType) {
-        emitComposerTyping(true);
-        if (!typingHeartbeatTimer) {
-            typingHeartbeatTimer = setInterval(() => {
-                const id = getOpenChatId();
-                if (id && !isPendingChatId(id) && isChatComposerKeyboardOpen()) {
-                    emitComposerTyping(true, true);
-                } else {
-                    syncComposerTyping();
-                }
-            }, TYPING_HEARTBEAT_MS);
-        }
-    } else {
-        if (typingHeartbeatTimer) {
-            clearInterval(typingHeartbeatTimer);
-            typingHeartbeatTimer = null;
-        }
-        emitComposerTyping(false);
-    }
-}
-
-window.refreshPartnerTypingHeader = refreshPartnerTypingHeader;
-window.syncComposerTyping = syncComposerTyping;
-
-socket.on('partner_typing', (data) => {
-    const chatId = data?.chat_id != null ? String(data.chat_id) : '';
-    if (!chatId) return;
-
-    if (data.typing) {
-        typingPartners.add(chatId);
-        if (typingExpireTimers[chatId]) clearTimeout(typingExpireTimers[chatId]);
-        typingExpireTimers[chatId] = setTimeout(() => {
-            typingPartners.delete(chatId);
-            delete typingExpireTimers[chatId];
-            refreshPartnerTypingHeader();
-        }, TYPING_EXPIRE_MS);
-    } else {
-        typingPartners.delete(chatId);
-        if (typingExpireTimers[chatId]) {
-            clearTimeout(typingExpireTimers[chatId]);
-            delete typingExpireTimers[chatId];
-        }
-    }
-    refreshPartnerTypingHeader();
-});
-
 socket.on('disconnect', () => {
-    emittedTypingChatId = null;
-    if (typingHeartbeatTimer) {
-        clearInterval(typingHeartbeatTimer);
-        typingHeartbeatTimer = null;
-    }
     emittedViewingChatId = null;
     if (viewingHeartbeatTimer) {
         clearInterval(viewingHeartbeatTimer);
@@ -2198,24 +2069,13 @@ socket.on('disconnect', () => {
 });
 
 socket.on('connect', () => {
-    syncComposerTyping();
     syncChatViewing();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    const ta = document.getElementById('messages-textarea');
-    if (ta) {
-        ta.addEventListener('focus', syncComposerTyping);
-        ta.addEventListener('blur', () => {
-            setTimeout(syncComposerTyping, 0);
-        });
-    }
-
     const chatScreen = document.getElementById('message-chats');
     const chatContent = document.getElementById('chat-content');
     const classObs = new MutationObserver(() => {
-        syncComposerTyping();
-        refreshPartnerTypingHeader();
         syncChatViewing();
     });
     if (chatScreen) classObs.observe(chatScreen, { attributes: true, attributeFilter: ['class'] });
@@ -2223,11 +2083,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-    syncComposerTyping();
     syncChatViewing();
 });
 window.addEventListener('pagehide', () => {
-    emitComposerTyping(false);
     emitChatViewing(false);
 });
 
@@ -3061,6 +2919,195 @@ function updateScrollToBottomButton() {
     btn.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
 }
 
+function getComposerRowCount() {
+    const ta = document.getElementById('messages-textarea');
+    if (!ta) return 1;
+    const rows = parseInt(ta.getAttribute('rows') || '1', 10);
+    return Number.isFinite(rows) && rows > 0 ? rows : 1;
+}
+
+function updateExpandComposerButton() {
+    const btn = document.getElementById('expand-composer-btn');
+    if (!btn) return;
+    const overlay = document.querySelector('[data-overlay="4"]');
+    const modalOpen = !!(overlay && overlay.classList.contains('active'));
+    const shouldShow = getComposerRowCount() > 2 && !modalOpen;
+    const isShown = btn.classList.contains('is-visible');
+    if (shouldShow === isShown) return;
+    btn.classList.toggle('is-visible', shouldShow);
+    btn.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+}
+
+function syncExpandEditorToComposer() {
+    const expandTa = document.getElementById('composer-expand-textarea');
+    const ta = document.getElementById('messages-textarea');
+    if (!expandTa || !ta) return;
+    ta.value = expandTa.value;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function setComposerExpandHeaderMode(selection) {
+    const normal = document.getElementById('composer-expand-header-normal');
+    const select = document.getElementById('composer-expand-header-select');
+    if (!normal || !select) return;
+    normal.classList.toggle('hidden', !!selection);
+    select.classList.toggle('hidden', !selection);
+}
+
+function syncComposerExpandHeaderFromSelection() {
+    const expandTa = document.getElementById('composer-expand-textarea');
+    if (!expandTa) {
+        setComposerExpandHeaderMode(false);
+        return;
+    }
+    const hasSel = expandTa.selectionStart !== expandTa.selectionEnd;
+    setComposerExpandHeaderMode(hasSel);
+}
+
+function wrapExpandMarkdown(kind) {
+    const ta = document.getElementById('composer-expand-textarea');
+    const markers = MSG_MD_MARKERS[kind];
+    if (!ta || !markers) return;
+
+    let start = ta.selectionStart || 0;
+    let end = ta.selectionEnd || 0;
+    if (start === end) return;
+    if (start > end) {
+        const t = start;
+        start = end;
+        end = t;
+    }
+
+    const [open, close] = markers;
+    const value = ta.value;
+    const selected = value.slice(start, end);
+    let newValue;
+    let newStart;
+    let newEnd;
+
+    const before = value.slice(Math.max(0, start - open.length), start);
+    const after = value.slice(end, end + close.length);
+
+    if (before === open && after === close) {
+        newValue = value.slice(0, start - open.length) + selected + value.slice(end + close.length);
+        newStart = start - open.length;
+        newEnd = newStart + selected.length;
+    } else if (
+        selected.startsWith(open)
+        && selected.endsWith(close)
+        && selected.length > open.length + close.length
+    ) {
+        const inner = selected.slice(open.length, selected.length - close.length);
+        newValue = value.slice(0, start) + inner + value.slice(end);
+        newStart = start;
+        newEnd = start + inner.length;
+    } else {
+        newValue = value.slice(0, start) + open + selected + close + value.slice(end);
+        newStart = start + open.length;
+        newEnd = newStart + selected.length;
+    }
+
+    ta.value = newValue;
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(newStart, newEnd);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    syncComposerExpandHeaderFromSelection();
+}
+
+async function expandCopySelection() {
+    const ta = document.getElementById('composer-expand-textarea');
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    if (start === end) return;
+    const text = ta.value.slice(Math.min(start, end), Math.max(start, end));
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            document.execCommand('copy');
+        }
+    } catch (_) { /* ignore */ }
+    ta.focus({ preventScroll: true });
+    try {
+        ta.setSelectionRange(start, end);
+    } catch (_) { /* ignore */ }
+    syncComposerExpandHeaderFromSelection();
+}
+
+async function expandPasteAtSelection() {
+    const ta = document.getElementById('composer-expand-textarea');
+    if (!ta) return;
+    let start = ta.selectionStart || 0;
+    let end = ta.selectionEnd || 0;
+    if (start > end) {
+        const t = start;
+        start = end;
+        end = t;
+    }
+    let text = '';
+    try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+        }
+    } catch (_) {
+        text = '';
+    }
+    if (!text) {
+        ta.focus({ preventScroll: true });
+        try {
+            document.execCommand('paste');
+        } catch (_) { /* ignore */ }
+        syncComposerExpandHeaderFromSelection();
+        return;
+    }
+    ta.setRangeText(text, start, end, 'end');
+    ta.focus({ preventScroll: true });
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    syncComposerExpandHeaderFromSelection();
+}
+
+function openComposerExpandEditor() {
+    const ta = document.getElementById('messages-textarea');
+    const expandTa = document.getElementById('composer-expand-textarea');
+    if (!ta || !expandTa || typeof window.openOverlay !== 'function') return;
+    expandTa.value = ta.value;
+    setComposerExpandHeaderMode(false);
+    window.openOverlay('4');
+    updateExpandComposerButton();
+    requestAnimationFrame(() => {
+        expandTa.focus({ preventScroll: true });
+        try {
+            const len = expandTa.value.length;
+            expandTa.setSelectionRange(len, len);
+        } catch (_) { /* ignore */ }
+        syncComposerExpandHeaderFromSelection();
+    });
+}
+
+function closeComposerExpandEditor(syncBack) {
+    if (syncBack) syncExpandEditorToComposer();
+    setComposerExpandHeaderMode(false);
+    if (typeof window.closeOverlay === 'function') window.closeOverlay('4');
+    updateExpandComposerButton();
+    const ta = document.getElementById('messages-textarea');
+    if (ta) {
+        requestAnimationFrame(() => ta.focus({ preventScroll: true }));
+    }
+}
+
+async function sendFromComposerExpand() {
+    syncExpandEditorToComposer();
+    if (typeof sendMessage === 'function') {
+        await sendMessage();
+    }
+    const expandTa = document.getElementById('composer-expand-textarea');
+    if (expandTa) expandTa.value = '';
+    setComposerExpandHeaderMode(false);
+    if (typeof window.closeOverlay === 'function') window.closeOverlay('4');
+    updateExpandComposerButton();
+}
+
 function initScrollToBottomButton() {
     const btn = document.getElementById('scroll-to-bottom-btn');
     if (!btn || btn.dataset.bound === '1') {
@@ -3076,8 +3123,125 @@ function initScrollToBottomButton() {
     updateScrollToBottomButton();
 }
 
-document.addEventListener('DOMContentLoaded', initScrollToBottomButton);
-if (document.readyState !== 'loading') initScrollToBottomButton();
+function initExpandComposerButton() {
+    const btn = document.getElementById('expand-composer-btn');
+    const sendBtn = document.getElementById('composer-expand-send');
+    const closeBtn = document.getElementById('composer-expand-close');
+    const expandTa = document.getElementById('composer-expand-textarea');
+    const selectHeader = document.getElementById('composer-expand-header-select');
+    const overlay = document.querySelector('[data-overlay="4"]');
+
+    if (btn && btn.dataset.bound !== '1') {
+        btn.dataset.bound = '1';
+        btn.addEventListener('pointerdown', (e) => e.preventDefault());
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openComposerExpandEditor();
+        });
+    }
+    if (sendBtn && sendBtn.dataset.bound !== '1') {
+        sendBtn.dataset.bound = '1';
+        sendBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+        sendBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendFromComposerExpand();
+        });
+    }
+    if (closeBtn && closeBtn.dataset.bound !== '1') {
+        closeBtn.dataset.bound = '1';
+        closeBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+        closeBtn.addEventListener('click', () => {
+            syncExpandEditorToComposer();
+            setComposerExpandHeaderMode(false);
+            setTimeout(updateExpandComposerButton, 300);
+        });
+    }
+
+    if (expandTa && expandTa.dataset.expandHeaderBound !== '1') {
+        expandTa.dataset.expandHeaderBound = '1';
+        const syncSel = () => syncComposerExpandHeaderFromSelection();
+        expandTa.addEventListener('select', syncSel);
+        expandTa.addEventListener('keyup', syncSel);
+        expandTa.addEventListener('mouseup', syncSel);
+        expandTa.addEventListener('touchend', syncSel);
+        expandTa.addEventListener('input', syncSel);
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement === expandTa) syncSel();
+        });
+        expandTa.addEventListener('blur', () => {
+            // Не сбрасываем сразу — клик по кнопкам fmt/copy приходит после blur
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (active && selectHeader && selectHeader.contains(active)) return;
+                if (active === expandTa) return;
+                syncComposerExpandHeaderFromSelection();
+            }, 0);
+        });
+    }
+
+    if (selectHeader && selectHeader.dataset.expandActionsBound !== '1') {
+        selectHeader.dataset.expandActionsBound = '1';
+        selectHeader.addEventListener('pointerdown', (e) => {
+            // Не снимаем выделение в textarea
+            if (e.target.closest('.element-header')) e.preventDefault();
+        });
+        selectHeader.querySelectorAll('[data-expand-fmt]').forEach((el) => {
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapExpandMarkdown(el.getAttribute('data-expand-fmt'));
+            });
+        });
+        const copyBtn = document.getElementById('composer-expand-copy');
+        const pasteBtn = document.getElementById('composer-expand-paste');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                expandCopySelection();
+            });
+        }
+        if (pasteBtn) {
+            pasteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                expandPasteAtSelection();
+            });
+        }
+    }
+
+    if (overlay && overlay.dataset.composerExpandBound !== '1') {
+        overlay.dataset.composerExpandBound = '1';
+        const origClose = window.closeOverlay;
+        if (typeof origClose === 'function' && !window.__composerExpandCloseWrapped) {
+            window.__composerExpandCloseWrapped = true;
+            window.closeOverlay = function (overlayId) {
+                if (String(overlayId) === '4') {
+                    const active = document.querySelector('[data-overlay="4"].active');
+                    if (active) syncExpandEditorToComposer();
+                    setComposerExpandHeaderMode(false);
+                }
+                const result = origClose.apply(this, arguments);
+                if (String(overlayId) === '4') {
+                    setTimeout(updateExpandComposerButton, 280);
+                }
+                return result;
+            };
+        }
+    }
+
+    updateExpandComposerButton();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initScrollToBottomButton();
+    initExpandComposerButton();
+});
+if (document.readyState !== 'loading') {
+    initScrollToBottomButton();
+    initExpandComposerButton();
+}
 
 function isWideChatLayout() {
     // Планшет/ноут: список чатов виден рядом с перепиской
@@ -3174,39 +3338,35 @@ function fitMessageMetaLayout(bubbleOrRoot) {
     const bubble = bubbleOrRoot?.classList?.contains('message-bubble')
         ? bubbleOrRoot
         : bubbleOrRoot?.querySelector?.('.message-bubble');
-    if (!bubble) return;
+    if (!bubble || !bubble.isConnected) return;
     const content = bubble.querySelector('.message-content');
     const info = bubble.querySelector('.message-info');
     if (!content || !info) return;
 
-    const run = () => {
-        if (!bubble.isConnected) return;
-        bubble.classList.remove('is-meta-inline', 'is-meta-below');
-        ensureMessageMetaTail(content);
+    bubble.classList.remove('is-meta-inline', 'is-meta-below');
+    content.style.removeProperty('padding-bottom');
+    ensureMessageMetaTail(content);
 
-        const infoW = Math.ceil(info.getBoundingClientRect().width);
-        const infoH = Math.ceil(info.getBoundingClientRect().height);
-        if (infoW < 1) return;
+    const infoW = Math.ceil(info.getBoundingClientRect().width);
+    const infoH = Math.ceil(info.getBoundingClientRect().height);
+    if (infoW < 1) return;
 
-        const reserve = infoW + 6;
+    const reserve = infoW + 6;
 
-        // Без резерва — базовая высота текста
+    // Без резерва — базовая высота текста
+    bubble.style.setProperty('--meta-reserve', '0px');
+    const h0 = content.offsetHeight;
+
+    // С резервом: если высота выросла — хвост уехал на новую строку (мета под текстом)
+    bubble.style.setProperty('--meta-reserve', `${reserve}px`);
+    const h1 = content.offsetHeight;
+
+    if (h1 > h0 + 2) {
+        // Не оставляем пустую строку line-height — низкий pad под мету
+        bubble.classList.add('is-meta-below');
         bubble.style.setProperty('--meta-reserve', '0px');
-        const h0 = content.offsetHeight;
-
-        // С резервом: если высота выросла — хвост уехал на новую строку (мета под текстом)
-        bubble.style.setProperty('--meta-reserve', `${reserve}px`);
-        const h1 = content.offsetHeight;
-
-        if (h1 > h0 + 2) {
-            // Не оставляем пустую строку line-height — низкий pad под мету
-            bubble.classList.add('is-meta-below');
-            bubble.style.setProperty('--meta-reserve', '0px');
-            content.style.paddingBottom = `${Math.max(infoH - 2, 10)}px`;
-        }
-    };
-
-    requestAnimationFrame(() => requestAnimationFrame(run));
+        content.style.paddingBottom = `${Math.max(infoH - 2, 10)}px`;
+    }
 }
 
 function fitMessageMetaIn(root) {
@@ -3318,8 +3478,7 @@ async function sendMessage() {
     `;
 
     setMessageContent(wrapper.querySelector('.message-content'), text);
-    fitMessageMetaLayout(wrapper);
-
+    ensureMessageMetaTail(wrapper.querySelector('.message-content'));
     insertNewMessageWithDateCheck(messagesArea, wrapper, time);
 
     if (chatHash[chatId]) {
@@ -3442,7 +3601,7 @@ socket.on('new_message', async (data) => {
             }
 
             setMessageContent(wrapper.querySelector('.message-content'), decryptedText);
-            fitMessageMetaLayout(wrapper);
+            ensureMessageMetaTail(wrapper.querySelector('.message-content'));
             insertNewMessageWithDateCheck(messagesArea, wrapper, data.time);
 
             // Входящие: вниз только если уже были у низа ленты
@@ -3612,7 +3771,7 @@ function rebuildDateHeaders(area) {
     });
 }
 
-function buildMessageWrapper(msg, currentUserId, opts = {}) {
+function buildMessageWrapper(msg, currentUserId) {
     const mne = msg.sender_id != currentUserId;
     const typeClass = mne ? 'received' : 'sent';
     const wrapper = document.createElement('div');
@@ -3629,8 +3788,8 @@ function buildMessageWrapper(msg, currentUserId, opts = {}) {
         </div>
     `;
     setMessageContent(wrapper.querySelector('.message-content'), msg.decryptedText);
-    // skipMetaFit — при подгрузке истории fit делаем синхронно до коррекции scroll
-    if (!opts.skipMetaFit) fitMessageMetaLayout(wrapper);
+    // Meta-tail сразу в DOM (дефолтный --meta-reserve в CSS). Fit — после вставки в документ.
+    ensureMessageMetaTail(wrapper.querySelector('.message-content'));
     return wrapper;
 }
 
@@ -3687,7 +3846,7 @@ async function loadOlderMessages(chatId) {
         if (sorted.length) {
             const fragment = document.createDocumentFragment();
             sorted.forEach((msg) => {
-                fragment.appendChild(buildMessageWrapper(msg, window.userId, { skipMetaFit: true }));
+                fragment.appendChild(buildMessageWrapper(msg, window.userId));
             });
             const lastReal = getLastRealMessage(area);
             if (lastReal) lastReal.after(fragment);
@@ -3699,31 +3858,10 @@ async function loadOlderMessages(chatId) {
         else area.querySelector('#history-load-sentinel')?.remove();
 
         // Meta layout синхронно меняет высоту — сначала fit, потом коррекция скролла
-        const bubbles = sorted.length
-            ? Array.from(area.querySelectorAll('.message-bubble')).slice(-sorted.length)
-            : [];
-        bubbles.forEach((b) => {
-            // синхронный проход без ожидания двойного rAF
-            const content = b.querySelector('.message-content');
-            const info = b.querySelector('.message-info');
-            if (!content || !info) return;
-            b.classList.remove('is-meta-inline', 'is-meta-below');
-            content.style.removeProperty('padding-bottom');
-            ensureMessageMetaTail(content);
-            const infoW = Math.ceil(info.getBoundingClientRect().width);
-            const infoH = Math.ceil(info.getBoundingClientRect().height);
-            if (infoW < 1) return;
-            const reserve = infoW + 6;
-            b.style.setProperty('--meta-reserve', '0px');
-            const h0 = content.offsetHeight;
-            b.style.setProperty('--meta-reserve', `${reserve}px`);
-            const h1 = content.offsetHeight;
-            if (h1 > h0 + 2) {
-                b.classList.add('is-meta-below');
-                b.style.setProperty('--meta-reserve', '0px');
-                content.style.paddingBottom = `${Math.max(infoH - 2, 10)}px`;
-            }
-        });
+        if (sorted.length) {
+            const bubbles = Array.from(area.querySelectorAll('.message-bubble')).slice(-sorted.length);
+            bubbles.forEach((b) => fitMessageMetaLayout(b));
+        }
 
         const heightDelta = area.scrollHeight - prevHeight;
         area.scrollTop = prevScroll - heightDelta;
@@ -4213,29 +4351,11 @@ function renderPartnerAvatar(partnerId, chatId) {
 }
 
 const THEME_STORAGE_KEY = 'dovery-theme';
-const WALLPAPER_STORAGE_KEY = 'dovery-wallpaper';
 
 function getDoveryTheme() {
     const attr = document.documentElement.getAttribute('data-theme');
     if (attr === 'dark' || attr === 'light') return attr;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-/** classic | pattern | rainbow — rainbow: чёрный + радуга через mask bg.png (dark). */
-function getDoveryWallpaper() {
-    const attr = document.documentElement.getAttribute('data-wallpaper');
-    if (attr === 'classic' || attr === 'pattern' || attr === 'rainbow') return attr;
-    return getDoveryTheme() === 'dark' ? 'rainbow' : 'classic';
-}
-
-function applyDoveryWallpaper(mode) {
-    const next = mode === 'classic' || mode === 'pattern' || mode === 'rainbow'
-        ? mode
-        : (getDoveryTheme() === 'dark' ? 'rainbow' : 'classic');
-    document.documentElement.setAttribute('data-wallpaper', next);
-    try {
-        localStorage.setItem(WALLPAPER_STORAGE_KEY, next);
-    } catch (e) {}
 }
 
 function getThemeMenuItem() {
@@ -4275,23 +4395,8 @@ function applyDoveryTheme(theme) {
     document.documentElement.setAttribute('data-theme', next);
     try {
         localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch (e) {}
-    // При смене темы подставляем дефолтные обои, если пользователь ещё не выбирал явно
-    let wallpaper = null;
-    try {
-        wallpaper = localStorage.getItem(WALLPAPER_STORAGE_KEY);
-    } catch (e) {}
-    if (wallpaper !== 'classic' && wallpaper !== 'pattern' && wallpaper !== 'rainbow') {
-        applyDoveryWallpaper(next === 'dark' ? 'rainbow' : 'classic');
-    }
-    // Dark + устаревший pattern после миграции — подтянуть rainbow, если mig ещё не было
-    try {
-        if (next === 'dark' && !localStorage.getItem('dovery-wp-mig-rainbow')) {
-            if (!wallpaper || wallpaper === 'pattern') {
-                applyDoveryWallpaper('rainbow');
-            }
-            localStorage.setItem('dovery-wp-mig-rainbow', '1');
-        }
+        localStorage.removeItem('dovery-wallpaper');
+        localStorage.removeItem('dovery-wp-mig-rainbow');
     } catch (e) {}
     syncThemeMenuItem();
 }
@@ -4304,8 +4409,6 @@ window.getDoveryTheme = getDoveryTheme;
 window.toggleDoveryTheme = toggleDoveryTheme;
 window.syncThemeMenuItem = syncThemeMenuItem;
 window.applyDoveryTheme = applyDoveryTheme;
-window.getDoveryWallpaper = getDoveryWallpaper;
-window.applyDoveryWallpaper = applyDoveryWallpaper;
 
 const E2EE_EMOJI_POOL = [
     '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈',
@@ -4513,11 +4616,12 @@ function wrapComposerMarkdown(kind) {
 window.copy_text = copy_text;
 window.paste_text = paste_text;
 window.wrapComposerMarkdown = wrapComposerMarkdown;
+window.restoreComposerSelection = restoreComposerSelection;
 
 let composerMenuAt = 0;
 let composerPressTimer = null;
 
-function openComposerContextMenu(x, y) {
+async function openComposerContextMenu(x, y) {
     if (!inputField || typeof showDropdown !== 'function') return;
     if (Date.now() - composerMenuAt < 350) return;
     composerMenuAt = Date.now();
@@ -4529,7 +4633,9 @@ function openComposerContextMenu(x, y) {
         : (window.list_items_icon_04 || []);
     if (!items.length) return;
 
-    showDropdown(inputField, items, 'icon', { x, y }, { vertical: true });
+    await showDropdown(inputField, items, 'icon', { x, y }, { vertical: true });
+    // Держим клавиатуру: меню не должно забирать focus у textarea
+    restoreComposerSelection();
 }
 
 if (inputField) {
@@ -4561,6 +4667,26 @@ if (inputField) {
     inputField.addEventListener('touchcancel', cancelComposerPress);
     inputField.addEventListener('touchmove', cancelComposerPress);
 }
+
+/** Клики по dropdown не снимают focus с composer — иначе падает клавиатура. */
+(function keepComposerKeyboardWithDropdown() {
+    const dd = document.getElementById('tagDropdown');
+    if (!dd || dd.dataset.keepComposerFocus === '1') return;
+    dd.dataset.keepComposerFocus = '1';
+    dd.addEventListener('pointerdown', (e) => {
+        const ta = document.getElementById('messages-textarea');
+        if (!ta) return;
+        const fromComposer = document.activeElement === ta
+            || (typeof currentOpenButton !== 'undefined' && currentOpenButton === ta);
+        if (fromComposer) {
+            e.preventDefault();
+            // После transform (⋮ → форматирование) вернуть каретку
+            requestAnimationFrame(() => {
+                if (typeof restoreComposerSelection === 'function') restoreComposerSelection();
+            });
+        }
+    }, true);
+})();
 
 function escapeMenuArg(value) {
     return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");

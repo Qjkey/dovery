@@ -602,9 +602,17 @@ function bindDropdownHandlers(items, type, buttonElement, moreItems) {
           e.preventDefault();
           e.stopPropagation();
           // Обычное меню; «Назад» должен быть в list_items (isBack: true)
-          transformDropdown(moreItems, 'icon', {
+          const fromComposer = currentOpenButton && currentOpenButton.id === 'messages-textarea';
+          Promise.resolve(transformDropdown(moreItems, 'icon', {
               vertical: false,
               pinCorner: 'bottom-right'
+          })).then(() => {
+              if (!fromComposer) return;
+              if (typeof window.restoreComposerSelection === 'function') {
+                  window.restoreComposerSelection();
+              } else {
+                  document.getElementById('messages-textarea')?.focus({ preventScroll: true });
+              }
           });
       });
   }
@@ -1135,7 +1143,13 @@ document.addEventListener('DOMContentLoaded', () => {
           resetModalExpandStyles(profileModal);
           profileModal.style.transition = 'none';
           measureModalAtRest(profileModal);
-          applyModalExpand(profileModal, 0, false);
+          const startFull = profileModal.hasAttribute('data-start-fullscreen')
+              && (profileModal._maxExpand || 0) > 0;
+          applyModalExpand(
+              profileModal,
+              startFull ? profileModal._maxExpand : 0,
+              false
+          );
           profileModal.classList.remove('profile-modal--dragging');
           profileModal.style.transform = 'translateY(110%)';
 
